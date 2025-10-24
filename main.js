@@ -669,14 +669,16 @@ function renderCampaignView(data) {
       if (isEnded) {
         adsetStatusClass = "complete";
         adsetStatusText = `<span class="status-label">COMPLETE</span>`;
-      } else if (dailyBudget > 0) {
+      } else if (hasActiveAd && dailyBudget > 0) {
+        // ✅ chỉ hiện Daily Budget nếu có ad ACTIVE
         adsetStatusClass = "active dbudget";
         adsetStatusText = `
           <span class="status-label">Daily Budget</span>
           <span class="status-value">${dailyBudget.toLocaleString(
             "vi-VN"
           )}đ</span>`;
-      } else if (lifetimeBudget > 0) {
+      } else if (hasActiveAd && lifetimeBudget > 0) {
+        // ✅ chỉ hiện Lifetime Budget nếu có ad ACTIVE
         adsetStatusClass = "active budget";
         const d = as.end_time ? new Date(as.end_time) : null;
         const endDate = d
@@ -693,8 +695,10 @@ function renderCampaignView(data) {
       } else if (hasActiveAd) {
         adsetStatusClass = "active";
         adsetStatusText = `<span>ACTIVE</span>`;
+      } else {
+        adsetStatusClass = "inactive";
+        adsetStatusText = `<span>INACTIVE</span>`;
       }
-
       const adsetCpr =
         as.result > 0
           ? as.optimization_goal === "REACH"
