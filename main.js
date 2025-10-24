@@ -1,9 +1,10 @@
 let startDate, endDate;
-const BATCH_SIZE = 40; // Giới hạn của Meta là 50
 let VIEW_GOAL; // Dùng cho chart breakdown
+const CACHE = new Map();
+const BATCH_SIZE = 40; // max 50 theo FB
+const CONCURRENCY_LIMIT = 5; // max batch song song
 const API_VERSION = "v24.0";
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
-
 const goalMapping = {
   "Lead Form": ["LEAD_GENERATION", "QUALITY_LEAD"],
   Awareness: ["REACH", "AD_RECALL_LIFT", "IMPRESSIONS"],
@@ -75,6 +76,26 @@ function getAction(actions, type) {
  * - Xử lý 'item' từ breakdown (có actions là object)
  * - Ưu tiên goal từ VIEW_GOAL nếu có
  */
+async function runBatchesWithLimit(tasks, limit = CONCURRENCY_LIMIT) {
+  const results = [];
+  let i = 0;
+
+  async function worker() {
+    while (i < tasks.length) {
+      const idx = i++;
+      try {
+        results[idx] = await tasks[idx]();
+      } catch (err) {
+        console.warn(`⚠️ Batch ${idx} failed:`, err.message);
+        results[idx] = null;
+      }
+    }
+  }
+
+  const pool = Array.from({ length: limit }, worker);
+  await Promise.all(pool);
+  return results;
+}
 function getResults(item, goal) {
   if (!item) return 0; // 1. Tìm data insights (cho ad/adset) hoặc item (cho breakdown)
 
@@ -122,38 +143,33 @@ function getResults(item, goal) {
 }
 // ===================== UTILS =====================
 async function fetchJSON(url, options = {}) {
+  const key = url + JSON.stringify(options);
+  if (CACHE.has(key)) return CACHE.get(key);
+
   try {
     const res = await fetch(url, options);
+    const text = await res.text();
+
     if (!res.ok) {
+      let msg = `HTTP ${res.status} - ${res.statusText}`;
       try {
-        const errData = await res.json();
-        if (errData.error) {
-          throw new Error(
-            `Meta API Error: ${errData.error.message} (Code: ${errData.error.code})`
-          );
-        }
-      } catch (e) {}
-      throw new Error(`HTTP ${res.status} - ${res.statusText}`);
+        const errData = JSON.parse(text);
+        if (errData.error)
+          msg = `Meta API Error: ${errData.error.message} (Code: ${errData.error.code})`;
+      } catch {}
+      throw new Error(msg);
     }
-    const data = await res.json();
-    // Xử lý lỗi riêng lẻ trong batch
-    if (options.method === "POST" && Array.isArray(data)) {
-      data.forEach((item, index) => {
-        if (item && item.code !== 200) {
-          console.warn(
-            `Batch item ${index} failed (Code: ${item.code}):`,
-            item.body
-          );
-        }
-      });
-    } else if (data.error) {
+
+    const data = JSON.parse(text);
+    if (data.error)
       throw new Error(
         `Meta API Error: ${data.error.message} (Code: ${data.error.code})`
       );
-    }
+
+    CACHE.set(key, data);
     return data;
   } catch (err) {
-    console.error(`Fetch failed for ${url}:`, err);
+    console.error(`❌ Fetch failed: ${url}`, err);
     throw err;
   }
 }
@@ -166,22 +182,21 @@ function chunkArray(arr, size) {
 }
 
 async function fetchAdsets() {
-  const apiUrl = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=adset&fields=adset_id,adset_name,campaign_id,campaign_name,spend,optimization_goal&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${META_TOKEN}`;
+  const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=adset&fields=adset_id,adset_name,campaign_id,campaign_name,spend,optimization_goal&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${META_TOKEN}`;
 
-  const data = await fetchJSON(apiUrl);
-  console.log(data.data);
-
+  const data = await fetchJSON(url);
+  console.log("✅ Adset fetched:", data.data?.length || 0);
   return data.data || [];
 }
 
 async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
   if (!Array.isArray(adsetIds) || !adsetIds.length) return [];
 
-  const batches = chunkArray(adsetIds, BATCH_SIZE);
+  const adsetChunks = chunkArray(adsetIds, BATCH_SIZE);
 
-  const allAdsLists = await Promise.all(
-    batches.map(async (batch) => {
-      // --- 1️⃣ Fetch ads song song ---
+  const allAdsLists = await runBatchesWithLimit(
+    adsetChunks.map((batch) => async () => {
+      // 1️⃣ Lấy danh sách ads
       const fbBatch1 = batch.map((adsetId) => ({
         method: "GET",
         relative_url: `${adsetId}/ads?fields=id,name,effective_status,adset_id,adset{end_time,daily_budget,lifetime_budget},creative{effective_object_story_id,thumbnail_url,instagram_permalink_url}`,
@@ -207,7 +222,6 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
             : null;
           const isEnded = endTime && endTime < now;
 
-          // 🔹 Nếu adset hết hạn thì tự chuyển thành COMPLETED
           let effectiveStatus = ad.effective_status;
           if (isEnded) effectiveStatus = "COMPLETED";
 
@@ -220,16 +234,12 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
               status: ad.adset?.status || null,
               daily_budget: ad.adset?.daily_budget || null,
               lifetime_budget: ad.adset?.lifetime_budget || null,
-              start_time: ad.adset?.start_time || null,
               end_time: ad.adset?.end_time || null,
             },
             creative: {
-              body: ad.creative?.body || null,
-              title: ad.creative?.title || null,
               thumbnail_url: ad.creative?.thumbnail_url || null,
               instagram_permalink_url:
                 ad.creative?.instagram_permalink_url || null,
-              object_story_id: ad.creative?.effective_object_story_id || null,
               facebook_post_url: ad.creative?.effective_object_story_id
                 ? `https://facebook.com/${ad.creative.effective_object_story_id}`
                 : null,
@@ -240,18 +250,15 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
 
       if (!adsList.length) return [];
 
-      // --- 2️⃣ Fetch insights song song ---
-      const adIdChunks = chunkArray(
+      // 2️⃣ Lấy insights cho từng ad
+      const adChunks = chunkArray(
         adsList.map((a) => a.id),
         BATCH_SIZE
       );
-
-      const insightPromises = adIdChunks.map((chunk) => {
+      const insightTasks = adChunks.map((chunk) => async () => {
         const fbBatch2 = chunk.map((adId) => ({
           method: "GET",
-          relative_url: `${adId}/insights?fields=spend,impressions,reach,actions,optimization_goal&time_range[since]=${encodeURIComponent(
-            startDate
-          )}&time_range[until]=${encodeURIComponent(endDate)}`,
+          relative_url: `${adId}/insights?fields=spend,impressions,reach,actions,optimization_goal&time_range[since]=${startDate}&time_range[until]=${endDate}`,
         }));
 
         return fetchJSON(BASE_URL, {
@@ -261,123 +268,70 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
         });
       });
 
-      const insightResponses = await Promise.allSettled(insightPromises);
-
-      // --- 3️⃣ Map insights ---
+      const insightResponses = await runBatchesWithLimit(insightTasks, 5);
       const insightsMap = new Map();
-      insightResponses.forEach((settled, batchIndex) => {
-        if (settled.status !== "fulfilled") return;
-        const resp2 = settled.value;
-        const chunk = adIdChunks[batchIndex];
-        for (let i = 0; i < resp2.length; i++) {
-          const r = resp2[i];
+
+      insightResponses.forEach((resp, batchIdx) => {
+        if (!resp) return;
+        const chunk = adChunks[batchIdx];
+        for (let i = 0; i < resp.length; i++) {
+          const r = resp[i];
           const adId = chunk[i];
-          if (r?.code === 200 && r?.body) {
-            try {
+          try {
+            if (r?.code === 200 && r?.body) {
               const body = JSON.parse(r.body);
-              insightsMap.set(adId, body?.data?.[0] || null);
-            } catch {
-              insightsMap.set(adId, null);
-            }
-          } else {
+              insightsMap.set(adId, body.data?.[0] || null);
+            } else insightsMap.set(adId, null);
+          } catch {
             insightsMap.set(adId, null);
           }
         }
       });
 
-      // --- 4️⃣ Merge insights ---
-      const processedAdsBatch = adsList.map((ad) => {
-        const insight = insightsMap.get(ad.id) || {
+      // 3️⃣ Gộp data lại
+      const processedBatch = adsList.map((ad) => ({
+        ad_id: ad.id,
+        ad_name: ad.name,
+        adset_id: ad.adset_id,
+        effective_status: ad.effective_status,
+        adset: ad.adset,
+        creative: ad.creative,
+        insights: insightsMap.get(ad.id) || {
           spend: 0,
           impressions: 0,
           reach: 0,
           actions: [],
-        };
-        const optimizationGoal = insight?.optimization_goal || "UNKNOWN";
+        },
+      }));
 
-        return {
-          ad_id: ad.id,
-          ad_name: ad.name,
-          adset_id: ad.adset_id,
-          effective_status: ad.effective_status,
-          optimization_goal: optimizationGoal, // 🧠 thêm dòng này
-          adset: ad.adset,
-          creative: ad.creative,
-          insights: insight,
-        };
-      });
-
-      onBatchProcessedCallback?.(processedAdsBatch);
-      return processedAdsBatch;
+      onBatchProcessedCallback?.(processedBatch);
+      return processedBatch;
     })
   );
 
   const allAds = allAdsLists.flat();
-  renderGoalChart(allAds);
+
   return allAds;
 }
 
-async function fetchStoryMeta(object_story_ids) {
-  const metaMap = new Map(); // Dùng Map để tra cứu O(1)
-  const uniqueIds = [...new Set(object_story_ids.filter(Boolean))]; // Lọc ID rỗng và trùng
-  const batches = chunkArray(uniqueIds, BATCH_SIZE);
-
-  await Promise.all(
-    batches.map(async (batch) => {
-      const fbBatch = batch.map((id) => ({
-        method: "GET",
-        relative_url: `${id}?fields=full_picture,message,attachments{subattachments,media,url,description}`,
-      }));
-
-      const batchData = await fetchJSON(BASE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: META_TOKEN, batch: fbBatch }),
-      });
-
-      batch.forEach((storyId, idx) => {
-        const body =
-          batchData[idx]?.code === 200 && batchData[idx]?.body
-            ? JSON.parse(batchData[idx].body)
-            : null;
-        if (body && !body.error) {
-          metaMap.set(storyId, {
-            full_picture:
-              body.full_picture ||
-              body.attachments?.data?.[0]?.media?.image?.src ||
-              null,
-            message_real: body.message || null,
-            carousel:
-              body.attachments?.data?.[0]?.subattachments?.data?.map((a) => ({
-                url: a.url,
-                media: a.media?.image?.src,
-                desc: a.description,
-              })) || null,
-          });
-        }
-      });
-    })
-  );
-
-  return metaMap;
+async function fetchDailySpendByAccount() {
+  const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions&time_increment=1&time_range[since]=${startDate}&time_range[until]=${endDate}&access_token=${META_TOKEN}`;
+  const data = await fetchJSON(url);
+  return data.data || [];
 }
 
-async function fetchDailySpendByAccount() {
-  try {
-    if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
-    const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions&time_increment=1&time_range[since]=${startDate}&time_range[until]=${endDate}&access_token=${META_TOKEN}`;
-    const data = await fetchJSON(url);
-    const results = data.data || [];
-    console.log(results);
+let DAILY_DATA = [];
 
-    return results;
+async function loadDailyChart() {
+  try {
+    console.log("⚙️ Fetching daily spend data...");
+    DAILY_DATA = await fetchDailySpendByAccount();
+    renderDetailDailyChart2(DAILY_DATA);
+    console.log("✅ Daily chart rendered successfully.");
   } catch (err) {
-    console.error("❌ Error fetching daily spend for account", err);
-    return null;
+    console.error("❌ Error in daily chart flow:", err);
   }
 }
-
-let DAILY_DATA;
 
 async function loadDailyChart() {
   try {
@@ -956,6 +910,15 @@ async function loadCampaignList() {
     // 🔹 Render UI
     window._ALL_CAMPAIGNS = campaigns;
     renderCampaignView(campaigns);
+    const allAds = campaigns.flatMap((c) =>
+      c.adsets.flatMap((as) =>
+        (as.ads || []).map((ad) => ({
+          optimization_goal: as.optimization_goal,
+          insights: { spend: ad.spend || 0 },
+        }))
+      )
+    );
+    renderGoalChart(allAds);
     // updateSummaryUI(campaigns);
   } catch (err) {
     console.error("❌ Error in Flow 2 (Campaign List):", err);
@@ -2199,7 +2162,7 @@ function renderChartByDevice(dataByDevice) {
     key = key.toLowerCase();
     if (key.includes("android")) return "Android";
     if (key.includes("iphone")) return "iPhone";
-    if (key.includes("ipad")) return "iPad";
+    if (key.includes("ipad")) return "iPhone";
     if (key.includes("tablet")) return "Tablet";
     if (key.includes("desktop")) return "Desktop";
     return key.charAt(0).toUpperCase() + key.slice(1);
