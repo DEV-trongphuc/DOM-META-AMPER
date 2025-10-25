@@ -82,17 +82,17 @@ html {
 /* Laptop 14 inch ~ 1366px width */
 @media (max-width: 1400px) {
   html {
-    font-size: 55%; /* 12px */
+    font-size: 50%; /* 12px */
   }
 }
 @media (max-width: 1700px) {
   html {
-    font-size: 45%; /* 12px */
+    font-size: 40%; /* 12px */
   }
 }
 @media (max-width: 1800px) {
   html {
-    font-size: 55%; /* 12px */
+    font-size: 50%; /* 12px */
   }
 }
 
