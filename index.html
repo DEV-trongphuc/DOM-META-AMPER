@@ -377,33 +377,7 @@
                 </div>
               </div>
             </div>
-            <div class="dom_inner dom_fade_item w25 box_shadow chart show">
-              <h2 class="op8">
-                <i class="fa-solid fa-bullseye main_clr"></i> Frequency
-              </h2>
-              <div class="dom_frequency">
-                <div
-                  class="semi-donut margin"
-                  style="--percentage: 26.32; --fill: #ffa900"
-                >
-                  <p class="frequency_number"><span>0.0</span><span></span></p>
-                </div>
-                <div class="frequency_number_label">
-                  <p>0</p>
-                  <p>3</p>
-                </div>
-                <div class="dom_frequency_label op8">
-                  <p>
-                    <b>Impression</b>
-                    <span class="dom_frequency_label_impression">0</span>
-                  </p>
-                  <p>
-                    <b>Reach</b>
-                    <span class="dom_frequency_label_reach">0</span>
-                  </p>
-                </div>
-              </div>
-            </div>
+          
             <div
               class="dom_inner dom_fade_item w50 dom_platform_inner box_shadow chart"
             >
@@ -447,6 +421,16 @@
                 </div>
               </div>
             </div>
+            <div
+            class="dom_inner dom_fade_item w35 box_shadow chart full trendline"
+          >
+            <h2>
+              <i class="fa-solid fa-chart-line main_clr"></i> Leads Daily
+            </h2>
+            <div>
+              <canvas id="age_gender_total"></canvas>
+            </div>
+          </div>
           </div>
           <div class="dom_row flex">
             <div class="dom_inner view_campaign">
@@ -678,7 +662,7 @@
           </div>
           <div class="dom_row">
             <div class="dom_detail_ad">
-              <div class="dom_inner dom_fade_item w65 box_shadow chart show">
+              <div class="dom_inner dom_fade_item wfull box_shadow chart show">
                 <h2>
                   <i class="fa-solid fa-tags main_clr"></i>
                   24-hour Spent - Result
@@ -687,13 +671,31 @@
                   <canvas id="chart_by_hour"></canvas>
                 </div>
               </div>
-              <div class="dom_inner dom_fade_item w33 box_shadow chart show">
-                <h2>
-                  <i class="fa-solid fa-tags main_clr"></i>
-                  Device
+              <div class="dom_inner dom_fade_item w25 box_shadow chart show">
+                <h2 class="op8">
+                  <i class="fa-solid fa-bullseye main_clr"></i> Frequency
                 </h2>
-                <div class="chart-wrapper">
-                  <canvas id="chart_by_device"></canvas>
+                <div class="dom_frequency">
+                  <div
+                    class="semi-donut margin"
+                    style="--percentage: 26.32; --fill: #ffa900"
+                  >
+                    <p class="frequency_number"><span>0.0</span><span></span></p>
+                  </div>
+                  <div class="frequency_number_label">
+                    <p>0</p>
+                    <p>3</p>
+                  </div>
+                  <div class="dom_frequency_label op8">
+                    <p>
+                      <b>Impression</b>
+                      <span class="dom_frequency_label_impression">0</span>
+                    </p>
+                    <p>
+                      <b>Reach</b>
+                      <span class="dom_frequency_label_reach">0</span>
+                    </p>
+                  </div>
                 </div>
               </div>
               <!-- Targeting -->
@@ -725,12 +727,13 @@
             <div class="dom_inner dom_fade_item w33 box_shadow chart show">
               <h2>
                 <i class="fa-solid fa-tags main_clr"></i>
-                Detail CPR
+                Device
               </h2>
-              <div class="dom_toplist_wrap" id="deep_cpr">
-                <ul class="dom_toplist"></ul>
+              <div class="chart-wrapper">
+                <canvas id="chart_by_device"></canvas>
               </div>
             </div>
+          
           </div>
         </div>
 
