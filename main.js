@@ -1,7 +1,7 @@
 let startDate, endDate;
 let VIEW_GOAL; // Dùng cho chart breakdown
 const CACHE = new Map();
-const BATCH_SIZE = 40; // max 50 theo FB
+const BATCH_SIZE = 20; // max 50 theo FB
 const CONCURRENCY_LIMIT = 5; // max batch song song
 const API_VERSION = "v24.0";
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
@@ -682,6 +682,8 @@ function renderCampaignView(data) {
               data-name="${as.name}"
               data-goal="${as.optimization_goal}"
               data-spend="${ad.spend}"
+              data-reach="${ad.reach}"
+              data-impressions="${ad.impressions}"
               data-result="${ad.result}"
               data-cpr="${adCpr}"
               data-thumb="${ad.thumbnail || ""}"
@@ -1011,6 +1013,8 @@ async function handleViewClick(e, type = "ad") {
 
   // --- Lấy dữ liệu từ dataset ---
   const spend = parseFloat(el.dataset.spend || 0);
+  const reach = parseFloat(el.dataset.reach || 0);
+  const impressions = parseFloat(el.dataset.impressions || 0);
   const goal = el.dataset.goal || "";
   const name = el.dataset.name || "";
   const result = parseFloat(el.dataset.result || 0);
@@ -1034,7 +1038,28 @@ async function handleViewClick(e, type = "ad") {
 
   // --- Gán VIEW_GOAL toàn cục ---
   VIEW_GOAL = goal;
+  const freqWrap = document.querySelector(".dom_frequency");
+  if (freqWrap && reach > 0) {
+    const frequency = impressions / reach; // tần suất hiển thị trung bình
+    const percent = Math.min((frequency / 4) * 100, 100); // ví dụ 3 = full bar
 
+    // Cập nhật progress (dạng donut/bar)
+    const donut = freqWrap.querySelector(".semi-donut");
+    if (donut) donut.style.setProperty("--percentage", percent.toFixed(1));
+
+    // Text hiển thị frequency
+    const freqNum = freqWrap.querySelector(".frequency_number");
+    if (freqNum)
+      freqNum.querySelector("span:nth-child(1)").textContent =
+        frequency.toFixed(1);
+
+    // Impression & Reach labels
+    const impLabel = freqWrap.querySelector(".dom_frequency_label_impression");
+    const reachLabel = freqWrap.querySelector(".dom_frequency_label_reach");
+    if (impLabel)
+      impLabel.textContent = impressions.toLocaleString("vi-VN");
+    if (reachLabel) reachLabel.textContent = reach.toLocaleString("vi-VN");
+  }
   // --- Hiển thị panel chi tiết ---
   const domDetail = document.querySelector("#dom_detail");
   if (domDetail) {
@@ -1372,17 +1397,46 @@ function debounce(fn, delay = 500) {
   };
 }
 
-// 🎯 Lắng nghe input filter với debounce
 const filterInput = document.getElementById("filter");
+const filterButton = document.getElementById("filter_button");
+
 if (filterInput) {
+  // 🧠 Khi nhấn Enter mới filter
+  filterInput.addEventListener(
+    "keydown",
+    debounce((e) => {
+      if (e.key === "Enter") {
+        const keyword = e.target.value.trim().toLowerCase();
+        applyCampaignFilter(keyword);
+      } else if (e.target.value.trim() === "") {
+        // 🧹 Nếu clear input → reset về mặc định
+        applyCampaignFilter("");
+      }
+    }, 300)
+  );
+
+  // 👀 Khi clear input bằng tay (xóa hết text)
   filterInput.addEventListener(
     "input",
     debounce((e) => {
-      const keyword = e.target.value.trim().toLowerCase();
-      applyCampaignFilter(keyword);
-    }, 500)
+      if (e.target.value.trim() === "") {
+        applyCampaignFilter("");
+      }
+    }, 300)
   );
 }
+
+if (filterButton) {
+  // 🖱 Khi click nút tìm
+  filterButton.addEventListener(
+    "click",
+    debounce(() => {
+      const keyword = filterInput?.value?.trim().toLowerCase() || "";
+      applyCampaignFilter(keyword);
+    }, 300)
+  );
+}
+
 async function applyCampaignFilter(keyword) {
   if (!window._ALL_CAMPAIGNS || !Array.isArray(window._ALL_CAMPAIGNS)) return;
 
@@ -1509,14 +1563,12 @@ function calcTotalAction(data, type) {
 // ================== Render Targeting ==================
 function renderTargetingToDOM(targeting) {
   const targetBox = document.getElementById("detail_targeting");
-  if (!targetBox) return;
+  if (!targetBox || !targeting) return;
 
-  // === Age ===
-  let min = 18,
-    max = 65;
+  // === AGE RANGE ===
+  let min = 18, max = 65;
   if (Array.isArray(targeting.age_range) && targeting.age_range.length === 2) {
-    min = targeting.age_range[0];
-    max = targeting.age_range[1];
+    [min, max] = targeting.age_range;
   } else {
     min = targeting.age_min || 18;
     max = targeting.age_max || 65;
@@ -1530,11 +1582,9 @@ function renderTargetingToDOM(targeting) {
 
   const ageBar = targetBox.querySelector(".detail_age_bar");
   if (ageBar) {
-    const fullMin = 18;
-    const fullMax = 65;
+    const fullMin = 18, fullMax = 65;
     const leftPercent = ((min - fullMin) / (fullMax - fullMin)) * 100;
     const widthPercent = ((max - min) / (fullMax - fullMin)) * 100;
-
     let rangeEl = ageBar.querySelector(".age_range");
     if (!rangeEl) {
       rangeEl = document.createElement("div");
@@ -1545,77 +1595,71 @@ function renderTargetingToDOM(targeting) {
     rangeEl.style.width = `${widthPercent}%`;
   }
 
-  // === Gender ===
+  // === GENDER ===
   const genderWrap = targetBox.querySelector(".detail_gender_bar");
   if (genderWrap) {
     const genders = Array.isArray(targeting.genders) ? targeting.genders : [];
     const validGenders = genders
       .map(String)
       .filter((g) => ["male", "female", "other"].includes(g.toLowerCase()));
-
-    if (validGenders.length) {
-      genderWrap.innerHTML = validGenders.map((g) => `<p>${g}</p>`).join("");
-    } else {
-      genderWrap.innerHTML = `<p>Male</p><p>Female</p><p>Other</p>`;
-    }
+    genderWrap.innerHTML = validGenders.length
+      ? validGenders.map((g) => `<p>${g}</p>`).join("")
+      : `<p>Male</p><p>Female</p><p>Other</p>`;
   }
 
-  // === Locations ===
+  // === LOCATIONS ===
   const locationWrap = targetBox.querySelector(".detail_location_bar");
   if (locationWrap) {
     let locations = [];
-
     const { geo_locations } = targeting || {};
 
-    if (geo_locations?.cities) {
+    if (geo_locations?.cities)
       locations = geo_locations.cities.map(
         (c) => `${c.name} (${c.radius}${c.distance_unit || "km"})`
       );
-    }
 
-    if (geo_locations?.regions) {
+    if (geo_locations?.regions)
       locations = locations.concat(geo_locations.regions.map((r) => r.name));
-    }
 
-    if (geo_locations?.custom_locations) {
+    if (geo_locations?.custom_locations)
       locations = locations.concat(
-        geo_locations.custom_locations.map((r) => r.name)
+        geo_locations.custom_locations.map(
+          (r) =>
+            `${r.name} (${r.radius}${r.distance_unit || "km"})`
+        )
       );
-    }
 
-    if (geo_locations?.places) {
+    if (geo_locations?.places)
       locations = locations.concat(
         geo_locations.places.map(
-          (p) => `${p.name} (${p.radius} ${p.distance_unit || "km"})`
+          (p) => `${p.name} (${p.radius}${p.distance_unit || "km"})`
         )
       );
-    }
 
-    if (locations.length) {
-      locationWrap.innerHTML = locations
-        .slice(0, 5)
-        .map(
-          (c) =>
-            `<p><i class="fa-solid fa-location-crosshairs"></i><span>${c}</span></p>`
-        )
-        .join("");
-    } else {
-      locationWrap.innerHTML = `<p><i class="fa-solid fa-location-crosshairs"></i><span>Việt Nam</span></p>`;
-    }
+    if (geo_locations?.countries)
+      locations = locations.concat(geo_locations.countries);
+
+    locationWrap.innerHTML = locations.length
+      ? locations
+          .slice(0, 5)
+          .map(
+            (c) =>
+              `<p><i class="fa-solid fa-location-crosshairs"></i><span>${c}</span></p>`
+          )
+          .join("")
+      : `<p><i class="fa-solid fa-location-crosshairs"></i><span>Việt Nam</span></p>`;
   }
 
-  // === Frequency Tags (Interests / Education / Industries / Behaviour) ===
-  // === Frequency Tags (tổng hợp toàn bộ flexible_spec) ===
+  // === FLEXIBLE SPEC (Interests / Education / etc.) ===
   const freqWrap = targetBox.querySelector(".frequency_tag");
   if (freqWrap) {
     const tags = [];
-
     const flex = targeting.flexible_spec || [];
+
     flex.forEach((fs) => {
       for (const [key, arr] of Object.entries(fs)) {
         if (!Array.isArray(arr)) continue;
         arr.forEach((item) => {
-          // Ưu tiên name, nếu không có thì hiển thị giá trị trực tiếp
           const name = item?.name || item;
           const cleanKey = key
             .replace(/_/g, " ")
@@ -1632,10 +1676,119 @@ function renderTargetingToDOM(targeting) {
               `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
           )
           .join("")
-      : `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">Automatic Target</span></p>`;
+      : `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">Advantage targeting</span></p>`;
   }
 
-  // === Advantage Audience ===
+  // === CUSTOM & LOOKALIKE AUDIENCES ===
+  const audienceWrap = targetBox.querySelector(".detail_audience");
+  if (audienceWrap) {
+    const audiences = [];
+
+    if (Array.isArray(targeting.custom_audiences)) {
+      targeting.custom_audiences.forEach((a) =>
+        audiences.push(`${a.name || a.id} (Custom Audience)`)
+      );
+    }
+
+    if (Array.isArray(targeting.lookalike_spec)) {
+      targeting.lookalike_spec.forEach((a) =>
+        audiences.push(`${a.name || a.origin || a.id} (Lookalike Audience)`)
+      );
+    }
+
+    audienceWrap.innerHTML = audiences.length
+      ? audiences
+          .map(
+            (t) =>
+            `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
+          )
+          .join("")
+      : `<p><span>No audience selected</span></p>`;
+  }
+
+  // === EXCLUDED AUDIENCES ===
+  const excludeWrap = targetBox.querySelector(".detail_exclude");
+  if (excludeWrap) {
+    const excluded = [];
+    const {
+      excluded_custom_audiences,
+      excluded_interests,
+      excluded_behaviors,
+      excluded_geo_locations,
+    } = targeting || {};
+
+    if (Array.isArray(excluded_custom_audiences))
+      excluded_custom_audiences.forEach((e) =>
+        excluded.push(`${e.name || e.id} (Custom Audience)`)
+      );
+
+    if (Array.isArray(excluded_interests))
+      excluded_interests.forEach((e) =>
+        excluded.push(`${e.name || e.id} (Interest)`)
+      );
+
+    if (Array.isArray(excluded_behaviors))
+      excluded_behaviors.forEach((e) =>
+        excluded.push(`${e.name || e.id} (Behavior)`)
+      );
+
+    if (excluded_geo_locations?.countries)
+      excluded_geo_locations.countries.forEach((c) =>
+        excluded.push(`${c} (Excluded Country)`)
+      );
+
+    excludeWrap.innerHTML = excluded.length
+      ? excluded
+          .map(
+            (t) =>
+            `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
+          )
+          .join("")
+      : `<p><span>No excluded audience</span></p>`;
+  }
+
+  // === LANGUAGES (Locales) ===
+  const localeWrap = targetBox.querySelector(".detail_locale");
+  if (localeWrap && Array.isArray(targeting.locales)) {
+    const localeMap = {
+      1: "English (US)",
+      2: "Spanish",
+      3: "French",
+      6: "Vietnamese",
+    };
+    const langs = targeting.locales.map((l) => localeMap[l] || `Locale ID ${l}`);
+    localeWrap.innerHTML = langs
+      .map(
+        (l) =>
+          `<p><i class="fa-solid fa-language"></i><span>${l}</span></p>`
+      )
+      .join("");
+  }
+
+  // === PLACEMENT ===
+  const placementWrap = targetBox.querySelector(".detail_placement");
+  if (placementWrap) {
+    const {
+      publisher_platforms,
+      facebook_positions,
+      instagram_positions,
+    } = targeting || {};
+    const platforms = [
+      ...(publisher_platforms || []),
+      ...(facebook_positions || []),
+      ...(instagram_positions || []),
+    ];
+    placementWrap.innerHTML = platforms.length
+      ? platforms
+          .map(
+            (p) =>
+              `<p><i class="fa-solid fa-bullhorn"></i><span>${p}</span></p>`
+          )
+          .join("")
+      : `<p><i class="fa-solid fa-bullhorn"></i><span>Automatic placement</span></p>`;
+  }
+
+  // === ADVANTAGE AUDIENCE ===
   const optimizeWrap = targetBox.querySelector(".detail_optimize");
   if (optimizeWrap) {
     const adv =
@@ -1645,6 +1798,7 @@ function renderTargetingToDOM(targeting) {
     optimizeWrap.textContent = adv;
   }
 }
+
 
 // ================== Render Interaction ==================
 function renderInteraction(byDate) {
@@ -1669,13 +1823,13 @@ function renderInteraction(byDate) {
     },
 
     {
-      key: "post_save",
+      key: "onsite_conversion.post_save",
       label: "Saves",
       icon: "fa-solid fa-bookmark",
     },
     {
       key: "page_engagement",
-      label: "Page Engage",
+      label: "Page Engaged",
       icon: "fa-solid fa-bolt",
     },
     {
@@ -1689,8 +1843,8 @@ function renderInteraction(byDate) {
       icon: "fa-solid fa-video",
     },
     {
-      key: "photo_view",
-      label: "Photo Views",
+      key: "like",
+      label: "Follows",
       icon: "fa-solid fa-video",
     },
     {
@@ -2141,36 +2295,32 @@ function renderChartByDevice(dataByDevice) {
   if (!ctx) return;
   const c2d = ctx.getContext("2d");
 
-  // Chuẩn hoá tên thiết bị
   const prettyName = (key) => {
     key = key.toLowerCase();
     if (key.includes("android")) return "Android";
-    if (key.includes("iphone")) return "iPhone";
-    if (key.includes("ipad")) return "iPhone";
+    if (key.includes("iphone") || key.includes("ipad")) return "iPhone";
     if (key.includes("tablet")) return "Tablet";
     if (key.includes("desktop")) return "Desktop";
     return key.charAt(0).toUpperCase() + key.slice(1);
   };
 
-  // Lọc chỉ giữ thiết bị có result > 0
+  // ✅ Lấy device có result > 0
   const validEntries = Object.entries(dataByDevice)
     .map(([k, v]) => [prettyName(k), getResults(v) || 0])
     .filter(([_, val]) => val > 0);
 
-  // Nếu không có dữ liệu hợp lệ thì thoát
   if (!validEntries.length) {
     if (window.chart_by_device_instance)
       window.chart_by_device_instance.destroy();
     return;
   }
 
-  // Sắp xếp giảm dần theo result
+  // 🔹 Sort giảm dần theo result
   validEntries.sort((a, b) => b[1] - a[1]);
-
   const labels = validEntries.map(([k]) => k);
   const resultData = validEntries.map(([_, v]) => v);
 
-  // Màu: 2 cái lớn nhất nổi bật, còn lại nhạt hơn
+  // 🎨 Màu sắc: top 2 nổi bật
   const highlightColors = [
     "rgba(255,171,0,0.9)", // vàng
     "rgba(38,42,83,0.9)", // xanh đậm
@@ -2181,21 +2331,50 @@ function renderChartByDevice(dataByDevice) {
     "rgba(0, 71, 26, 0.7)",
     "rgba(153, 0, 0, 0.7)",
   ];
-
   const colors = resultData.map((_, i) =>
     i < 2 ? highlightColors[i] : fallbackColors[i - 2] || "#ccc"
   );
 
+  // 🔢 Tính % cao nhất
+  const total = resultData.reduce((a, b) => a + b, 0);
+  const maxIndex = resultData.indexOf(Math.max(...resultData));
+  const maxLabel = labels[maxIndex];
+  const maxPercent = ((resultData[maxIndex] / total) * 100).toFixed(1);
+
   if (window.chart_by_device_instance)
     window.chart_by_device_instance.destroy();
 
+  // 🎯 Plugin custom: show % giữa lỗ
+  const centerTextPlugin = {
+    id: "centerText",
+    afterDraw(chart) {
+      const { width, height } = chart;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#333";
+  
+      // 🎯 Dịch text lên 10px cho đúng giữa lỗ donut
+      const centerY = height / 2 - 18;
+  
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText(`${maxPercent}%`, width / 2, centerY - 4);
+  
+      ctx.font = "12px sans-serif";
+      ctx.fillText(maxLabel, width / 2, centerY + 18);
+      ctx.restore();
+    },
+  };
+
+  // 🎨 Render chart
   window.chart_by_device_instance = new Chart(c2d, {
-    type: "pie",
+    type: "doughnut",
     data: {
       labels,
       datasets: [
         {
-          label: "Result",
+          label: "Results",
           data: resultData,
           backgroundColor: colors,
           borderColor: "#fff",
@@ -2205,35 +2384,34 @@ function renderChartByDevice(dataByDevice) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false, // Không set width/height
+      cutout: "70%", // 💫 tạo lỗ tròn
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: "bottom",
-          labels: { color: "#333", boxWidth: 14, padding: 12 },
+          labels: {
+            color: "#333",
+            boxWidth: 14,
+            padding: 10,
+          },
         },
         tooltip: {
           callbacks: {
-            label: (c) => `${c.label}: ${c.raw}`,
+            label: (ctx) =>
+              `${ctx.label}: ${formatNumber(ctx.raw)} (${(
+                (ctx.raw / total) *
+                100
+              ).toFixed(1)}%)`,
           },
         },
-        datalabels: {
-          color: "#fff",
-          font: { weight: "bold", size: 11 },
-          formatter: (v, ctx) => {
-            const total = ctx.chart.data.datasets[0].data.reduce(
-              (a, b) => a + b,
-              0
-            );
-            const pct = total ? ((v / total) * 100).toFixed(1) + "%" : "";
-            return pct;
-          },
-        },
+        datalabels: { display: false },
       },
-      hoverOffset: 10, // hiệu ứng nổi khi hover
+      hoverOffset: 8,
     },
-    plugins: [ChartDataLabels],
+    plugins: [centerTextPlugin],
   });
 }
+
 function renderChartByRegion(dataByRegion) {
   if (!dataByRegion) return;
 
@@ -2541,23 +2719,19 @@ function renderChartByPlatform(allData) {
       if (k.includes("desktop") || k.includes("pc"))
         return "https://ms.codes/cdn/shop/articles/this-pc-computer-display-windows-11-icon.png?v=1709255180";
     }
-    if (groupKey === "byAgeGender") {
+    if (groupKey === "byAgeGender" || groupKey === "byRegion")
       return "https://raw.githubusercontent.com/DEV-trongphuc/DOM_MISA_IDEAS_CRM/refs/heads/main/DOM_MKT%20(2).png";
-    }
-    if (groupKey === "byRegion") {
-      return "https://raw.githubusercontent.com/DEV-trongphuc/DOM_MISA_IDEAS_CRM/refs/heads/main/DOM_MKT%20(2).png";
-    }
+
     if (k.includes("facebook"))
       return "https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png";
-
     if (k.includes("instagram"))
       return "https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg";
+
     return "https://raw.githubusercontent.com/DEV-trongphuc/DOM_MISA_IDEAS_CRM/refs/heads/main/DOM_MKT%20(2).png";
   };
 
   let hasData = false;
 
-  // 🧩 Duyệt tất cả nhóm data
   for (const [groupKey, groupLabel] of Object.entries(sources)) {
     const group = allData[groupKey];
     if (!group) continue;
@@ -2565,22 +2739,28 @@ function renderChartByPlatform(allData) {
     const items = [];
     for (const [key, val] of Object.entries(group)) {
       const spend = +val.spend || 0;
-      const result = getResults(val);
-      if (!spend || !result) continue;
-
+      const result = getResults(val); // có thể = 0 hoặc undefined
       const goal = VIEW_GOAL;
-      const cpr = goal === "REACH" ? (spend / result) * 1000 : spend / result;
 
-      items.push({ key, spend, result, cpr, goal });
+      let cpr = 0;
+      if (result && spend) {
+        cpr = goal === "REACH" ? (spend / result) * 1000 : spend / result;
+      }
+
+      // ✅ Nếu có spend > 0 thì vẫn push, chỉ set result = 0
+      if (spend > 0) items.push({ key, spend, result: result || 0, cpr, goal });
     }
 
     if (!items.length) continue;
     hasData = true;
 
-    // Sort theo CPR tăng dần (tốt nhất → tệ nhất)
-    items.sort((a, b) => a.cpr - b.cpr);
-    const minCPR = items[0].cpr;
-    const maxCPR = items[items.length - 1].cpr;
+    // ✅ Sắp xếp theo spend giảm dần trước
+    items.sort((a, b) => b.spend - a.spend);
+
+    // Tìm giá trị CPR min và max
+    const cprValues = items.map((x) => x.cpr).filter((x) => x > 0);
+    const minCPR = Math.min(...cprValues);
+    const maxCPR = Math.max(...cprValues);
 
     // Divider group
     const divider = document.createElement("li");
@@ -2588,37 +2768,37 @@ function renderChartByPlatform(allData) {
     divider.innerHTML = `<p><strong>${groupLabel}</strong></p>`;
     wrap.appendChild(divider);
 
-    // Render từng dòng
     items.forEach((p) => {
-      let color = "rgb(213,141,0)";
-      if (p.cpr === minCPR) color = "rgb(2,116,27)";
-      else if (p.cpr === maxCPR) color = "rgb(215,0,0)";
+      let color = "rgb(213,141,0)"; // mặc định vàng
+      if (p.cpr === minCPR && p.result > 0) color = "rgb(2,116,27)"; // ✅ xanh cho CPR tốt nhất
+      else if (p.cpr === maxCPR && p.result > 0) color = "rgb(215,0,0)"; // 🔴 đỏ cho CPR cao nhất
       const bg = color.replace("rgb", "rgba").replace(")", ",0.05)");
 
       const li = document.createElement("li");
       li.dataset.platform = p.key;
+      li.className = p.cpr === minCPR ? "best-performer" : "";
       li.innerHTML = `
         <p>
           <img src="${getLogo(p.key, groupKey)}" alt="${p.key}" />
           <span>${formatName(p.key)}</span>
         </p>
         <p><span class="total_spent"><i class="fa-solid fa-money-bill"></i> ${p.spend.toLocaleString()}đ</span></p>
-        <p><span class="total_result"><i class="fa-solid fa-bullseye"></i> ${formatNumber(
-          p.result
-        )}</span></p>
+        <p><span class="total_result"><i class="fa-solid fa-bullseye"></i> ${
+          p.result > 0 ? formatNumber(p.result) : "—"
+        }</span></p>
         <p class="toplist_percent" style="color:${color};background:${bg}">
-          ${formatMoney(p.cpr)}
+          ${p.result > 0 ? formatMoney(p.cpr) : "—"}
         </p>
       `;
       wrap.appendChild(li);
     });
   }
 
-  // Nếu rỗng toàn bộ
   if (!hasData) {
     wrap.innerHTML = `<li><p>Không có dữ liệu hợp lệ để hiển thị.</p></li>`;
   }
 }
+
 
 function renderDeepCPR(allData) {
   const wrap = document.querySelector("#deep_cpr .dom_toplist");
@@ -2704,7 +2884,7 @@ function renderCharts({
   byDevice,
   byDate,
 }) {
-  renderDetailDailyChart(byDate, "spend"); // Render lần đầu với 'spend'
+  renderDetailDailyChart(byDate, "spend"); 
   renderChartByHour(byHour);
   renderChartByAgeGender(byAgeGender);
   renderChartByRegion(byRegion);
@@ -2986,28 +3166,7 @@ function updatePlatformSummaryUI(data) {
     totalClick.toLocaleString("vi-VN");
   document.querySelector(".dom_interaction_view").textContent =
     totalView.toLocaleString("vi-VN");
-  const freqWrap = document.querySelector(".dom_frequency");
-  if (freqWrap && totalReach > 0) {
-    const frequency = totalImpression / totalReach; // tần suất hiển thị trung bình
-    const percent = Math.min((frequency / 3) * 100, 100); // ví dụ 3 = full bar
-
-    // Cập nhật progress (dạng donut/bar)
-    const donut = freqWrap.querySelector(".semi-donut");
-    if (donut) donut.style.setProperty("--percentage", percent.toFixed(1));
-
-    // Text hiển thị frequency
-    const freqNum = freqWrap.querySelector(".frequency_number");
-    if (freqNum)
-      freqNum.querySelector("span:nth-child(1)").textContent =
-        frequency.toFixed(1);
-
-    // Impression & Reach labels
-    const impLabel = freqWrap.querySelector(".dom_frequency_label_impression");
-    const reachLabel = freqWrap.querySelector(".dom_frequency_label_reach");
-    if (impLabel)
-      impLabel.textContent = totalImpression.toLocaleString("vi-VN");
-    if (reachLabel) reachLabel.textContent = totalReach.toLocaleString("vi-VN");
-  }
+  
 }
 
 async function loadPlatformSummary(campaignIds = []) {
@@ -3458,5 +3617,101 @@ function renderAgeGenderChart(rawData = []) {
       },
     },
     plugins: [ChartDataLabels],
+  });
+}
+document.querySelectorAll('.dom_menu li').forEach(menuItem => {
+  menuItem.addEventListener('click', function() {
+    // Remove active class from all menu items
+    document.querySelectorAll('.dom_menu li').forEach(item => item.classList.remove('active'));
+    // Add active class to the clicked item
+    menuItem.classList.add('active');
+
+    // Get the data-view of the clicked item
+    const view = menuItem.getAttribute('data-view');
+
+    // Get the container div and update its classes
+    const container = document.querySelector('.dom_container');
+    
+    // Remove all views from the container
+    container.classList.remove('dashboard', 'ad_detail');
+    
+    // Add the relevant class based on the clicked item
+    container.classList.add(view);
+  });
+});
+
+// 🎯 Quick Filter Logic
+
+const quickFilterBox = document.querySelector(".quick_filter");
+if (quickFilterBox) {
+  const selectedText = quickFilterBox.querySelector(".dom_selected");
+  const listItems = quickFilterBox.querySelectorAll(".dom_select_show li");
+
+  listItems.forEach((li) => {
+    li.addEventListener("click", async (e) => {
+      e.stopPropagation(); // 🧱 chặn sự kiện lan lên .quick_filter
+
+      // Xóa highlight cũ
+      listItems.forEach((x) => x.classList.remove("active"));
+      li.classList.add("active");
+
+      // Lấy label & data-view
+      const label = li.querySelector("span:last-child")?.textContent || "";
+      const view = li.querySelector(".radio_box")?.dataset.view || "";
+
+      // Hiển thị text đã chọn
+      selectedText.textContent = label;
+
+      // --- 🔹 Active campaigns ---
+      if (view === "active_ads") {
+        const activeLower = "active";
+
+        const activeCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+          let campaignActive = false;
+          for (const adset of c.adsets || []) {
+            for (const ad of adset.ads || []) {
+              if ((ad.status || "").toLowerCase() === activeLower) {
+                campaignActive = true;
+                break;
+              }
+            }
+            if (campaignActive) break;
+          }
+          return campaignActive;
+        });
+
+        console.log(
+          `🔹 Active campaigns found: ${activeCampaigns.length}/${window._ALL_CAMPAIGNS.length}`
+        );
+
+        renderCampaignView(activeCampaigns);
+      }
+
+      // --- 🔹 Reset filter ---
+      else if (view === "reset") {
+        selectedText.textContent = "Quick filter";
+        renderCampaignView(window._ALL_CAMPAIGNS);
+      }
+
+      // ✅ Đóng dropdown ngay lập tức
+      quickFilterBox.classList.remove("active");
+    });
+  });
+
+  // Toggle mở dropdown
+  quickFilterBox.addEventListener("click", (e) => {
+    if (
+      e.target.closest(".flex") ||
+      e.target.classList.contains("fa-angle-down")
+    ) {
+      quickFilterBox.classList.toggle("active");
+    }
+  });
+
+  // 🧠 Click ra ngoài dropdown → tự đóng luôn
+  document.addEventListener("click", (e) => {
+    if (!quickFilterBox.contains(e.target)) {
+      quickFilterBox.classList.remove("active");
+    }
   });
 }
