@@ -182,7 +182,7 @@ function chunkArray(arr, size) {
 }
 
 async function fetchAdsets() {
-  const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=adset&fields=adset_id,adset_name,campaign_id,campaign_name,spend,optimization_goal&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500&access_token=${META_TOKEN}`;
+  const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=adset&fields=adset_id,adset_name,campaign_id,campaign_name,optimization_goal&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}`;
 
   const data = await fetchJSON(url);
   console.log("✅ Adset fetched:", data.data?.length || 0);
@@ -190,129 +190,122 @@ async function fetchAdsets() {
 }
 
 async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
-  if (!Array.isArray(adsetIds) || !adsetIds.length) return [];
+  if (!Array.isArray(adsetIds) || adsetIds.length === 0) return [];
 
+  // ===== ⚙️ Config =====
+  const headers = { "Content-Type": "application/json" };
+  const now = Date.now();
+  const CONCURRENCY = 4; // safe zone: tránh throttle Meta
   const adsetChunks = chunkArray(adsetIds, BATCH_SIZE);
+  const results = [];
+  let batchCount = 0;
 
-  const allAdsLists = await runBatchesWithLimit(
+  console.time("⏱️ Total fetchAdsAndInsights");
+
+  // ===== ⚡ Main Process =====
+  await runBatchesWithLimit(
     adsetChunks.map((batch) => async () => {
-      // 1️⃣ Lấy danh sách ads
-      const fbBatch1 = batch.map((adsetId) => ({
-        method: "GET",
-        relative_url: `${adsetId}/ads?fields=id,name,effective_status,adset_id,adset{end_time,daily_budget,lifetime_budget},creative{effective_object_story_id,thumbnail_url,instagram_permalink_url}`,
-      }));
+      const startTime = performance.now();
 
-      const adsResp = await fetchJSON(BASE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: META_TOKEN, batch: fbBatch1 }),
-      });
-
-      const adsList = [];
-      const now = new Date();
-
-      for (const item of adsResp) {
-        if (item?.code !== 200 || !item?.body) continue;
-        const body = JSON.parse(item.body);
-        if (!Array.isArray(body.data)) continue;
-
-        body.data.forEach((ad) => {
-          const endTime = ad.adset?.end_time
-            ? new Date(ad.adset.end_time)
-            : null;
-          const isEnded = endTime && endTime < now;
-
-          let effectiveStatus = ad.effective_status;
-          if (isEnded) effectiveStatus = "COMPLETED";
-
-          adsList.push({
-            id: ad.id,
-            name: ad.name,
-            adset_id: ad.adset_id,
-            effective_status: effectiveStatus,
-            adset: {
-              status: ad.adset?.status || null,
-              daily_budget: ad.adset?.daily_budget || null,
-              lifetime_budget: ad.adset?.lifetime_budget || null,
-              end_time: ad.adset?.end_time || null,
-            },
-            creative: {
-              thumbnail_url: ad.creative?.thumbnail_url || null,
-              instagram_permalink_url:
-                ad.creative?.instagram_permalink_url || null,
-              facebook_post_url: ad.creative?.effective_object_story_id
-                ? `https://facebook.com/${ad.creative.effective_object_story_id}`
-                : null,
-            },
-          });
-        });
+      // === Build batch (gọn, không format string thừa) ===
+      const fbBatch = new Array(batch.length);
+      for (let i = 0; i < batch.length; i++) {
+        const adsetId = batch[i];
+        fbBatch[i] = {
+          method: "GET",
+          relative_url:
+            `${adsetId}/ads?fields=id,name,effective_status,adset_id,` +
+            `adset{end_time,daily_budget,lifetime_budget},` +
+            `creative{thumbnail_url,instagram_permalink_url,effective_object_story_id},` +
+            `insights.time_range({since:'${startDate}',until:'${endDate}'})` +
+            `{spend,impressions,reach,actions,optimization_goal}`,
+        };
       }
 
-      if (!adsList.length) return [];
-
-      // 2️⃣ Lấy insights cho từng ad
-      const adChunks = chunkArray(
-        adsList.map((a) => a.id),
-        BATCH_SIZE
-      );
-      const insightTasks = adChunks.map((chunk) => async () => {
-        const fbBatch2 = chunk.map((adId) => ({
-          method: "GET",
-          relative_url: `${adId}/insights?fields=spend,impressions,reach,actions,optimization_goal&time_range[since]=${startDate}&time_range[until]=${endDate}`,
-        }));
-
-        return fetchJSON(BASE_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access_token: META_TOKEN, batch: fbBatch2 }),
-        });
+      // === Gọi API ===
+      const adsResp = await fetchJSON(BASE_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ access_token: META_TOKEN, batch: fbBatch }),
       });
 
-      const insightResponses = await runBatchesWithLimit(insightTasks, 5);
-      const insightsMap = new Map();
+      // === Parse kết quả cực nhanh ===
+      const processed = [];
+      const respLen = adsResp.length;
 
-      insightResponses.forEach((resp, batchIdx) => {
-        if (!resp) return;
-        const chunk = adChunks[batchIdx];
-        for (let i = 0; i < resp.length; i++) {
-          const r = resp[i];
-          const adId = chunk[i];
-          try {
-            if (r?.code === 200 && r?.body) {
-              const body = JSON.parse(r.body);
-              insightsMap.set(adId, body.data?.[0] || null);
-            } else insightsMap.set(adId, null);
-          } catch {
-            insightsMap.set(adId, null);
-          }
+      for (let i = 0; i < respLen; i++) {
+        const item = adsResp[i];
+        if (item?.code !== 200 || !item?.body) continue;
+
+        let body;
+        try {
+          body = JSON.parse(item.body);
+        } catch {
+          continue;
         }
-      });
 
-      // 3️⃣ Gộp data lại
-      const processedBatch = adsList.map((ad) => ({
-        ad_id: ad.id,
-        ad_name: ad.name,
-        adset_id: ad.adset_id,
-        effective_status: ad.effective_status,
-        adset: ad.adset,
-        creative: ad.creative,
-        insights: insightsMap.get(ad.id) || {
-          spend: 0,
-          impressions: 0,
-          reach: 0,
-          actions: [],
-        },
-      }));
+        const data = body.data;
+        if (!Array.isArray(data) || data.length === 0) continue;
 
-      onBatchProcessedCallback?.(processedBatch);
-      return processedBatch;
-    })
+        for (let j = 0, len = data.length; j < len; j++) {
+          const ad = data[j];
+          const adset = ad.adset ?? {};
+          const creative = ad.creative ?? {};
+          const insights = ad.insights?.data?.[0] ?? {};
+
+          const endTime = adset.end_time ? Date.parse(adset.end_time) : 0;
+          const effective_status =
+            endTime && endTime < now ? "COMPLETED" : ad.effective_status;
+
+          processed.push({
+            ad_id: ad.id,
+            ad_name: ad.name,
+            adset_id: ad.adset_id,
+            effective_status,
+            adset: {
+              status: adset.status ?? null,
+              daily_budget: adset.daily_budget ?? null,
+              lifetime_budget: adset.lifetime_budget ?? null,
+              end_time: adset.end_time ?? null,
+            },
+            creative: {
+              thumbnail_url: creative.thumbnail_url ?? null,
+              instagram_permalink_url: creative.instagram_permalink_url ?? null,
+              facebook_post_url: creative.effective_object_story_id
+                ? `https://facebook.com/${creative.effective_object_story_id}`
+                : null,
+            },
+            insights: {
+              spend: +insights.spend || 0,
+              impressions: +insights.impressions || 0,
+              reach: +insights.reach || 0,
+              actions: insights.actions || [],
+              optimization_goal: insights.optimization_goal || "",
+            },
+          });
+        }
+      }
+
+      // === Stream về sớm (tránh nghẽn bộ nhớ) ===
+      if (processed.length) {
+        onBatchProcessedCallback?.(processed);
+        results.push(...processed);
+      }
+
+      // === Perf log ===
+      batchCount++;
+      const elapsed = (performance.now() - startTime).toFixed(0);
+      console.log(
+        `✅ Batch #${batchCount} (${batch.length} adsets) done in ${elapsed}ms`
+      );
+    }),
+    CONCURRENCY
   );
 
-  const allAds = allAdsLists.flat();
-
-  return allAds;
+  console.timeEnd("⏱️ Total fetchAdsAndInsights");
+  return results;
 }
+
 
 async function fetchDailySpendByAccount() {
   const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions&time_increment=1&time_range[since]=${startDate}&time_range[until]=${endDate}&access_token=${META_TOKEN}`;
@@ -321,17 +314,6 @@ async function fetchDailySpendByAccount() {
 }
 
 let DAILY_DATA = [];
-
-async function loadDailyChart() {
-  try {
-    console.log("⚙️ Fetching daily spend data...");
-    DAILY_DATA = await fetchDailySpendByAccount();
-    renderDetailDailyChart2(DAILY_DATA);
-    console.log("✅ Daily chart rendered successfully.");
-  } catch (err) {
-    console.error("❌ Error in daily chart flow:", err);
-  }
-}
 
 async function loadDailyChart() {
   try {
@@ -675,7 +657,7 @@ function renderCampaignView(data) {
         adsHtml[k] = `
           <div class="ad_item ${isActive ? "active" : "inactive"}">
             <div class="ads_name">
-              <a href="${ad.post_url}" target="_blank">
+              <a>
                 <img src="${ad.thumbnail}" data-ad-id-img="${ad.id}" />
                 <p class="ad_name">ID: ${ad.id}</p>
               </a>
@@ -946,6 +928,7 @@ async function main() {
   loadDailyChart();
   loadPlatformSummary();
   loadSpendPlatform();
+  loadAgeGenderSpendChart()
   loadCampaignList().finally(() => {
     console.log("Main flow completed. Hiding loading.");
     if (loading) loading.classList.remove("active");
@@ -1418,6 +1401,7 @@ async function applyCampaignFilter(keyword) {
   const ids = filtered.map((c) => c.id).filter(Boolean);
   loadPlatformSummary(ids);
   loadSpendPlatform(ids);
+  loadAgeGenderSpendChart(ids);
   const dailyData = ids.length ? await fetchDailySpendByCampaignIDs(ids) : [];
   renderDetailDailyChart2(dailyData, "spend");
 
@@ -3050,6 +3034,31 @@ async function fetchSpendByPlatform(campaignIds = []) {
     return [];
   }
 }
+async function fetchSpendByAgeGender(campaignIds = []) {
+  try {
+    if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
+
+    // Nếu có campaignIds thì filter, còn không thì query theo account
+    const filtering = campaignIds.length
+      ? `&filtering=${encodeURIComponent(
+          JSON.stringify([
+            { field: "campaign.id", operator: "IN", value: campaignIds },
+          ])
+        )}`
+      : "";
+
+    const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend&breakdowns=age,gender&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
+
+    const data = await fetchJSON(url);
+    const results = data.data || [];
+
+    return results;
+  } catch (err) {
+    console.error("❌ Error fetching spend by age_gender:", err);
+    return [];
+  }
+}
+
 function summarizeSpendByPlatform(data) {
   const result = {
     facebook: 0,
@@ -3156,6 +3165,10 @@ async function loadSpendPlatform(campaignIds = []) {
   const data = await fetchSpendByPlatform(campaignIds);
   const summary = summarizeSpendByPlatform(data);
   renderPlatformSpendUI(summary);
+}
+async function loadAgeGenderSpendChart(campaignIds = []) {
+  const data = await fetchSpendByAgeGender(campaignIds);
+  renderAgeGenderChart(data);
 }
 
 main();
@@ -3318,3 +3331,132 @@ document.addEventListener("click", (e) => {
     applyCampaignFilter(filter);
   }
 });
+function renderAgeGenderChart(rawData = []) {
+  if (!Array.isArray(rawData) || !rawData.length) return;
+
+  // 🚫 Bỏ gender unknown
+  const data = rawData.filter(
+    (d) => d.gender && d.gender.toLowerCase() !== "unknown"
+  );
+  if (!data.length) return;
+
+  const ctx = document.getElementById("age_gender_total");
+  if (!ctx) return;
+  const c2d = ctx.getContext("2d");
+
+  // ❌ Clear chart cũ
+  if (window.chart_age_gender_total?.destroy) {
+    window.chart_age_gender_total.destroy();
+    window.chart_age_gender_total = null;
+  }
+
+  // 🔹 Gom theo độ tuổi + giới tính
+  const ages = [...new Set(data.map((d) => d.age))].sort(
+    (a, b) => parseInt(a) - parseInt(b)
+  );
+
+  const maleSpends = [];
+  const femaleSpends = [];
+  const totalByAge = {};
+
+  ages.forEach((age) => {
+    const male = data.find(
+      (d) => d.age === age && d.gender.toLowerCase() === "male"
+    );
+    const female = data.find(
+      (d) => d.age === age && d.gender.toLowerCase() === "female"
+    );
+    const maleSpend = male ? +male.spend : 0;
+    const femaleSpend = female ? +female.spend : 0;
+    maleSpends.push(maleSpend);
+    femaleSpends.push(femaleSpend);
+    totalByAge[age] = maleSpend + femaleSpend;
+  });
+
+  // 🔸 Xác định nhóm tuổi có tổng chi cao nhất
+  const maxAge = Object.keys(totalByAge).reduce((a, b) =>
+    totalByAge[a] > totalByAge[b] ? a : b
+  );
+
+  // 🎨 Màu
+  const gradientGray = c2d.createLinearGradient(0, 0, 0, 300);
+  gradientGray.addColorStop(0, "rgba(210,210,210,1)");
+  gradientGray.addColorStop(1, "rgba(160,160,160,0.6)");
+
+  const gradientGold = c2d.createLinearGradient(0, 0, 0, 300);
+  gradientGold.addColorStop(0, "rgba(255,169,0,1)");
+  gradientGold.addColorStop(1, "rgba(255,169,0,0.6)");
+
+  const maleColors = ages.map((age) =>
+    age === maxAge ? gradientGold : gradientGray
+  );
+  const femaleColors = ages.map((age) =>
+    age === maxAge ? gradientGold : gradientGray
+  );
+
+  // ⚙️ Cấu hình Chart.js
+  window.chart_age_gender_total = new Chart(c2d, {
+    type: "bar",
+    data: {
+      labels: ages,
+      datasets: [
+        {
+          label: "Male",
+          data: maleSpends,
+          backgroundColor: maleColors,
+          borderRadius: 8,
+          borderWidth: 0,
+        },
+        {
+          label: "Female",
+          data: femaleSpends,
+          backgroundColor: femaleColors,
+          borderRadius: 8,
+          borderWidth: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { left: 10, right: 10 } },
+      animation: { duration: 700, easing: "easeOutQuart" },
+      plugins: {
+        legend: { display: false }, // ❌ bỏ chú thích
+        tooltip: {
+          callbacks: {
+            title: (ctx) => `Age: ${ctx[0].label}`,
+            label: (ctx) => `${ctx.dataset.label}: ${formatMoneyShort(ctx.raw)}`,
+          },
+        },
+        datalabels: { display: false }, // ❌ bỏ label trên bar
+      },
+      scales: {
+        x: {
+          stacked: false,
+          grid: {
+            color: "rgba(0,0,0,0.03)",
+            drawBorder: true,
+            borderColor: "rgba(0,0,0,0.05)",
+          },
+          ticks: {
+            color: "#555",
+            font: { weight: "600", size: 11 },
+          },
+          title: { display: false},
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: "rgba(0,0,0,0.03)",
+            drawBorder: true,
+            borderColor: "rgba(0,0,0,0.05)",
+          },
+          ticks: { display: false },
+          title: { display: false},
+        },
+      },
+    },
+    plugins: [ChartDataLabels],
+  });
+}
