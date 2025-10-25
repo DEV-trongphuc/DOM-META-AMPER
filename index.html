@@ -83,13 +83,17 @@
             <i class="fa-solid fa-chart-column"></i>
             <span>Dashboard</span>
           </li>
+          <li class="" data-view="ad_detail">
+            <i class="fa-solid fa-list"></i>
+            <span>Ad Detail</span>
+          </li>
 
           <!-- <li class="" data-view="won">
             <i class="fa-solid fa-graduation-cap"></i>
             <span>Won</span>
           </li> -->
         </ul>
-        <p class="dom_text_menu">OTHER APP</p>
+        <!-- <p class="dom_text_menu">OTHER APP</p> -->
         <ul class="dom_other_menu">
           <!-- <li class="" data-view="ads">
             <a target="_blank" href="https://ideas-crm-dashboard.vercel.app/">
@@ -104,7 +108,7 @@
           </li> -->
         </ul>
       </div>
-      <div class="dom_container dashboard detail">
+      <div class="dom_container dashboard ">
         <div class="dom_header flex">
           <div class="dom_header_time">
             <div class="dom_select time">
@@ -282,7 +286,7 @@
             <div class="dom_inner dom_fade_item w33 box_shadow chart trendline">
               <div class="dom_table_filter">
                 <h2>
-                  <i class="fa-solid fa-chart-line main_clr"></i> Leads Daily
+                  <i class="fa-solid fa-chart-line main_clr"></i> Daily Spent
                 </h2>
                 <div class="dom_select daily_total">
                   <i class="fa-solid fa-chart-area"></i>
@@ -317,7 +321,7 @@
               class="dom_inner dom_fade_item w35 box_shadow chart full trendline"
             >
               <h2>
-                <i class="fa-solid fa-chart-line main_clr"></i> Leads Daily
+                <i class="fa-solid fa-chart-line main_clr"></i> Optimization goal
               </h2>
               <div>
                 <canvas id="goal_chart"></canvas>
@@ -355,7 +359,7 @@
                     <span class="dom_interaction_reaction"> - </span>
                   </div>
                   <div class="dom_interaction_note">
-                    <span>Like page/Follow</span>
+                    <span>Follows</span>
                     <span class="dom_interaction_like"> - </span>
                   </div>
                   <div class="dom_interaction_note">
@@ -425,14 +429,14 @@
             class="dom_inner dom_fade_item w35 box_shadow chart full trendline"
           >
             <h2>
-              <i class="fa-solid fa-chart-line main_clr"></i> Leads Daily
+              <i class="fa-solid fa-chart-line main_clr"></i> Age & Gender
             </h2>
             <div>
               <canvas id="age_gender_total"></canvas>
             </div>
           </div>
           </div>
-          <div class="dom_row flex">
+          <div class="dom_row flex ad_detail">
             <div class="dom_inner view_campaign">
               <h2>
                 <i class="fa-solid fa-list main_clr"></i> Detail Campaign -
@@ -441,7 +445,27 @@
               <div class="dom_table_header">
                 <div class="dom_campaign_filter">
                   <input placeholder="Filter by Campaign name" id="filter" />
-                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <i class="fa-solid fa-magnifying-glass" id="filter_button"></i>
+                </div>
+                <div class="dom_select quick_filter">
+                  <div class="flex">
+                    <p class="dom_selected">Quick filter</p>
+                  </div>
+                  <i class="fa-solid fa-angle-down"></i>
+                  <ul class="dom_select_show">
+                    <li  class="">
+                      <span data-view="active_ads" class="radio_box"></span> <span>ACTIVE ADS</span>
+                    </li>
+                    <li  class="">
+                      <span data-view="reset"  class="radio_box"></span> <span>Reset filter</span>
+                    </li>
+                    <!-- <li  class="">
+                      <span class="radio_box"></span> <span>Today</span>
+                    </li>
+                    <li  class="">
+                      <span class="radio_box"></span> <span>Today</span>
+                    </li> -->
+                  </ul>
                 </div>
                 <div>
                   <!-- <div class="dom_select quick_filter_detail">
@@ -644,7 +668,7 @@
                     <p>Khác</p>
                   </div>
                   <p class="detail_text">Optimize</p>
-                  <div class="detail_gender_bar"><p>Anvatage +</p></div>
+                  <div class="detail_optimize detail_gender_bar"><p>Anvatage +</p></div>
                 </div>
                 <div class="detail_gender">
                   <p class="detail_text">Location</p>
@@ -656,6 +680,10 @@
                       <span class="tag_name">Automatic Target</span>
                     </p>
                   </div>
+                  <p class="detail_text">Custom Audiences</p>
+                  <div class="detail_audience frequency_tag"></div>
+                  <p class="detail_text">Exclude</p>
+                  <div class="detail_exclude frequency_tag"></div>
                 </div>
               </div>
             </div>
@@ -684,7 +712,7 @@
                   </div>
                   <div class="frequency_number_label">
                     <p>0</p>
-                    <p>3</p>
+                    <p>4</p>
                   </div>
                   <div class="dom_frequency_label op8">
                     <p>
