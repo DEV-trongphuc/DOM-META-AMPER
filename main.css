@@ -904,7 +904,7 @@ tbody {
   display: flex;
   box-shadow: 0 0 5px var(--shadow02);
   border-radius: 15px;
-  background: #f3f3f3;
+  background: #f7f7f7;
   cursor: pointer;
   position: relative;
 }
@@ -944,14 +944,17 @@ tbody {
 .account_item_avatar {
   width: 35px;
   height: 35px;
-  border-radius: 15px;
+  border-radius: 50rem;
 }
 .account_item_info {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 8px;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
+}
+.account_item > i {
+  opacity: .7;
 }
 .account_item_name {
   font-weight: bold;
@@ -961,7 +964,8 @@ tbody {
   max-width: 13rem;
 }
 .account_item_id {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  opacity: 0.8;
 }
 .dom_account_view > ul li {
   padding: 1.5rem 1rem;
@@ -1002,7 +1006,7 @@ tbody {
   pointer-events: none;
   transition: 0.3s;
 }
-.dom_account_view_block.active ~ ul {
+.dom_account_view.active  ul {
   opacity: 1;
   pointer-events: all;
 }
@@ -2300,14 +2304,15 @@ tbody {
   height: 100%;
 }
 .dom_platform > div:first-child {
-  width: 30%;
+  width: 35%;
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 .dom_platform > div:last-child {
-  width: 70%;
+  width: 65%;
+  margin-left: 1rem;
 }
 .dom_platform_item > p > span {
   font-weight: bold;
