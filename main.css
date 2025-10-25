@@ -99,7 +99,7 @@ html {
 /* Laptop nhỏ hơn 1280px */
 @media (max-width: 1280px) {
   html {
-    font-size: 40%; /* 12px */
+    font-size: 38%; /* 12px */
   }
 }
 
@@ -247,7 +247,11 @@ html {
   align-items: center;
 }
 .interaction_list .dom_interaction_note:nth-child(5) {
-  background-color: #ffe8bb57;
+  background: linear-gradient(135deg, var(--mainClr) 0%, #d88200ee 100%);
+  color: white;
+}
+.interaction_list .dom_interaction_note:nth-child(5) > span:last-child {
+font-size: 2.5rem;
 }
 .dom_header_time {
   display: flex;
@@ -942,8 +946,8 @@ tbody {
   opacity: 0.9;
 }
 .account_item_avatar {
-  width: 35px;
-  height: 35px;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: 50rem;
 }
 .account_item_info {
@@ -1148,6 +1152,10 @@ tbody {
 }
 .dom_inner.w35 {
   width: 35%;
+  background: rgba(255, 255, 255, 0.8);
+}
+.dom_inner.w30 {
+  width: 30%;
   background: rgba(255, 255, 255, 0.8);
 }
 
@@ -2308,7 +2316,7 @@ tbody {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 .dom_platform > div:last-child {
   width: 65%;
@@ -2406,7 +2414,6 @@ tbody {
   gap: 2rem;
   border-radius: 15px;
   height: max-content;
-  opacity: 0.8;
 }
 .dom_interaction_note > span:last-child {
   font-size: 1.7rem;
@@ -3051,7 +3058,6 @@ tbody {
   display: none;
 }
 .dom_container .dom_dashboard {
-  padding-bottom: 30rem;
 }
 
 .dom_detail_ad {
@@ -3147,7 +3153,7 @@ tbody {
 .detail_age_bar .age_range {
   position: absolute;
   height: 100%;
-  background-color: var(--mainClr);
+  background: linear-gradient(135deg, var(--mainClr) 0%, #d88200ee 100%);
   border-radius: 50rem;
   top: 0;
   transition: all 0.3s ease;
@@ -3172,8 +3178,7 @@ tbody {
 }
 .detail_gender h2 {
   font-weight: bold;
-  font-size: 2rem;
-  opacity: 0.8;
+  font-size: 1.8rem;
 }
 .detail_thumb {
   display: flex;
@@ -3324,7 +3329,7 @@ tbody {
   opacity: 0.8;
 }
 .dom_detail_header > a:last-child {
-  background-color: var(--mainClr);
+  background: linear-gradient(135deg, var(--mainClr) 0%, #d88200ee 100%);
   padding: 1.5rem 2rem;
   border-radius: 10px;
   font-weight: bold;
