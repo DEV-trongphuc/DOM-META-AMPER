@@ -1,3 +1,4 @@
+
 let monthlyChartInstance = null;
 // Nhãn tháng (dùng chung)
 const MONTH_LABELS = [
@@ -15,9 +16,15 @@ const MONTH_LABELS = [
   "Dec",
 ];
 let startDate, endDate;
+// =================== DATE PICKER STATE ===================
+let calendarCurrentMonth = new Date().getMonth();
+let calendarCurrentYear = new Date().getFullYear();
+let tempStartDate = null;
+let tempEndDate = null;
 let VIEW_GOAL; // Dùng cho chart breakdown
 const CACHE = new Map();
 let DAILY_DATA = [];
+let CURRENT_CAMPAIGN_FILTER = ""; // 👈 Lưu bộ lọc hiện tại (dùng cho Brand filter)
 const BATCH_SIZE = 10;
 const CONCURRENCY_LIMIT = 40;
 const API_VERSION = "v24.0";
@@ -45,7 +52,7 @@ const resultMapping = {
   PROFILE_VISIT: "link_click",
   LINK_CLICKS: "link_click",
   LANDING_PAGE_VIEWS: "link_click",
-  REPLIES: "onsite_conversion.messaging_conversation_replied_7d",
+  REPLIES: "onsite_conversion.total_messaging_connection",
   IMPRESSIONS: "impressions",
   PAGE_LIKES: "follows",
   DEFAULT: "reach", // Fallback
@@ -191,7 +198,7 @@ async function fetchJSON(url, options = {}) {
           await new Promise((r) => setTimeout(r, 5000));
           return fetchJSON(url, options); // Thử lại sau khi bị giới hạn tốc độ
         }
-      } catch {}
+      } catch { }
       throw new Error(msg);
     }
     const data = JSON.parse(text);
@@ -203,11 +210,103 @@ async function fetchJSON(url, options = {}) {
   }
 }
 
+
 function chunkArray(arr, size) {
   const chunks = [];
   for (let i = 0; i < arr.length; i += size)
     chunks.push(arr.slice(i, i + size));
   return chunks;
+}
+
+/**
+ * 👤 Lấy danh sách tài khoản quảng cáo từ API
+ */
+async function fetchMyAdAccounts() {
+  const url = `${BASE_URL}/me/adaccounts?fields=name,account_id,id,business{profile_picture_uri}&limit=50&access_token=${META_TOKEN}`;
+  try {
+    const res = await fetchJSON(url);
+    return res.data || [];
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy danh sách tài khoản:", err);
+    return [];
+  }
+}
+
+/**
+ * 🎨 Khởi tạo bộ chọn tài khoản (render động)
+ */
+async function initAccountSelector() {
+  const accounts = await fetchMyAdAccounts();
+  const dropdownUl = document.querySelector(".dom_account_view ul");
+  const selectedInfo = document.querySelector(".dom_account_view_block .account_item");
+
+  if (!dropdownUl || !selectedInfo) return;
+
+  // Xóa danh sách cũ (hardcoded)
+  dropdownUl.innerHTML = "";
+
+  // 🚩 Lọc danh sách nếu có setup ALLOWED_ACCOUNTS
+  const allowedIds = window.ALLOWED_ACCOUNTS;
+  const filteredAccounts = (Array.isArray(allowedIds) && allowedIds.length > 0)
+    ? accounts.filter(acc => allowedIds.includes(acc.account_id))
+    : accounts;
+
+  filteredAccounts.forEach(acc => {
+    const li = document.createElement("li");
+    li.dataset.acc = acc.account_id;
+
+    // Sử dụng ảnh business profile pic hoặc ảnh mặc định
+    const avatarUrl = acc.business?.profile_picture_uri || "./logo.png";
+
+    li.innerHTML = `
+      <img src="${avatarUrl}" />
+      <p><span> ${acc.name}</span></p>
+    `;
+    dropdownUl.appendChild(li);
+
+    // Cập nhật thông tin hiển thị nếu đây là tài khoản đang chọn
+    if (acc.account_id === ACCOUNT_ID) {
+      updateSelectedAccountUI(acc.name, acc.account_id, avatarUrl);
+    }
+  });
+
+  // Nếu ACCOUNT_ID hiện tại không khớp với bất kỳ acc nào trong danh sách (trường hợp id lạ)
+  // Thực hiện fetch chi tiết riêng cho ACCOUNT_ID đó
+  const isCurrentAccountInList = accounts.some(a => a.account_id === ACCOUNT_ID);
+  if (!isCurrentAccountInList && ACCOUNT_ID) {
+    fetchSingleAccountInfo(ACCOUNT_ID);
+  }
+}
+
+/**
+ * 🛠️ Cập nhật UI tài khoản đang chọn
+ */
+function updateSelectedAccountUI(name, id, avatarUrl) {
+  const selectedInfo = document.querySelector(".dom_account_view_block .account_item");
+  if (!selectedInfo) return;
+
+  const avatar = selectedInfo.querySelector(".account_item_avatar");
+  const nameEl = selectedInfo.querySelector(".account_item_name");
+  const idEl = selectedInfo.querySelector(".account_item_id");
+
+  if (avatar) avatar.src = avatarUrl || "./logo.png";
+  if (nameEl) nameEl.textContent = name;
+  if (idEl) idEl.textContent = id;
+}
+
+/**
+ * 🔍 Fetch thông tin 1 tài khoản cụ thể (nếu ko có trong list /me/adaccounts)
+ */
+async function fetchSingleAccountInfo(accId) {
+  const url = `${BASE_URL}/act_${accId}?fields=name,account_id,business{profile_picture_uri}&access_token=${META_TOKEN}`;
+  try {
+    const acc = await fetchJSON(url);
+    if (acc) {
+      updateSelectedAccountUI(acc.name, acc.account_id, acc.business?.profile_picture_uri);
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy thông tin tài khoản lẻ:", err);
+  }
 }
 
 async function fetchAdsets() {
@@ -255,7 +354,7 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
         method: "GET",
         relative_url:
           `${adsetId}/ads?fields=id,name,effective_status,adset_id,` +
-          `adset{end_time,daily_budget,lifetime_budget},` +
+          `adset{end_time,start_time,daily_budget,lifetime_budget},` +
           `creative{thumbnail_url,instagram_permalink_url,effective_object_story_id},` +
           `insights.time_range({since:'${startDate}',until:'${endDate}'}){spend,impressions,reach,actions,optimization_goal}`,
       }));
@@ -310,6 +409,7 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
               daily_budget: adset.daily_budget || 0,
               lifetime_budget: adset.lifetime_budget ?? null,
               end_time: adset.end_time ?? null,
+              start_time: adset.start_time ?? null,
             },
             creative: {
               thumbnail_url: creative.thumbnail_url ?? null,
@@ -396,6 +496,7 @@ function groupByCampaign(adsets) {
         reactions: 0,
         lead: 0,
         message: 0,
+        link_clicks: 0,
         adsets: [],
         _adsetMap: Object.create(null),
         // Thêm status cho campaign (lấy từ ad đầu tiên, giả định chúng giống nhau)
@@ -416,8 +517,10 @@ function groupByCampaign(adsets) {
         reactions: 0,
         lead: 0,
         message: 0,
+        link_clicks: 0,
         ads: [],
         end_time: as.ads?.[0]?.adset?.end_time || null,
+        start_time: as.ads?.[0]?.adset?.start_time || null,
         daily_budget: as.ads?.[0]?.adset?.daily_budget || 0,
         lifetime_budget: as.ads?.[0]?.adset?.lifetime_budget || 0,
       };
@@ -433,8 +536,8 @@ function groupByCampaign(adsets) {
       const ins = Array.isArray(ad.insights?.data)
         ? ad.insights.data[0]
         : Array.isArray(ad.insights)
-        ? ad.insights[0]
-        : ad.insights || {};
+          ? ad.insights[0]
+          : ad.insights || {};
 
       const spend = +ins.spend || 0;
       const reach = +ins.reach || 0;
@@ -445,11 +548,13 @@ function groupByCampaign(adsets) {
       const actions = ins.actions;
       const messageCount = safeGetActionValue(
         actions,
-        "onsite_conversion.messaging_conversation_replied_7d"
+        "onsite_conversion.total_messaging_connection"
       );
       const leadCount =
         safeGetActionValue(actions, "lead") +
         safeGetActionValue(actions, "onsite_conversion.lead_grouped"); // ✅ Cộng dồn adset-level
+
+      const linkClicks = safeGetActionValue(actions, "link_click"); // Extract link_click
 
       adset.spend += spend;
       adset.result += result;
@@ -458,6 +563,7 @@ function groupByCampaign(adsets) {
       adset.reactions += reactions;
       adset.lead += leadCount;
       adset.message += messageCount; // ✅ Cộng dồn campaign-level
+      adset.link_clicks += linkClicks;
 
       campaign.spend += spend;
       campaign.result += result;
@@ -466,6 +572,7 @@ function groupByCampaign(adsets) {
       campaign.reactions += reactions;
       campaign.lead += leadCount;
       campaign.message += messageCount; // 🖼️ Add ad summary
+      campaign.link_clicks += linkClicks;
 
       adset.ads.push({
         id: ad.ad_id || ad.id || null,
@@ -636,9 +743,8 @@ function renderCampaignView(data) {
       <div class="campaign_item ${campaignStatusClass}">
         <div class="campaign_main">
           <div class="ads_name">
-            <div class="campaign_thumb campaign_icon_wrap ${
-              hasActiveAdset ? "" : "inactive"
-            }">
+            <div class="campaign_thumb campaign_icon_wrap ${hasActiveAdset ? "" : "inactive"
+      }">
               <i class="${iconClass}"></i>
             </div>
             <p class="ad_name">${c.name}</p>
@@ -646,15 +752,14 @@ function renderCampaignView(data) {
           <div class="ad_status ${campaignStatusClass}">${campaignStatusText}</div>
           <div class="ad_spent">${formatMoney(c.spend)}</div>
           <div class="ad_result">${formatNumber(c.result)}</div>
-          <div class="ad_cpr">${
-            campaignCpr > 0 ? formatMoney(campaignCpr) : "-"
-          }</div>
+          <div class="ad_cpr">${campaignCpr > 0 ? formatMoney(campaignCpr) : "-"
+      }</div>
           <div class="ad_cpm">${formatMoney(calcCpm(c.spend, c.reach))}</div>
           <div class="ad_reach">${formatNumber(c.reach)}</div>
           <div class="ad_frequency">${calcFrequency(
-            c.impressions,
-            c.reach
-          )}</div>
+        c.impressions,
+        c.reach
+      )}</div>
           <div class="ad_reaction">${formatNumber(c.reactions)}</div>
           <div class="campaign_view"><i class="fa-solid fa-angle-down"></i></div>
         </div>`);
@@ -676,36 +781,70 @@ function renderCampaignView(data) {
       const dailyBudget = +as.daily_budget || 0;
       const lifetimeBudget = +as.lifetime_budget || 0;
 
+      const formatDate = (dateStr) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        return `${String(d.getDate()).padStart(2, "0")}-${String(
+          d.getMonth() + 1
+        ).padStart(2, "0")}-${d.getFullYear()}`;
+      };
+      const startDate = formatDate(as.start_time);
+      const endDate = formatDate(as.end_time);
+      let label = "";
+      let value = "";
+      let timeText = "";
       if (isEnded) {
-        adsetStatusClass = "complete";
-        adsetStatusText = `<span class="status-label">COMPLETE</span>`;
-      } else if (hasActiveAd && dailyBudget > 0) {
-        adsetStatusClass = "active dbudget";
+        adsetStatusClass = "complete budget";
+        // adsetStatusText = `<span class="status-label">COMPLETE</span>`;
+        // adsetStatusClass = "active budget";
+        label = `<span class="status-label"></span>`;
+        value = `<span class="status-value">COMPLETE</span>`;
+        timeText = `<i class="fa-regular fa-clock" style="opacity: 0.5"></i> ${startDate} to ${endDate}`;
+
         adsetStatusText = `
-          <span class="status-label">Daily Budget</span>
-          <span class="status-value">${dailyBudget.toLocaleString(
+          ${label}
+          ${value}
+          ${timeText ? `<span class="status-date">${timeText}</span>` : ""}
+        `;
+      } else if (hasActiveAd && (dailyBudget > 0 || lifetimeBudget > 0)) {
+        adsetStatusClass = "active budget";
+
+
+        if (dailyBudget > 0) {
+          label = `<span class="status-label">Daily Budget</span>`;
+          value = `<span class="status-value">${dailyBudget.toLocaleString(
             "vi-VN"
           )}đ</span>`;
-      } else if (hasActiveAd && lifetimeBudget > 0) {
-        adsetStatusClass = "active budget";
-        const d = as.end_time ? new Date(as.end_time) : null;
-        const endDate = d
-          ? `${String(d.getDate()).padStart(2, "0")}-${String(
-              d.getMonth() + 1
-            ).padStart(2, "0")}-${d.getFullYear()}`
-          : "";
-        adsetStatusText = `
-          <span class="status-label">Lifetime Budget</span>
-          <span class="status-value">${lifetimeBudget.toLocaleString(
+          timeText = endDate
+            ? `<i class="fa-regular fa-clock" style="opacity: 0.5"></i> ${startDate} to ${endDate}`
+            : `<i class="fa-regular fa-clock" style="opacity: 0.5"></i> START: ${startDate}`;
+        } else if (lifetimeBudget > 0) {
+          label = `<span class="status-label">Lifetime Budget</span>`;
+          value = `<span class="status-value">${lifetimeBudget.toLocaleString(
             "vi-VN"
-          )}đ</span>
-          <span class="status-date">END ${endDate}</span>`;
+          )}đ</span>`;
+          timeText = `<i class="fa-regular fa-clock" style="opacity: 0.5"></i> ${startDate} to ${endDate}`;
+        }
+
+        adsetStatusText = `
+          ${label}
+          ${value}
+          ${timeText ? `<span class="status-date">${timeText}</span>` : ""}
+        `;
       } else if (hasActiveAd) {
         adsetStatusClass = "active";
         adsetStatusText = `<span>ACTIVE</span>`;
       } else {
-        adsetStatusClass = "inactive";
-        adsetStatusText = `<span>INACTIVE</span>`;
+        adsetStatusClass = "inactive budget";
+
+        label = `<span class="status-label"></span>`;
+        value = `<span class="status-value">INACTIVE</span>`;
+        timeText = `<i class="fa-regular fa-clock" style="opacity: 0.5"></i> ${startDate} to ${endDate}`;
+        adsetStatusText = `
+          ${label}
+          ${value}
+          ${timeText ? `<span class="status-date">${timeText}</span>` : ""}
+        `;
       }
 
       const adsetCpr =
@@ -730,24 +869,23 @@ function renderCampaignView(data) {
           <div class="ad_item ${isActive ? "active" : "inactive"}">
             <div class="ads_name">
               <a>
-                <img src="${ad.thumbnail}" data-ad-id-img="${ad.id}" />
+                <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${ad.thumbnail}" data-ad-id-img="${ad.id}" />
                 <p class="ad_name">ID: ${ad.id}</p>
               </a>
             </div>
-            <div class="ad_status ${isActive ? "active" : "inactive"}">${
-          ad.status
-        }</div>
+            <div class="ad_status ${isActive ? "active" : "inactive"}">${ad.status
+          }</div>
             <div class="ad_spent">${formatMoney(ad.spend)}</div>
             <div class="ad_result">${formatNumber(ad.result)}</div>
             <div class="ad_cpr">${adCpr > 0 ? formatMoney(adCpr) : "-"}</div>
             <div class="ad_cpm">${formatMoney(
-              calcCpm(ad.spend, ad.reach)
-            )}</div>
+            calcCpm(ad.spend, ad.reach)
+          )}</div>
             <div class="ad_reach">${formatNumber(ad.reach)}</div>
             <div class="ad_frequency">${calcFrequency(
-              ad.impressions,
-              ad.reach
-            )}</div>
+            ad.impressions,
+            ad.reach
+          )}</div>
             <div class="ad_reaction">${formatNumber(ad.reactions)}</div>
             <div class="ad_view"
               data-ad-id="${ad.id}"
@@ -769,7 +907,7 @@ function renderCampaignView(data) {
         <div class="adset_item ${adsetStatusClass}">
           <div class="ads_name">
             <a>
-              <img src="${as.ads?.[0]?.thumbnail}" />
+              <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${as.ads?.[0]?.thumbnail}" />
               <p class="ad_name">${as.name}</p>
             </a>
           </div>
@@ -778,16 +916,16 @@ function renderCampaignView(data) {
           <div class="ad_result">${formatNumber(as.result)}</div>
           <div class="ad_cpr">
             <i class="${getCampaignIcon(
-              as.optimization_goal
-            )} adset_goal_icon"></i>
+        as.optimization_goal
+      )} adset_goal_icon"></i>
             <span>${as.optimization_goal}</span>
           </div>
           <div class="ad_cpm">${formatMoney(calcCpm(as.spend, as.reach))}</div>
           <div class="ad_reach">${formatNumber(as.reach)}</div>
           <div class="ad_frequency">${calcFrequency(
-            as.impressions,
-            as.reach
-          )}</div>
+        as.impressions,
+        as.reach
+      )}</div>
           <div class="ad_reaction">${formatNumber(as.reactions)}</div>
           <div class="adset_view">
             <div class="campaign_view"><i class="fa-solid fa-angle-down"></i></div>
@@ -978,20 +1116,22 @@ async function loadCampaignList() {
 
 // 🧩 Chạy 1 lần khi load page
 function initDashboard() {
+  /* Fix: Initialize default date range if missing */
+  if (typeof startDate === 'undefined' || !startDate) {
+    const defaultRange = getDateRange("last_7days");
+    startDate = defaultRange.start;
+    endDate = defaultRange.end;
+  }
   initDateSelector();
   setupDetailDailyFilter();
   setupDetailDailyFilter2();
   setupFilterDropdown();
   setupYearDropdown();
-
-  // ⭐ TỐI ƯU: Gọi addListeners MỘT LẦN DUY NHẤT
   addListeners();
-
+  setupAIReportModal();
   const { start, end } = getDateRange("last_7days");
   startDate = start;
   endDate = end;
-
-  // Có thể add thêm listener hoặc setup UI khác ở đây
 }
 
 // 🧠 Hàm chỉ để load lại data (gọi khi đổi account/filter)
@@ -1008,13 +1148,14 @@ async function loadDashboardData() {
   if (loading) loading.classList.add("active");
 
   // 🔁 Chạy song song các luồng
-  loadDailyChart();
-  loadPlatformSummary();
-  loadSpendPlatform();
-  loadAgeGenderSpendChart();
-  loadRegionSpendChart();
+  // loadDailyChart();
+  // loadPlatformSummary();
+  // loadSpendPlatform();
+  // loadAgeGenderSpendChart();
+  // loadRegionSpendChart();
+  loadAllDashboardCharts();
   initializeYearData();
-  fetchAdAccountInfo();
+
   resetYearDropdownToCurrentYear();
   resetFilterDropdownTo("spend");
   loadCampaignList().finally(() => {
@@ -1025,10 +1166,36 @@ async function loadDashboardData() {
 // 🚀 Hàm chính gọi khi load trang lần đầu
 async function main() {
   renderYears();
-  initDashboard(); // <-- addListeners() được gọi bên trong hàm này
-  initializeYearData();
-  fetchAdAccountInfo();
+  initDashboard();
+  await initAccountSelector(); // 👈 Khởi tạo chọn tài khoản động
   await loadDashboardData();
+
+  // 🖱️ Lắng nghe sự kiện Reset All Filters từ Empty Card
+  document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("btn_reset_all")) {
+      resetAllFilters();
+    }
+  });
+}
+
+/**
+ * 🧹 Reset toàn bộ filter về trạng thái mặc định
+ */
+function resetAllFilters() {
+  // 1. Reset ô tìm kiếm
+  const campaignSearch = document.getElementById("campaign_filter");
+  if (campaignSearch) campaignSearch.value = "";
+
+  // 2. Xóa filter brand hiện tại
+  if (typeof CURRENT_CAMPAIGN_FILTER !== 'undefined') {
+    CURRENT_CAMPAIGN_FILTER = "";
+  }
+
+  // 3. Reset UI dropdown và các filter khác
+  resetUIFilter();
+
+  // 4. Tải lại toàn bộ dashboard
+  loadAllDashboardCharts();
 }
 
 main();
@@ -1046,6 +1213,18 @@ const calcCpr = (insights) => {
   const result = getResults(insights); // Dùng hàm getResults thống nhất
   return result ? spend / result : 0;
 };
+
+/**
+ * Hàm helper để load ảnh lazy khi click mở rộng
+ */
+function loadLazyImages(container) {
+  if (!container) return;
+  const lazyImages = container.querySelectorAll("img[data-src]");
+  lazyImages.forEach((img) => {
+    img.src = img.dataset.src;
+    img.removeAttribute("data-src");
+  });
+}
 
 // ================== Event ==================
 
@@ -1082,6 +1261,7 @@ function addListeners() {
         .forEach((c) => c.classList.remove("show"));
       // Mở campaign hiện tại
       campaignItem.classList.add("show");
+      loadLazyImages(campaignItem);
       return; // Đã xử lý xong, không cần check thêm
     }
 
@@ -1093,6 +1273,12 @@ function addListeners() {
 
       e.stopPropagation();
       adsetItem.classList.toggle("show");
+      if (adsetItem.classList.contains("show")) {
+        const adItemBox = adsetItem.nextElementSibling;
+        if (adItemBox && adItemBox.classList.contains("ad_item_box")) {
+          loadLazyImages(adItemBox);
+        }
+      }
       return; // Đã xử lý xong
     }
 
@@ -1122,6 +1308,16 @@ function addListeners() {
     const domDetail = document.querySelector("#dom_detail");
     if (domDetail) domDetail.classList.remove("active");
   });
+
+  // 3. Listener cho nút Export CSV
+  const exportBtn = document.getElementById("export_csv_btn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      if (typeof exportAdsToCSV === "function") {
+        exportAdsToCSV();
+      }
+    });
+  }
 }
 
 // ================================================================
@@ -1204,7 +1400,7 @@ async function handleViewClick(e, type = "ad") {
     // Cập nhật header
     const img = domDetail.querySelector(".dom_detail_header img");
     const idEl = domDetail.querySelector(".dom_detail_id");
-    const viewPostBtn = domDetail.querySelector(".view_post_btn");
+    // const viewPostBtn = domDetail.querySelector(".view_post_btn");
 
     if (img) img.src = thumb;
     if (idEl)
@@ -1212,10 +1408,10 @@ async function handleViewClick(e, type = "ad") {
     <span>${name}</span> <span> ID: ${id}</span>
    `;
 
-    if (viewPostBtn) {
-      viewPostBtn.href = postUrl;
-      viewPostBtn.style.display = postUrl === "#" ? "none" : "inline-block";
-    }
+    // if (viewPostBtn) {
+    //   viewPostBtn.href = postUrl;
+    //   viewPostBtn.style.display = postUrl === "#" ? "none" : "inline-block";
+    // }
   }
 
   // --- Loading overlay ---
@@ -1224,6 +1420,7 @@ async function handleViewClick(e, type = "ad") {
 
   try {
     if (type === "ad") {
+      // await fetchAdDetailBatch(id);
       await showAdDetail(id);
     } else {
       console.log("🔍 Xem chi tiết adset:", id, { spend, goal, result, cpr });
@@ -1442,35 +1639,48 @@ async function fetchAdDailyInsights(ad_id) {
 }
 
 // ===================== HIỂN THỊ CHI TIẾT AD =====================
+// ===================== HIỂN THỊ CHI TIẾT AD (ĐÃ SỬA ĐỔI) =====================
 async function showAdDetail(ad_id) {
   if (!ad_id) return;
 
   const detailBox = document.querySelector(".dom_detail");
   if (!detailBox) return;
-  detailBox.classList.add("active");
+  // Không cần add active ở đây nữa, vì handleViewClick đã làm rồi
 
-  // Hủy các chart cũ chỉ một lần
+  // Hủy các chart cũ (Giữ nguyên)
+  // --- 1. Hủy các chart cũ ---
   const chartsToDestroy = [
-    window.detail_spent_chart_instance,
-    window.chart_by_hour_chart,
-    window.chart_by_age_gender_chart,
-    window.chart_by_region_chart,
-    window.chart_by_device_chart,
-    window.chart_by_platform_chart,
+    window.detail_spent_chart_instance, // Chart daily trend trong detail
+    window.chartByHourInstance, // Chart theo giờ (sửa tên biến)
+    window.chart_by_age_gender_instance, // Chart tuổi/giới tính
+    window.chart_by_region_instance, // Chart vùng miền
+    window.chart_by_device_instance, // Chart thiết bị (doughnut)
   ];
 
-  chartsToDestroy.forEach((chart) => chart?.destroy());
+  chartsToDestroy.forEach((chart) => {
+    if (chart && typeof chart.destroy === "function") {
+      try {
+        chart.destroy();
+      } catch (e) {
+        console.warn("Lỗi khi hủy chart:", e);
+      }
+    }
+  });
+
+  // Gán lại null cho các instance đã hủy
   window.detail_spent_chart_instance = null;
-  // Gán lại null cho tất cả các instance đã destroy
-  window.chart_by_hour_chart = null;
-  window.chart_by_age_gender_chart = null;
-  window.chart_by_region_chart = null;
-  window.chart_by_device_chart = null;
-  window.chart_by_platform_chart = null;
+  window.chartByHourInstance = null;
+  window.chart_by_age_gender_instance = null;
+  window.chart_by_region_instance = null;
+  window.chart_by_device_instance = null;
 
   try {
-    // Fetch tất cả API song song
-    const [
+    // ⭐ THAY ĐỔI CHÍNH: Gọi hàm batch MỘT LẦN ở đây
+    const results = await fetchAdDetailBatch(ad_id);
+    console.log(results);
+
+    // Bóc tách kết quả từ object 'results'
+    const {
       targeting,
       byHour,
       byAgeGender,
@@ -1478,58 +1688,279 @@ async function showAdDetail(ad_id) {
       byPlatform,
       byDevice,
       byDate,
-    ] = await Promise.all([
-      fetchAdsetTargeting(ad_id),
-      fetchAdsetActionsByHour(ad_id),
-      fetchAdsetActionsByAgeGender(ad_id),
-      fetchAdsetActionsByRegion(ad_id),
-      fetchAdsetActionsByPlatformPosition(ad_id),
-      fetchAdsetActionsByDevice(ad_id),
-      fetchAdDailyInsights(ad_id),
-    ]);
+      adPreview,
+    } = results;
 
-    // Kiểm tra xem dữ liệu đã sẵn sàng chưa
-    if (
-      !targeting ||
-      !byHour ||
-      !byAgeGender ||
-      !byRegion ||
-      !byPlatform ||
-      !byDevice ||
-      !byDate
-    ) {
-      console.error("❌ Missing required data for ad_id:", ad_id);
-      return;
+    // Kiểm tra dữ liệu CƠ BẢN
+    // if (
+    //   !targeting ||
+    //   !byHour ||
+    //   !byAgeGender ||
+    //   !byRegion ||
+    //   !byPlatform ||
+    //   !byDevice ||
+    //   !byDate
+    // ) {
+    //   console.error(
+    //     "❌ Dữ liệu chi tiết ad bị thiếu sau khi fetch batch:",
+    //     ad_id
+    //   );
+    //   // Có thể hiển thị thông báo lỗi phù hợp hơn
+    //   return;
+    // }
+
+    // ⭐ Render Ad Preview
+    const previewBox = document.getElementById("preview_box");
+    if (previewBox) {
+      previewBox.innerHTML = adPreview || "";
     }
 
     // ================== Render Targeting ==================
     renderTargetingToDOM(targeting);
 
-    // ================== Render Interaction ==================
-    renderInteraction(byDevice); // Note: Original code uses byDevice, but byDate seems more correct for total interactions. Keeping as-is.
-    window.dataByDate = byDate; // Lưu trữ dữ liệu cho việc vẽ chart
+    const processedByDate = {};
+    (byDate || []).forEach((item) => {
+      const date = item.date_start;
+      if (date) {
+        processedByDate[date] = {
+          spend: parseFloat(item.spend || 0),
+          impressions: parseInt(item.impressions || 0),
+          reach: parseInt(item.reach || 0),
+          actions: item.actions
+            ? Object.fromEntries(
+              item.actions.map((a) => [a.action_type, parseInt(a.value || 0)])
+            )
+            : {},
+        };
+      }
+    });
+
+    // Chuyển đổi các breakdown khác về dạng object {key: {spend, actions...}}
+    const processBreakdown = (dataArray, keyField1, keyField2 = null) => {
+      console.log();
+
+      const result = {};
+      (dataArray || []).forEach((item) => {
+        let key = item[keyField1] || "unknown";
+        if (keyField2) {
+          key = `${key}_${item[keyField2] || "unknown"}`;
+        }
+        if (!result[key]) {
+          result[key] = { spend: 0, impressions: 0, reach: 0, actions: {} };
+        }
+        result[key].spend += parseFloat(item.spend || 0);
+        result[key].impressions += parseInt(item.impressions || 0);
+        result[key].reach += parseInt(item.reach || 0);
+        if (item.actions) {
+          item.actions.forEach((a) => {
+            result[key].actions[a.action_type] =
+              (result[key].actions[a.action_type] || 0) +
+              parseInt(a.value || 0);
+          });
+        }
+      });
+      return result;
+    };
+
+    const processedByHour = processBreakdown(
+      byHour,
+      "hourly_stats_aggregated_by_advertiser_time_zone"
+    );
+
+    const processedByAgeGender = processBreakdown(byAgeGender, "age", "gender");
+    const processedByRegion = processBreakdown(byRegion, "region");
+    const processedByPlatform = processBreakdown(
+      byPlatform,
+      "publisher_platform",
+      "platform_position"
+    );
+    console.log(processedByAgeGender);
+
+    const processedByDevice = processBreakdown(byDevice, "impression_device");
+
+    renderInteraction(processedByDate); // Truyền dữ liệu đã xử lý
+    window.dataByDate = processedByDate; // Lưu data đã xử lý
 
     // ================== Render Chart ==================
+    // Truyền dữ liệu đã xử lý vào hàm render
     renderCharts({
-      byHour,
-      byAgeGender,
-      byRegion,
-      byPlatform,
-      byDevice,
-      byDate,
+      byHour: processedByHour,
+      byAgeGender: processedByAgeGender,
+      byRegion: processedByRegion,
+      byPlatform: processedByPlatform, // Dữ liệu này có thể chưa được xử lý đúng dạng object mong đợi bởi renderChartByPlatform
+      byDevice: processedByDevice,
+      byDate: processedByDate,
     });
 
+    // Hàm này cần dữ liệu đã được xử lý thành object, KHÔNG phải array raw
     renderChartByPlatform({
-      byAgeGender,
-      byRegion,
-      byPlatform,
-      byDevice,
+      // Hàm này render list, không phải chart
+      byAgeGender: processedByAgeGender,
+      byRegion: processedByRegion,
+      byPlatform: processedByPlatform,
+      byDevice: processedByDevice,
     });
+    // ✅ Lưu toàn bộ data vào global để Deep Report AI sử dụng
+    window.campaignSummaryData = {
+      spend: Object.values(processedByDate).reduce((t, d) => t + d.spend, 0),
+      impressions: Object.values(processedByDate).reduce(
+        (t, d) => t + d.impressions,
+        0
+      ),
+      reach: Object.values(processedByDate).reduce((t, d) => t + d.reach, 0),
+      // ✅ Lấy results chủ lực từ actions
+      results: Object.values(processedByDate).reduce(
+        (t, d) =>
+          t +
+          (d.actions?.["onsite_conversion.lead_grouped"] ||
+            d.actions?.["onsite_conversion.total_messaging_connection"] ||
+            0),
+        0
+      ),
+    };
+
+    window.targetingData = targeting;
+    window.processedByDate = processedByDate;
+    window.processedByHour = processedByHour;
+
+    window.processedByAgeGender = processedByAgeGender;
+    window.processedByRegion = processedByRegion;
+    window.processedByPlatform = processedByPlatform;
   } catch (err) {
-    console.error("❌ Error loading ad detail:", err);
+    console.error("❌ Lỗi khi load/render chi tiết ad (batch):", err);
+  }
+  // Phần finally tắt loading nằm trong handleViewClick
+}
+/**
+ * ⭐ TỐI ƯU: Hàm Batch Request mới.
+ * Thay thế 8 hàm fetch...() riêng lẻ khi xem chi tiết ad.
+ */
+async function fetchAdDetailBatch(ad_id) {
+  if (!ad_id) throw new Error("ad_id is required for batch fetch");
+
+  // 1. Chuẩn bị các tham số chung
+  const timeRangeParam = `&time_range[since]=${startDate}&time_range[until]=${endDate}`;
+
+  // 2. Định nghĩa 8 "yêu cầu con" (relative URLs)
+  const batchRequests = [
+    // 2.1. Targeting
+    {
+      method: "GET",
+      name: "targeting",
+      relative_url: `${ad_id}?fields=targeting`,
+    },
+    // 2.2. Insights: By Hour
+    {
+      method: "GET",
+      name: "byHour",
+      relative_url: `${ad_id}/insights?fields=spend,impressions,reach,actions&breakdowns=hourly_stats_aggregated_by_advertiser_time_zone${timeRangeParam}`,
+    },
+    // 2.3. Insights: By Age/Gender
+    {
+      method: "GET",
+      name: "byAgeGender",
+      relative_url: `${ad_id}/insights?fields=spend,impressions,reach,actions&breakdowns=age,gender${timeRangeParam}`,
+    },
+    // 2.4. Insights: By Region
+    {
+      method: "GET",
+      name: "byRegion",
+      relative_url: `${ad_id}/insights?fields=spend,impressions,reach,actions&breakdowns=region${timeRangeParam}`,
+    },
+    // 2.5. Insights: By Platform/Position
+    {
+      method: "GET",
+      name: "byPlatform",
+      relative_url: `${ad_id}/insights?fields=spend,impressions,reach,actions&breakdowns=publisher_platform,platform_position${timeRangeParam}`,
+    },
+    // 2.6. Insights: By Device
+    {
+      method: "GET",
+      name: "byDevice",
+      relative_url: `${ad_id}/insights?fields=spend,impressions,reach,actions&breakdowns=impression_device${timeRangeParam}`,
+    },
+    // 2.7. Insights: By Date (Daily)
+    {
+      method: "GET",
+      name: "byDate",
+      relative_url: `${ad_id}/insights?fields=spend,impressions,reach,actions&time_increment=1${timeRangeParam}`,
+    },
+    // 2.8. Ad Preview
+    {
+      method: "GET",
+      name: "adPreview",
+      relative_url: `${ad_id}/previews?ad_format=DESKTOP_FEED_STANDARD`,
+    },
+  ];
+
+  // 3. Gửi Batch Request
+  const headers = { "Content-Type": "application/json" };
+  const fbBatchBody = {
+    access_token: META_TOKEN,
+    batch: batchRequests,
+    include_headers: false,
+  };
+
+  try {
+    const batchResponse = await fetchJSON(BASE_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(fbBatchBody),
+    });
+
+    // 4. Bóc tách kết quả
+    const results = {};
+    if (!Array.isArray(batchResponse)) {
+      throw new Error("Batch response (ad detail) was not an array");
+    }
+
+    batchResponse.forEach((item, index) => {
+      const name = batchRequests[index].name; // Lấy tên đã định danh
+      console.log(name);
+
+      // Mặc định giá trị rỗng
+      const defaultEmpty =
+        name === "targeting" || name === "adPreview" ? null : [];
+      results[name] = defaultEmpty;
+
+      if (item && item.code === 200) {
+        try {
+          const body = JSON.parse(item.body);
+
+          // Xử lý các cấu trúc trả về khác nhau
+          if (name === "targeting") {
+            results[name] = body.targeting || {};
+          } else if (name === "adPreview") {
+            results[name] = body.data?.[0]?.body || null; // Đây là chuỗi HTML
+          } else {
+            // Tất cả các 'insights' call khác
+
+            results[name] = body.data || [];
+          }
+        } catch (e) {
+          console.warn(`⚠️ Failed to parse batch response for ${name}`, e);
+        }
+      } else {
+        console.warn(`⚠️ Batch request for ${name} failed.`, item);
+      }
+    });
+
+    return results;
+  } catch (err) {
+    console.error("❌ Fatal error during ad detail batch fetch:", err);
+    // Trả về cấu trúc rỗng
+    return {
+      targeting: null,
+      byHour: [],
+      byAgeGender: [],
+      byRegion: [],
+      byPlatform: [],
+      byDevice: [],
+      byDate: [],
+      adPreview: null,
+    };
   }
 }
-
 // ================== LỌC THEO TỪ KHÓA ==================
 function debounce(fn, delay = 500) {
   let timeout;
@@ -1551,8 +1982,8 @@ if (filterInput) {
         const keyword = e.target.value.trim().toLowerCase();
         const filtered = keyword
           ? window._ALL_CAMPAIGNS.filter((c) =>
-              (c.name || "").toLowerCase().includes(keyword)
-            )
+            (c.name || "").toLowerCase().includes(keyword)
+          )
           : window._ALL_CAMPAIGNS;
 
         // 🔹 Render lại danh sách và tổng quan
@@ -1583,8 +2014,8 @@ if (filterButton) {
       const keyword = filterInput?.value?.trim().toLowerCase() || "";
       const filtered = keyword
         ? window._ALL_CAMPAIGNS.filter((c) =>
-            (c.name || "").toLowerCase().includes(keyword)
-          )
+          (c.name || "").toLowerCase().includes(keyword)
+        )
         : window._ALL_CAMPAIGNS;
 
       // 🔹 Render lại danh sách và tổng quan
@@ -1596,18 +2027,30 @@ if (filterButton) {
 async function applyCampaignFilter(keyword) {
   if (!window._ALL_CAMPAIGNS || !Array.isArray(window._ALL_CAMPAIGNS)) return;
 
+  CURRENT_CAMPAIGN_FILTER = keyword || ""; // 👈 Luôn lưu lại bộ lọc cuối cùng
+
   // 🚩 Nếu filter = "RESET" thì load full data
   if (keyword && keyword.toUpperCase() === "RESET") {
     renderCampaignView(window._ALL_CAMPAIGNS); // FULL_CAMPAIGN
-    await reloadFullData(); // gọi 1 hàm load lại toàn bộ
+    const allAds = window._ALL_CAMPAIGNS.flatMap((c) =>
+      c.adsets.flatMap((as) =>
+        (as.ads || []).map((ad) => ({
+          optimization_goal: as.optimization_goal,
+          insights: { spend: ad.spend || 0 },
+        }))
+      )
+    );
+    renderGoalChart(allAds);
+    resetUIFilter(); // 👈 Reset cả giao diện dropdown Brand
+    await loadAllDashboardCharts();
     return;
   }
 
   // 🔹 Lọc campaign theo tên (không phân biệt hoa thường)
   const filtered = keyword
     ? window._ALL_CAMPAIGNS.filter((c) =>
-        (c.name || "").toLowerCase().includes(keyword.toLowerCase())
-      )
+      (c.name || "").toLowerCase().includes(keyword.toLowerCase())
+    )
     : window._ALL_CAMPAIGNS;
 
   // 🔹 Render lại danh sách và tổng quan
@@ -1615,13 +2058,14 @@ async function applyCampaignFilter(keyword) {
 
   // 🔹 Lấy ID campaign hợp lệ để gọi API (lọc bỏ null)
   const ids = filtered.map((c) => c.id).filter(Boolean);
-  loadPlatformSummary(ids);
-  loadSpendPlatform(ids);
-  loadRegionSpendChart(ids);
-  loadAgeGenderSpendChart(ids);
-  const dailyData = ids.length ? await fetchDailySpendByCampaignIDs(ids) : [];
-  renderDetailDailyChart2(dailyData, "spend");
-
+  // loadPlatformSummary(ids);
+  // loadSpendPlatform(ids);
+  // loadRegionSpendChart(ids);
+  // loadAgeGenderSpendChart(ids);
+  // loadAllDashboardCharts(ids)
+  // const dailyData = ids.length ? await fetchDailySpendByCampaignIDs(ids) : [];
+  // renderDetailDailyChart2(dailyData, "spend");
+  await loadAllDashboardCharts(ids); // Pass mảng ids đã lọc
   // 🔹 Render lại goal chart (dựa theo ad-level)
   const allAds = filtered.flatMap((c) =>
     c.adsets.flatMap((as) =>
@@ -1681,30 +2125,6 @@ function buildDailyDataFromCampaigns(campaigns) {
 }
 
 // ================== LẤY DAILY SPEND THEO CAMPAIGN ==================
-async function fetchDailySpendByCampaignIDs(campaignIds = []) {
-  const loading = document.querySelector(".loading");
-  if (loading) loading.classList.add("active");
-  try {
-    if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
-
-    const filtering = encodeURIComponent(
-      JSON.stringify([
-        { field: "campaign.id", operator: "IN", value: campaignIds },
-      ])
-    );
-
-    const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions,campaign_name,campaign_id&time_increment=1&filtering=${filtering}&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}`;
-
-    const data = await fetchJSON(url);
-    const results = data.data || [];
-
-    if (loading) loading.classList.remove("active");
-    return results;
-  } catch (err) {
-    console.error("❌ Error fetching daily spend by campaign IDs", err);
-    return [];
-  }
-}
 
 // ================== Tổng hợp dữ liệu ==================
 function calcTotal(data, key) {
@@ -1801,12 +2221,12 @@ function renderTargetingToDOM(targeting) {
 
     locationWrap.innerHTML = locations.length
       ? locations
-          .slice(0, 5)
-          .map(
-            (c) =>
-              `<p><i class="fa-solid fa-location-crosshairs"></i><span>${c}</span></p>`
-          )
-          .join("")
+        .slice(0, 5)
+        .map(
+          (c) =>
+            `<p><i class="fa-solid fa-location-crosshairs"></i><span>${c}</span></p>`
+        )
+        .join("")
       : `<p><i class="fa-solid fa-location-crosshairs"></i><span>Việt Nam</span></p>`;
   }
 
@@ -1831,11 +2251,11 @@ function renderTargetingToDOM(targeting) {
 
     freqWrap.innerHTML = tags.length
       ? tags
-          .map(
-            (t) =>
-              `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
-          )
-          .join("")
+        .map(
+          (t) =>
+            `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
+        )
+        .join("")
       : `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">Advantage targeting</span></p>`;
   }
 
@@ -1858,11 +2278,11 @@ function renderTargetingToDOM(targeting) {
 
     audienceWrap.innerHTML = audiences.length
       ? audiences
-          .map(
-            (t) =>
-              `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
-          )
-          .join("")
+        .map(
+          (t) =>
+            `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
+        )
+        .join("")
       : `<p><span>No audience selected</span></p>`;
   }
 
@@ -1899,11 +2319,11 @@ function renderTargetingToDOM(targeting) {
 
     excludeWrap.innerHTML = excluded.length
       ? excluded
-          .map(
-            (t) =>
-              `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
-          )
-          .join("")
+        .map(
+          (t) =>
+            `<p class="freq_tag_item"><span class="tag_dot"></span><span class="tag_name">${t}</span></p>`
+        )
+        .join("")
       : `<p><span>No excluded audience</span></p>`;
   }
 
@@ -1938,11 +2358,11 @@ function renderTargetingToDOM(targeting) {
     ];
     placementWrap.innerHTML = platforms.length
       ? platforms
-          .map(
-            (p) =>
-              `<p><i class="fa-solid fa-bullhorn"></i><span>${p}</span></p>`
-          )
-          .join("")
+        .map(
+          (p) =>
+            `<p><i class="fa-solid fa-bullhorn"></i><span>${p}</span></p>`
+        )
+        .join("")
       : `<p><i class="fa-solid fa-bullhorn"></i><span>Automatic placement</span></p>`;
   }
 
@@ -2006,7 +2426,7 @@ function renderInteraction(byDate) {
       icon: "fa-solid fa-video", // Icon was fa-video, assuming typo, kept as-is
     },
     {
-      key: "onsite_conversion.messaging_conversation_replied_7d",
+      key: "onsite_conversion.total_messaging_connection",
       label: "Messages",
       icon: "fa-solid fa-message",
     },
@@ -2022,17 +2442,17 @@ function renderInteraction(byDate) {
   const html = `
       <div class="interaction_list">
         ${metrics
-          .map(
-            (m) => `
+      .map(
+        (m) => `
             <div class="dom_interaction_note">
                   <span class="metric_label">${m.label}</span>
               <span class="metric_value">${formatNumber(
-                totals[m.key] || 0
-              )}</span>
+          totals[m.key] || 0
+        )}</span>
                 </div>
           `
-          )
-          .join("")}
+      )
+      .join("")}
     </div>
   `;
 
@@ -2141,9 +2561,7 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
     if (type === "lead") return getResults(item);
     if (type === "reach") return item.reach || 0;
     if (type === "message")
-      return (
-        item.actions["onsite_conversion.messaging_conversation_replied_7d"] || 0
-      );
+      return item.actions["onsite_conversion.total_messaging_connection"] || 0;
     return 0;
   });
 
@@ -2174,8 +2592,7 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
 
     chart.options.plugins.datalabels.displayIndices = displayIndices;
     chart.options.plugins.tooltip.callbacks.label = (c) =>
-      `${c.dataset.label}: ${
-        type === "spend" ? formatMoneyShort(c.raw) : c.raw
+      `${c.dataset.label}: ${type === "spend" ? formatMoneyShort(c.raw) : c.raw
       }`;
 
     chart.update("active");
@@ -2212,8 +2629,7 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
         tooltip: {
           callbacks: {
             label: (c) =>
-              `${c.dataset.label}: ${
-                type === "spend" ? formatMoneyShort(c.raw) : c.raw
+              `${c.dataset.label}: ${type === "spend" ? formatMoneyShort(c.raw) : c.raw
               }`,
           },
         },
@@ -2378,9 +2794,8 @@ function renderBarChart(id, data) {
           callbacks: {
             label: (c) => {
               const val = c.raw || 0;
-              return `${c.dataset.label}: ${
-                c.dataset.label === "Spent" ? formatMoneyShort(val) : val
-              }`;
+              return `${c.dataset.label}: ${c.dataset.label === "Spent" ? formatMoneyShort(val) : val
+                }`;
             },
           },
         },
@@ -2487,8 +2902,7 @@ function renderChartByHour(dataByHour) {
         tooltip: {
           callbacks: {
             label: (c) =>
-              `${c.dataset.label}: ${
-                c.dataset.label === "Spent" ? formatMoneyShort(c.raw) : c.raw
+              `${c.dataset.label}: ${c.dataset.label === "Spent" ? formatMoneyShort(c.raw) : c.raw
               }`,
           },
         },
@@ -2645,8 +3059,9 @@ function renderChartByDevice(dataByDevice) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1, // Fix hình tròn không bị méo
       cutout: "70%", // 💫 tạo lỗ tròn
-      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: "bottom",
@@ -2765,10 +3180,9 @@ function renderChartByRegion(dataByRegion) {
         tooltip: {
           callbacks: {
             label: (ctx) =>
-              `${ctx.dataset.label}: ${
-                ctx.dataset.label === "Spent"
-                  ? formatMoneyShort(ctx.raw)
-                  : ctx.raw
+              `${ctx.dataset.label}: ${ctx.dataset.label === "Spent"
+                ? formatMoneyShort(ctx.raw)
+                : ctx.raw
               }`,
           },
         },
@@ -2782,8 +3196,8 @@ function renderChartByRegion(dataByRegion) {
             ctx.dataset.label === "Spent"
               ? formatMoneyShort(value)
               : value > 0
-              ? value
-              : "",
+                ? value
+                : "",
         },
       },
       scales: {
@@ -3025,7 +3439,7 @@ function renderChartByPlatform(allData) {
     // Divider group
     const divider = document.createElement("li");
     divider.className = "blank";
-    divider.innerHTML = `<p><strong>${groupLabel}</strong></p>`;
+    divider.innerHTML = `<p><b>${groupLabel}</b></p>`;
     fragment.appendChild(divider);
 
     items.forEach((p) => {
@@ -3044,10 +3458,9 @@ function renderChartByPlatform(allData) {
           <span>${formatName(p.key)}</span>
         </p>
         <p><span class="total_spent"><i class="fa-solid fa-money-bill"></i> ${p.spend.toLocaleString(
-          "vi-VN"
-        )}đ</span></p>
-        <p><span class="total_result"><i class="fa-solid fa-bullseye"></i> ${
-          p.result > 0 ? formatNumber(p.result) : "—"
+        "vi-VN"
+      )}đ</span></p>
+        <p><span class="total_result"><i class="fa-solid fa-bullseye"></i> ${p.result > 0 ? formatNumber(p.result) : "—"
         }</span></p>
         <p class="toplist_percent" style="color:${color};background:${bg}">
           ${p.result > 0 ? formatMoney(p.cpr) : "—"}
@@ -3100,7 +3513,7 @@ function renderDeepCPR(allData) {
 
     const divider = document.createElement("li");
     divider.className = "blank";
-    divider.innerHTML = `<p><strong>${groupName}</strong></p>`;
+    divider.innerHTML = `<p><b>${groupName}</b></p>`;
     fragment.appendChild(divider);
 
     const minCPR = groupItems[0].cpr;
@@ -3114,7 +3527,7 @@ function renderDeepCPR(allData) {
 
       const li = document.createElement("li");
       li.innerHTML = `
-        <p><strong>${formatDeepName(p.key)}</strong></p>
+        <p><b>${formatDeepName(p.key)}</b></p>
         <p class="toplist_percent" style="color:${color};background:${bg}">
           ${formatMoney(p.cpr)} ${p.goal === "REACH" ? "" : ""}
         </p>
@@ -3167,7 +3580,7 @@ function getChartValue(item, type) {
 
   const typeMap = {
     lead: ["lead", "onsite_conversion.lead_grouped"],
-    message: ["onsite_conversion.messaging_conversation_replied_7d"],
+    message: ["onsite_conversion.total_messaging_connection"],
     like: ["like"],
     spend: ["spend"],
     reach: ["reach"],
@@ -3214,8 +3627,8 @@ function renderDetailDailyChart2(dataByDate, type = currentDetailDailyType) {
 
   const displayIndices = calculateIndicesToShow(chartData, 5);
   const gLine = ctx.getContext("2d").createLinearGradient(0, 0, 0, 400);
-  gLine.addColorStop(0, "rgba(255,169,0,0.25)");
-  gLine.addColorStop(1, "rgba(255,171,0,0.05)");
+  gLine.addColorStop(0, "rgba(255,169,0,0.15)");
+  gLine.addColorStop(1, "rgba(255,171,0,0.01)");
 
   if (window.detail_spent_chart_instance2) {
     const chart = window.detail_spent_chart_instance2;
@@ -3226,8 +3639,7 @@ function renderDetailDailyChart2(dataByDate, type = currentDetailDailyType) {
     chart.data.datasets[0].label = type.charAt(0).toUpperCase() + type.slice(1);
 
     chart.options.plugins.tooltip.callbacks.label = (c) =>
-      `${c.dataset.label}: ${
-        type === "spend" ? formatMoneyShort(c.raw) : c.raw
+      `${c.dataset.label}: ${type === "spend" ? formatMoneyShort(c.raw) : c.raw
       }`;
 
     chart.options.plugins.datalabels.displayIndices = displayIndices;
@@ -3265,8 +3677,7 @@ function renderDetailDailyChart2(dataByDate, type = currentDetailDailyType) {
         tooltip: {
           callbacks: {
             label: (c) =>
-              `${c.dataset.label}: ${
-                type === "spend" ? formatMoneyShort(c.raw) : c.raw
+              `${c.dataset.label}: ${type === "spend" ? formatMoneyShort(c.raw) : c.raw
               }`,
           },
         },
@@ -3379,16 +3790,151 @@ function setupDetailDailyFilter() {
   });
 }
 
+/**
+ * Cập nhật UI tóm tắt tổng quan, bao gồm so sánh với kỳ trước.
+ */
+function updatePlatformSummaryUI(currentData, previousData = []) {
+  // Thêm previousData và giá trị mặc định
+  // --- Helper function để xử lý một object/array data ---
+
+  const processData = (data) => {
+    // Đảm bảo data là object, lấy phần tử đầu nếu là array
+    const insights = Array.isArray(data) ? data[0] || {} : data || {};
+
+    // Chuyển actions array thành object để dễ truy cập
+    const actionsObj = {};
+    (insights.actions || []).forEach(({ action_type, value }) => {
+      actionsObj[action_type] = (actionsObj[action_type] || 0) + (+value || 0);
+    });
+
+    // Trích xuất các chỉ số chính
+    return {
+      spend: +insights.spend || 0,
+      reach: +insights.reach || 0,
+      message: actionsObj["onsite_conversion.total_messaging_connection"] || 0,
+      lead: actionsObj["onsite_conversion.lead_grouped"] || 0,
+      // Các chỉ số phụ (nếu cần tính toán so sánh sau này)
+      like:
+        (actionsObj["like"] || 0) +
+        (actionsObj["page_follow"] || 0) +
+        (actionsObj["page_like"] || 0),
+      reaction: actionsObj["post_reaction"] || 0,
+      comment: actionsObj["comment"] || 0,
+      share: (actionsObj["post"] || 0) + (actionsObj["share"] || 0),
+      click: actionsObj["link_click"] || 0,
+      view: (actionsObj["video_view"] || 0) + (actionsObj["photo_view"] || 0),
+    };
+  };
+
+  // --- Xử lý dữ liệu cho kỳ hiện tại và kỳ trước ---
+  const currentMetrics = processData(currentData);
+  const previousMetrics = processData(previousData);
+  console.log(previousMetrics);
+
+  // --- Helper function tính toán % thay đổi và xác định trạng thái ---
+  const calculateChange = (current, previous) => {
+    const change = ((current - previous) / previous) * 100;
+    let type = "equal";
+    let icon = "fa-solid fa-equals";
+    let colorClass = "equal";
+
+    if (change > 0) {
+      type = "increase";
+      icon = "fa-solid fa-caret-up";
+      colorClass = "increase";
+    } else if (change < 0) {
+      type = "decrease";
+      icon = "fa-solid fa-caret-down";
+      colorClass = "decrease";
+    }
+
+    return { percentage: change, type, icon, colorClass };
+  };
+
+  // --- Helper function để render một chỉ số và % thay đổi ---
+  const renderMetric = (
+    id,
+    currentValue,
+    previousValue,
+    isCurrency = false
+  ) => {
+    console.log(previousValue);
+    console.log(previousData);
+
+    let titleText = ` ${previousValue.toLocaleString("vi-VN")} - (${previousData?.[0]?.date_start
+      } to ${previousData?.[0]?.date_stop})`;
+    const valueEl = document.querySelector(`#${id} span:first-child`);
+    const changeEl = document.querySelector(`#${id} span:last-child`);
+    changeEl.setAttribute("title", titleText);
+    if (!valueEl || !changeEl) {
+      console.warn(`Không tìm thấy element cho ID: ${id}`);
+      return;
+    }
+
+    // Định dạng giá trị hiện tại
+    valueEl.textContent = isCurrency
+      ? formatMoney(currentValue)
+      : formatNumber(currentValue);
+
+    // Tính toán và hiển thị thay đổi
+    const changeInfo = calculateChange(currentValue, previousValue);
+
+    changeEl.textContent = ""; // Xóa nội dung cũ
+    changeEl.className = ""; // Xóa class cũ
+
+    let percentageText = "";
+    if (changeInfo.type === "new") {
+      percentageText = "Mới"; // Hoặc để trống nếu muốn
+    } else if (changeInfo.percentage !== null) {
+      percentageText = `${changeInfo.percentage >= 0 ? "+" : ""
+        }${changeInfo.percentage.toFixed(1)}%`;
+    } else {
+      percentageText = "N/A"; // Trường hợp cả 2 là 0
+    }
+
+    changeEl.appendChild(document.createTextNode(` ${percentageText}`)); // Thêm khoảng trắng
+
+    // Thêm class màu sắc
+    changeEl.classList.add(changeInfo.colorClass);
+  };
+
+  // --- Render các chỉ số chính với so sánh ---
+  renderMetric("spent", currentMetrics.spend, previousMetrics.spend, true); // true vì là tiền tệ
+  renderMetric("reach", currentMetrics.reach, previousMetrics.reach);
+  renderMetric("message", currentMetrics.message, previousMetrics.message);
+  renderMetric("lead", currentMetrics.lead, previousMetrics.lead);
+
+  // --- Render các chỉ số phụ (không cần so sánh theo UI mới) ---
+  document.querySelector(".dom_interaction_reaction").textContent =
+    formatNumber(currentMetrics.reaction);
+  document.querySelector(".dom_interaction_like").textContent = formatNumber(
+    currentMetrics.like
+  ); // Đã gộp like+follow trong processData
+  document.querySelector(".dom_interaction_comment").textContent = formatNumber(
+    currentMetrics.comment
+  );
+  document.querySelector(".dom_interaction_share").textContent = formatNumber(
+    currentMetrics.share
+  );
+  document.querySelector(".dom_interaction_click").textContent = formatNumber(
+    currentMetrics.click
+  );
+  document.querySelector(".dom_interaction_view").textContent = formatNumber(
+    currentMetrics.view
+  );
+}
+
+// --- Các hàm format cũ (giữ nguyên hoặc đảm bảo chúng tồn tại) ---
 async function fetchPlatformStats(campaignIds = []) {
   try {
     if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
 
     const filtering = campaignIds.length
       ? `&filtering=${encodeURIComponent(
-          JSON.stringify([
-            { field: "campaign.id", operator: "IN", value: campaignIds },
-          ])
-        )}`
+        JSON.stringify([
+          { field: "campaign.id", operator: "IN", value: campaignIds },
+        ])
+      )}`
       : "";
     const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
 
@@ -3400,64 +3946,6 @@ async function fetchPlatformStats(campaignIds = []) {
     return [];
   }
 }
-
-function updatePlatformSummaryUI(data) {
-  if (!data) return;
-
-  // ⚠️ Trường hợp fetchPlatformStats trả về array
-  if (Array.isArray(data)) data = data[0] || {};
-
-  // Chuyển actions[] thành object để dễ truy cập key
-  const act = {};
-  (data.actions || []).forEach(({ action_type, value }) => {
-    act[action_type] = (act[action_type] || 0) + (+value || 0);
-  });
-
-  const totalSpend = +data.spend || 0;
-  const totalReach = +data.reach || 0;
-  const totalImpression = +data.impressions || 0;
-
-  const totalLike = act["like"] || 0;
-  const totalFollow = act["page_follow"] || act["page_like"] || 0;
-  const totalReaction = act["post_reaction"] || 0;
-  const totalComment = act["comment"] || 0;
-  const totalShare = act["post"] || act["share"] || 0;
-  const totalClick = act["link_click"] || 0;
-  const totalView = act["video_view"] || act["photo_view"] || 0;
-  const totalMessage =
-    act["onsite_conversion.messaging_conversation_replied_7d"] || 0;
-  const totalLead =
-    act["lead"] ||
-    act["onsite_web_lead"] ||
-    act["onsite_conversion.lead_grouped"] ||
-    0;
-
-  // --- Render UI ---
-  document.querySelector(
-    "#spent span"
-  ).textContent = `${totalSpend.toLocaleString("vi-VN")}đ`;
-  document.querySelector("#reach span").textContent =
-    totalReach.toLocaleString("vi-VN");
-  document.querySelector("#message span").textContent =
-    totalMessage.toLocaleString("vi-VN");
-  document.querySelector("#lead span").textContent =
-    totalLead.toLocaleString("vi-VN");
-
-  document.querySelector(".dom_interaction_reaction").textContent =
-    totalReaction.toLocaleString("vi-VN");
-  document.querySelector(".dom_interaction_like").textContent = (
-    totalLike + totalFollow
-  ).toLocaleString("vi-VN");
-  document.querySelector(".dom_interaction_comment").textContent =
-    totalComment.toLocaleString("vi-VN");
-  document.querySelector(".dom_interaction_share").textContent =
-    totalShare.toLocaleString("vi-VN");
-  document.querySelector(".dom_interaction_click").textContent =
-    totalClick.toLocaleString("vi-VN");
-  document.querySelector(".dom_interaction_view").textContent =
-    totalView.toLocaleString("vi-VN");
-}
-
 async function loadPlatformSummary(campaignIds = []) {
   const data = await fetchPlatformStats(campaignIds);
   updatePlatformSummaryUI(data);
@@ -3468,10 +3956,10 @@ async function fetchSpendByPlatform(campaignIds = []) {
 
     const filtering = campaignIds.length
       ? `&filtering=${encodeURIComponent(
-          JSON.stringify([
-            { field: "campaign.id", operator: "IN", value: campaignIds },
-          ])
-        )}`
+        JSON.stringify([
+          { field: "campaign.id", operator: "IN", value: campaignIds },
+        ])
+      )}`
       : "";
 
     const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend&breakdowns=publisher_platform,platform_position&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
@@ -3489,10 +3977,10 @@ async function fetchSpendByAgeGender(campaignIds = []) {
     // Nếu có campaignIds thì filter, còn không thì query theo account
     const filtering = campaignIds.length
       ? `&filtering=${encodeURIComponent(
-          JSON.stringify([
-            { field: "campaign.id", operator: "IN", value: campaignIds },
-          ])
-        )}`
+        JSON.stringify([
+          { field: "campaign.id", operator: "IN", value: campaignIds },
+        ])
+      )}`
       : "";
 
     const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend&breakdowns=age,gender&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
@@ -3512,10 +4000,10 @@ async function fetchSpendByRegion(campaignIds = []) {
 
     const filtering = campaignIds.length
       ? `&filtering=${encodeURIComponent(
-          JSON.stringify([
-            { field: "campaign.id", operator: "IN", value: campaignIds },
-          ])
-        )}`
+        JSON.stringify([
+          { field: "campaign.id", operator: "IN", value: campaignIds },
+        ])
+      )}`
       : "";
 
     const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend&breakdowns=region&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
@@ -3529,7 +4017,232 @@ async function fetchSpendByRegion(campaignIds = []) {
     return [];
   }
 }
+async function fetchDailySpendByCampaignIDs(campaignIds = []) {
+  const loading = document.querySelector(".loading");
+  if (loading) loading.classList.add("active");
+  try {
+    if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
 
+    const filtering = encodeURIComponent(
+      JSON.stringify([
+        { field: "campaign.id", operator: "IN", value: campaignIds },
+      ])
+    );
+
+    const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions,campaign_name,campaign_id&time_increment=1&filtering=${filtering}&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}`;
+
+    const data = await fetchJSON(url);
+    const results = data.data || [];
+
+    if (loading) loading.classList.remove("active");
+    return results;
+  } catch (err) {
+    console.error("❌ Error fetching daily spend by campaign IDs", err);
+    return [];
+  }
+}
+
+//  batch
+async function fetchDashboardInsightsBatch(campaignIds = []) {
+  if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
+
+  // --- 1. TÍNH KHOẢNG THỜI GIAN TRƯỚC ---
+  const currentStartDate = new Date(startDate + "T00:00:00");
+  const currentEndDate = new Date(endDate + "T00:00:00");
+  const durationMillis = currentEndDate.getTime() - currentStartDate.getTime();
+  const durationDays = durationMillis / (1000 * 60 * 60 * 24) + 1;
+
+  const previousEndDate = new Date(currentStartDate);
+  previousEndDate.setDate(previousEndDate.getDate());
+
+  const previousStartDate = new Date(previousEndDate);
+  previousStartDate.setDate(previousStartDate.getDate() - durationDays + 1);
+
+  const formatDate = (date) => date.toISOString().slice(0, 10);
+  const prevStartDateStr = formatDate(previousStartDate);
+  const prevEndDateStr = formatDate(previousEndDate);
+
+  console.log(`Current Range: ${startDate} to ${endDate}`);
+  console.log(
+    `Previous Range for Stats: ${prevStartDateStr} to ${prevEndDateStr}`
+  );
+  // --- KẾT THÚC BƯỚC 1 ---
+
+  const filtering = campaignIds.length
+    ? `&filtering=${encodeURIComponent(
+      JSON.stringify([
+        { field: "campaign.id", operator: "IN", value: campaignIds },
+      ])
+    )}`
+    : "";
+  const commonEndpoint = `act_${ACCOUNT_ID}/insights`;
+
+  // Time range strings
+  const currentTimeRange = `&time_range={"since":"${startDate}","until":"${endDate}"}`;
+  const previousTimeRange = `&time_range={"since":"${prevStartDateStr}","until":"${prevEndDateStr}"}`; // <<< DÙNG NGÀY TRƯỚC
+
+  // --- 2. ĐỊNH NGHĨA REQUESTS (Chỉ thêm platformStats_previous) ---
+  const batchRequests = [
+    // --- Dữ liệu kỳ hiện tại (Giữ nguyên) ---
+    {
+      method: "GET",
+      name: "platformStats",
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions${currentTimeRange}${filtering}`,
+    },
+    {
+      method: "GET",
+      name: "spendByPlatform",
+      relative_url: `${commonEndpoint}?fields=spend&breakdowns=publisher_platform,platform_position${currentTimeRange}${filtering}`,
+    },
+    {
+      method: "GET",
+      name: "spendByAgeGender",
+      relative_url: `${commonEndpoint}?fields=spend&breakdowns=age,gender${currentTimeRange}${filtering}`,
+    },
+    {
+      method: "GET",
+      name: "spendByRegion",
+      relative_url: `${commonEndpoint}?fields=spend&breakdowns=region${currentTimeRange}${filtering}`,
+    },
+    {
+      method: "GET",
+      name: "dailySpend",
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,campaign_name,campaign_id&time_increment=1${currentTimeRange}${filtering}`,
+    },
+
+    // --- Dữ liệu kỳ trước (Chỉ thêm platformStats) ---
+    {
+      method: "GET",
+      name: "platformStats_previous",
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions${previousTimeRange}${filtering}`,
+    }, // <<< CHỈ THÊM CÁI NÀY
+  ];
+  // --- KẾT THÚC BƯỚC 2 ---
+
+  const fbBatchBody = {
+    access_token: META_TOKEN,
+    batch: batchRequests,
+    include_headers: false,
+  };
+  const headers = { "Content-Type": "application/json" };
+
+  try {
+    const batchResponse = await fetchJSON(BASE_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(fbBatchBody),
+    });
+
+    if (!Array.isArray(batchResponse)) {
+      throw new Error(
+        "Batch response (insights + prev stats) was not an array"
+      );
+    }
+
+    // --- 3. XỬ LÝ KẾT QUẢ ---
+    const results = {};
+    batchResponse.forEach((item, index) => {
+      const requestName = batchRequests[index].name;
+      if (item && item.code === 200) {
+        try {
+          const body = JSON.parse(item.body);
+          results[requestName] = body.data || [];
+        } catch (e) {
+          console.warn(
+            `⚠️ Failed to parse batch response for ${requestName}`,
+            e
+          );
+          results[requestName] = [];
+        }
+      } else {
+        console.warn(
+          `⚠️ Batch request for ${requestName} failed with code ${item?.code}`
+        );
+        results[requestName] = [];
+      }
+    });
+    // --- KẾT THÚC BƯỚC 3 ---
+    console.log("Batch Results (Current & Previous Stats):", results);
+    return results;
+  } catch (err) {
+    console.error(
+      "❌ Fatal error during dashboard insights batch fetch (with prev stats):",
+      err
+    );
+    // Trả về cấu trúc rỗng
+    return {
+      platformStats: [],
+      spendByPlatform: [],
+      spendByAgeGender: [],
+      spendByRegion: [],
+      dailySpend: [],
+      platformStats_previous: [], // << Thêm key rỗng cho trường hợp lỗi
+    };
+  }
+}
+/**
+ * Hàm workflow mới:
+ * 1. Gọi fetchDashboardInsightsBatch MỘT LẦN.
+ * 2. Phân phối kết quả cho các hàm RENDER (thay vì các hàm load... riêng lẻ).
+ */
+async function loadAllDashboardCharts(campaignIds = []) {
+  // 1. Hiển thị loading (nếu cần)
+  const loading = document.querySelector(".loading");
+  if (loading) loading.classList.add("active");
+
+  try {
+    // 2. Gọi HÀM BATCH MỚI (1 request duy nhất)
+    const results = await fetchDashboardInsightsBatch(campaignIds);
+
+    // 🚩 CHECK EMPTY STATE: Nếu tổng spend = 0, hiện Empty Card
+    const insights = Array.isArray(results.platformStats) ? results.platformStats[0] || {} : results.platformStats || {};
+    const totalSpend = +insights.spend || 0;
+    const dashboard = document.querySelector(".dom_dashboard");
+
+    if (totalSpend === 0) {
+      document.querySelector(".dom_container")?.classList.add("is-empty");
+      console.log("Empty Dashboard - Showing No Data Found");
+      return; // Dừng render các chart khác
+    } else {
+      document.querySelector(".dom_container")?.classList.remove("is-empty");
+    }
+
+    // 3. Phân phối data đến các hàm RENDER/UPDATE UI (không fetch nữa)
+    // 3.1. Platform Stats (Summary)
+    updatePlatformSummaryUI(
+      results.platformStats,
+      results.platformStats_previous
+    );
+    DAILY_DATA = results.dailySpend;
+    // 3.2. Spend by Platform
+    const summary = summarizeSpendByPlatform(results.spendByPlatform);
+    renderPlatformSpendUI(summary);
+    renderPlatformPosition(results.spendByPlatform);
+
+    // 3.3. Spend by Age/Gender
+    renderAgeGenderChart(results.spendByAgeGender);
+
+    // 3.4. Spend by Region
+    renderRegionChart(results.spendByRegion);
+
+    // 3.5. Daily Spend
+    // Lưu ý: hàm fetchDailySpendByAccount của bạn giờ cũng được thay thế
+    // bằng results.dailySpend (khi campaignIds rỗng)
+    renderDetailDailyChart2(results.dailySpend, "spend"); // "spend" là default
+  } catch (err) {
+    console.error("❌ Lỗi khi tải dữ liệu charts dashboard:", err);
+  } finally {
+    if (loading) loading.classList.remove("active");
+  }
+}
+
+async function loadSpendPlatform(campaignIds = []) {
+  const data = await fetchSpendByPlatform(campaignIds);
+  console.log(data);
+  const summary = summarizeSpendByPlatform(data);
+  renderPlatformSpendUI(summary); // cũ
+  renderPlatformPosition(data); // mới
+}
 function summarizeSpendByPlatform(data) {
   const result = {
     facebook: 0,
@@ -3603,8 +4316,8 @@ function renderPlatformPosition(data) {
         <span>${formatNamePst(publisher, position)}</span>
       </p>
       <p><span class="total_spent"><i class="fa-solid fa-money-bill"></i> ${spend.toLocaleString(
-        "vi-VN"
-      )}đ</span></p>
+      "vi-VN"
+    )}đ</span></p>
       <p class="toplist_percent" style="color:rgb(226, 151, 0);background:rgba(254,169,0,0.05)">
         ${percent.toFixed(1)}%
       </p>
@@ -3689,6 +4402,8 @@ function renderPlatformSpendUI(summary) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
       cutout: "70%",
       plugins: {
         legend: { display: false },
@@ -3708,13 +4423,6 @@ function renderPlatformSpendUI(summary) {
   });
 }
 
-async function loadSpendPlatform(campaignIds = []) {
-  const data = await fetchSpendByPlatform(campaignIds);
-  console.log(data);
-  const summary = summarizeSpendByPlatform(data);
-  renderPlatformSpendUI(summary); // cũ
-  renderPlatformPosition(data); // mới
-}
 async function loadRegionSpendChart(campaignIds = []) {
   const data = await fetchSpendByRegion(campaignIds);
   renderRegionChart(data);
@@ -3725,81 +4433,266 @@ async function loadAgeGenderSpendChart(campaignIds = []) {
   renderAgeGenderChart(data);
 }
 
+// =================== DATE PICKER LOGIC (FB ADS STYLE) ===================
+// =================== DATE PICKER LOGIC (FB ADS STYLE) ===================
+// Variables moved to top to avoid TDZ error
+
 function initDateSelector() {
   const selectBox = document.querySelector(".dom_select.time");
   if (!selectBox) return;
 
   const selectedText = selectBox.querySelector(".dom_selected");
-  const list = selectBox.querySelector(".dom_select_show");
-  const items = list.querySelectorAll("li[data-date]");
-  const applyBtn = list.querySelector(".apply_custom_date");
-  const startInput = list.querySelector("#start");
-  const endInput = list.querySelector("#end");
+  const panel = selectBox.querySelector(".time_picker_panel");
+  const presetItems = panel.querySelectorAll(".time_picker_sidebar li[data-date]");
+  const updateBtn = panel.querySelector(".btn_update");
+  const cancelBtn = panel.querySelector(".btn_cancel");
+  const startInput = panel.querySelector("#start_date_val");
+  const endInput = panel.querySelector("#end_date_val");
 
-  // 🧩 Toggle dropdown
+  // Initial display sync
+  if (startDate && endDate) {
+    startInput.value = startDate;
+    endInput.value = endDate;
+    tempStartDate = startDate;
+    tempEndDate = endDate;
+  }
+
+  // Prevent duplicate listeners
+  if (selectBox.dataset.initialized) {
+    return;
+  }
+  selectBox.dataset.initialized = "true";
+
+  // Prevent clicks inside the panel from bubbling effectively
+  panel.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  // Toggle dropdown
   selectBox.addEventListener("click", (e) => {
-    if (!e.target.closest("ul")) {
-      list.classList.toggle("active");
+    // If clicking inside panel (though handled above, safety check) use return
+    if (e.target.closest(".time_picker_panel")) return;
+
+    // Stop propagation to prevent document listeners from closing it immediately
+    e.stopPropagation();
+
+    const isActive = panel.classList.contains("active");
+    // Close all other dropdowns
+    document.querySelectorAll(".dom_select_show").forEach(p => p.classList.remove("active"));
+
+    if (!isActive) {
+      panel.classList.add("active");
+      renderCalendar();
     }
   });
 
-  // 🧠 Chọn preset date
-  items.forEach((item) => {
+  // Handle sidebar presets
+  presetItems.forEach((item) => {
     item.addEventListener("click", (e) => {
       e.stopPropagation();
       const type = item.dataset.date;
 
+      // Reset active state
+      presetItems.forEach((i) => i.classList.remove("active"));
+      item.classList.add("active");
+
       if (type === "custom_range") {
-        const box = item.querySelector(".custom_date");
-        box.classList.add("show");
+        // Just focus on the calendar
         return;
       }
-
-      // Reset active
-      items.forEach((i) => i.classList.remove("active"));
-      item.classList.add("active");
 
       const range = getDateRange(type);
       startDate = range.start;
       endDate = range.end;
-      selectedText.textContent = item.textContent.trim();
-      list.classList.remove("active");
+      tempStartDate = startDate;
+      tempEndDate = endDate;
 
-      // 🔥 Refresh dashboard
+      startInput.value = startDate;
+      endInput.value = endDate;
+
+      selectedText.textContent = item.querySelector('span:last-child').textContent.trim();
+      panel.classList.remove("active");
+
+      // Update calendar highlights
+      renderCalendar();
+
+      // Refresh dashboard
       reloadDashboard();
-      resetUIFilter();
     });
   });
 
-  // 🧾 Apply custom date
-  applyBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const start = startInput.value;
-    const end = endInput.value;
-    if (!start || !end) {
-      alert("⛔ Vui lòng chọn đầy đủ ngày!");
-      return;
-    }
+  // Cancel button
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      panel.classList.remove("active");
+      // Reset temp to match actual global
+      tempStartDate = startDate;
+      tempEndDate = endDate;
+    });
+  }
 
-    const s = new Date(start);
-    const eD = new Date(end);
-    if (eD < s) {
-      alert("⚠️ Ngày kết thúc phải sau ngày bắt đầu!");
-      return;
-    }
+  // Update button
+  if (updateBtn) {
+    updateBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const start = startInput.value;
+      const end = endInput.value;
 
-    selectedText.textContent = `${start} → ${end}`;
-    list.classList.remove("active");
+      if (!start || !end) {
+        alert("⛔ Vui lòng chọn đầy đủ ngày!");
+        return;
+      }
 
-    // 💡 Update global
-    startDate = start;
-    endDate = end;
+      const s = new Date(start);
+      const eD = new Date(end);
+      if (eD < s) {
+        alert("⚠️ Ngày kết thúc phải sau ngày bắt đầu!");
+        return;
+      }
 
-    // 🚀 Reload dashboard
-    reloadDashboard();
-    resetUIFilter();
+      const fmt = (d) => {
+        const [y, m, da] = d.split("-");
+        return `${da}/${m}/${y}`;
+      };
+
+      startDate = start;
+      endDate = end;
+      selectedText.textContent = `${fmt(start)} - ${fmt(end)}`;
+      panel.classList.remove("active");
+
+      reloadDashboard();
+    });
+  }
+
+  // Handle manual input changes
+  startInput.addEventListener('change', () => {
+    tempStartDate = startInput.value;
+    renderCalendar();
+  });
+  endInput.addEventListener('change', () => {
+    tempEndDate = endInput.value;
+    renderCalendar();
   });
 }
+
+// Helper to format date in Local Time (YYYY-MM-DD)
+function formatDateLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function renderCalendar() {
+  const container = document.getElementById("calendar_left");
+  if (!container) return;
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  const firstDayOfMonth = new Date(calendarCurrentYear, calendarCurrentMonth, 1).getDay();
+  const daysInMonth = new Date(calendarCurrentYear, calendarCurrentMonth + 1, 0).getDate();
+
+  let html = `
+    <div class="calendar_nav">
+      <button onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+      <span>${monthNames[calendarCurrentMonth]} ${calendarCurrentYear}</span>
+      <button onclick="changeMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+    <div class="calendar_grid">
+      <div class="calendar_day_name">Su</div>
+      <div class="calendar_day_name">Mo</div>
+      <div class="calendar_day_name">Tu</div>
+      <div class="calendar_day_name">We</div>
+      <div class="calendar_day_name">Th</div>
+      <div class="calendar_day_name">Fr</div>
+      <div class="calendar_day_name">Sa</div>
+  `;
+
+  // Empty slots for previous month
+  for (let i = 0; i < firstDayOfMonth; i++) {
+    html += `<div class="calendar_day empty"></div>`;
+  }
+
+  const todayStr = formatDateLocal(new Date());
+  const start = tempStartDate ? new Date(tempStartDate) : null;
+  const end = tempEndDate ? new Date(tempEndDate) : null;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const curDate = new Date(calendarCurrentYear, calendarCurrentMonth, day);
+    const curDateStr = formatDateLocal(curDate);
+
+    let classes = ["calendar_day"];
+    if (curDateStr === todayStr) classes.push("today");
+
+    if (start && curDateStr === tempStartDate) classes.push("selected");
+    if (end && curDateStr === tempEndDate) classes.push("selected");
+
+    if (start && end && curDate > start && curDate < end) {
+      classes.push("in_range");
+    }
+
+    html += `<div class="${classes.join(' ')}" onclick="selectCalendarDay('${curDateStr}')">${day}</div>`;
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+// Attach these to window so they're accessible from inline onclick if needed
+// or better, use standard listeners. I'll use standard but for quick iteration here:
+window.changeMonth = (dir) => {
+  calendarCurrentMonth += dir;
+  if (calendarCurrentMonth < 0) {
+    calendarCurrentMonth = 11;
+    calendarCurrentYear--;
+  } else if (calendarCurrentMonth > 11) {
+    calendarCurrentMonth = 0;
+    calendarCurrentYear++;
+  }
+  renderCalendar();
+};
+
+window.selectCalendarDay = (dateStr) => {
+  const startInput = document.getElementById("start_date_val");
+  const endInput = document.getElementById("end_date_val");
+
+  if (!tempStartDate || (tempStartDate && tempEndDate)) {
+    // Start fresh selection
+    tempStartDate = dateStr;
+    tempEndDate = null;
+    startInput.value = dateStr;
+    endInput.value = "";
+  } else {
+    // Selecting the end date
+    if (dateStr === tempStartDate) {
+      // Deselect if clicking the same day twice when no end date set
+      tempStartDate = null;
+      startInput.value = "";
+    } else {
+      const s = new Date(tempStartDate);
+      const e = new Date(dateStr);
+
+      if (e < s) {
+        tempEndDate = tempStartDate;
+        tempStartDate = dateStr;
+      } else {
+        tempEndDate = dateStr;
+      }
+
+      startInput.value = tempStartDate;
+      endInput.value = tempEndDate;
+    }
+  }
+
+  // Highlight "Custom Date" in sidebar
+  const presetItems = document.querySelectorAll(".time_picker_sidebar li[data-date]");
+  presetItems.forEach(i => i.classList.remove("active"));
+  const customLi = document.querySelector('li[data-date="custom_range"]');
+  if (customLi) customLi.classList.add("active");
+
+  renderCalendar();
+};
 
 // =================== PRESET RANGE ===================
 function getDateRange(type) {
@@ -3817,6 +4710,9 @@ function getDateRange(type) {
     case "last_7days":
       start.setDate(today.getDate() - 6);
       break;
+    case "last_30days":
+      start.setDate(today.getDate() - 29);
+      break;
     case "this_week": {
       const day = today.getDay() || 7;
       start.setDate(today.getDate() - day + 1);
@@ -3831,9 +4727,15 @@ function getDateRange(type) {
     case "this_month":
       start.setDate(1);
       break;
+    case "last_month":
+      start.setMonth(today.getMonth() - 1, 1);
+      const lastDayPrevMonth = new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+      end.setMonth(today.getMonth() - 1, lastDayPrevMonth);
+      break;
   }
 
-  const fmt = (d) => d.toISOString().slice(0, 10);
+  // Use local formatter instead of UTC
+  const fmt = (d) => formatDateLocal(d);
   return { start: fmt(start), end: fmt(end) };
 }
 
@@ -3852,12 +4754,19 @@ function reloadDashboard() {
     domDate.textContent = `${fmt(startDate)} - ${fmt(endDate)}`;
   }
   const selectedText = document.querySelector(".quick_filter .dom_selected");
-  selectedText.textContent = "Quick filter"; // Đặt lại text filter về mặc định
+  if (selectedText) selectedText.textContent = "Quick filter"; // Đặt lại text filter bảng về mặc định
+
   // Gọi các hàm load dữ liệu
-  loadDailyChart();
-  loadPlatformSummary();
-  loadSpendPlatform();
+  // Nếu có bộ lọc, applyCampaignFilter sẽ tự gọi loadAllDashboardCharts(ids) sau khi load list xong
+  if (!CURRENT_CAMPAIGN_FILTER || CURRENT_CAMPAIGN_FILTER.toUpperCase() === "RESET") {
+    loadAllDashboardCharts();
+  }
+
   loadCampaignList().finally(() => {
+    // 🚩 Nếu đang có bộ lọc thì áp dụng lại để lọc danh sách và cập nhật dashboard
+    if (CURRENT_CAMPAIGN_FILTER && CURRENT_CAMPAIGN_FILTER.toUpperCase() !== "RESET") {
+      applyCampaignFilter(CURRENT_CAMPAIGN_FILTER);
+    }
     if (loading) loading.classList.remove("active");
   });
 }
@@ -4266,6 +5175,25 @@ if (quickFilterBox) {
   });
 }
 document.addEventListener("DOMContentLoaded", () => {
+  // --- 📅 Initialize Date Selector ---
+  const defaultRange = getDateRange("last_7days");
+  startDate = defaultRange.start;
+  endDate = defaultRange.end;
+  initDateSelector();
+
+  const previewBtn = document.getElementById("preview_button");
+
+  if (previewBtn) {
+    previewBtn.addEventListener("click", () => {
+      const header = previewBtn.closest(".dom_detail_header");
+      if (header) {
+        header.classList.toggle("active");
+
+        // Option: đổi hướng icon cho có vibe animation
+        previewBtn.classList.toggle("rotated");
+      }
+    });
+  }
   const menuItems = document.querySelectorAll(".dom_menu li");
   const container = document.querySelector(".dom_container");
   const mobileMenu = document.querySelector("#mobile_menu");
@@ -4314,6 +5242,11 @@ document.addEventListener("DOMContentLoaded", () => {
       // Add new view class based on the clicked item
       const view = li.getAttribute("data-view");
       container.classList.add(view);
+
+      // 👉 Nếu là nút account thì mới fetch
+      if (view === "account") {
+        fetchAdAccountInfo();
+      }
 
       // Close the sidebar on mobile after a menu click
       domSidebar.classList.remove("active");
@@ -4406,7 +5339,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function fetchAdAccountInfo() {
-  const url = `${BASE_URL}/act_${ACCOUNT_ID}?fields=id,funding_source_details,name,balance,currency,amount_spent&access_token=${META_TOKEN}`;
+  const url = `${BASE_URL}/act_${ACCOUNT_ID}?fields=id,funding_source_details,name,balance,amount_spent,business_name,business_street,business_street2,business_city,business_state,business_zip,business_country_code,tax_id&access_token=${META_TOKEN}`;
 
   try {
     const data = await fetchJSON(url);
@@ -4437,9 +5370,50 @@ async function fetchAdAccountInfo() {
       vat * 1
     ).toLocaleString("vi-VN")}đ`;
     document.getElementById("detail_method").innerHTML = paymentMethodDisplay;
-    document.getElementById("detail_paid").innerHTML = `${(
-      amountSpent * 1
-    ).toLocaleString("vi-VN")}đ`;
+
+    // Cập nhật Business Info
+    const rawAddressParts = [
+      data.business_street,
+      data.business_street2,
+      data.business_city,
+      data.business_state,
+      data.business_zip,
+      data.business_country_code
+    ].filter(p => p && p.trim().length > 0 && p.trim().toLowerCase() !== 'vn' && p.trim().toLowerCase() !== 'vietnam').map(p => p.trim());
+
+    // Deduplicate address parts cleverly (favoring longer strings)
+    const uniqueParts = [];
+    rawAddressParts.forEach(p => {
+      let skip = false;
+      for (let i = 0; i < uniqueParts.length; i++) {
+        const up = uniqueParts[i];
+        if (up.toLowerCase().includes(p.toLowerCase())) {
+          skip = true; // Current is shorter or same as existing, skip it
+          break;
+        }
+        if (p.toLowerCase().includes(up.toLowerCase())) {
+          uniqueParts[i] = p; // Current is longer, replace existing
+          skip = true;
+          break;
+        }
+      }
+      if (!skip) uniqueParts.push(p);
+    });
+
+    const businessHtml = `
+      <div class="business_info_box">
+        <p class="b_name"><i class="fa-solid fa-building"></i> ${data.business_name || "N/A"}</p>
+        <p class="b_addr"><i class="fa-solid fa-map-marker-alt"></i> ${uniqueParts.join(', ')}</p>
+        <p class="b_tax"><i class="fa-solid fa-id-card"></i> Tax ID: ${data.tax_id || "N/A"}</p>
+      </div>
+    `;
+    const businessLi = document.querySelector("#detail_total_report .dom_total_report.balance ul li:nth-child(3)");
+    if (businessLi) {
+      businessLi.innerHTML = `
+        <span class="b_title"><i class="fa-solid fa-circle-info"></i> Business Info</span>
+        ${businessHtml}
+      `;
+    }
 
     return data;
   } catch (error) {
@@ -4549,7 +5523,7 @@ function processMonthlyData(data) {
           case "onsite_conversion.lead_grouped":
             monthsData[month].lead += value;
             break;
-          case "onsite_conversion.messaging_conversation_replied_7d":
+          case "onsite_conversion.total_messaging_connection":
             monthsData[month].message += value;
             break;
           case "like":
@@ -4600,8 +5574,7 @@ function renderMonthlyChart(data, filter) {
     chart.data.datasets[0].label = `${chartLabel} by Month`;
     chart.options.scales.y.suggestedMax = maxValue * 1.1; // Cập nhật trục Y
     chart.options.plugins.tooltip.callbacks.label = (c) =>
-      `${chartLabel}: ${
-        filter === "spend" ? formatMoneyShort(c.raw) : formatNumber(c.raw)
+      `${chartLabel}: ${filter === "spend" ? formatMoneyShort(c.raw) : formatNumber(c.raw)
       }`;
 
     chart.options.plugins.datalabels.formatter = (v) =>
@@ -4637,10 +5610,9 @@ function renderMonthlyChart(data, filter) {
           tooltip: {
             callbacks: {
               label: (c) =>
-                `${chartLabel}: ${
-                  filter === "spend"
-                    ? formatMoneyShort(c.raw)
-                    : formatNumber(c.raw)
+                `${chartLabel}: ${filter === "spend"
+                  ? formatMoneyShort(c.raw)
+                  : formatNumber(c.raw)
                 }`,
             },
           },
@@ -4711,6 +5683,8 @@ async function initializeYearData() {
  */
 function setupFilterDropdown() {
   const actionFilter = document.querySelector(".dom_select.year_filter");
+  console.log(actionFilter);
+
   if (!actionFilter) return;
 
   const actionList = actionFilter.querySelector("ul.dom_select_show");
@@ -4720,6 +5694,7 @@ function setupFilterDropdown() {
   // Xử lý đóng/mở
   actionFilter.addEventListener("click", (e) => {
     e.stopPropagation();
+
     const isActive = actionList.classList.contains("active");
     document.querySelectorAll(".dom_select_show.active").forEach((ul) => {
       if (ul !== actionList) ul.classList.remove("active");
@@ -4737,8 +5712,8 @@ function setupFilterDropdown() {
         actionList.classList.remove("active");
         return;
       }
+      console.log(li);
 
-      // Cập nhật UI
       actionItems.forEach((el) => el.classList.remove("active"));
       actionList
         .querySelectorAll(".radio_box")
@@ -4897,26 +5872,26 @@ function resetYearDropdownToCurrentYear() {
   // Đóng dropdown năm
   yearList.classList.remove("active");
 }
-async function reloadFullData() {
-  const ids = []; // rỗng => full data
-  loadPlatformSummary(ids);
-  loadSpendPlatform(ids);
-  loadAgeGenderSpendChart(ids);
-  loadRegionSpendChart(ids);
-  const dailyData = await fetchDailySpendByCampaignIDs(ids);
-  renderDetailDailyChart2(dailyData, "spend");
+// async function reloadFullData() {
+//   const ids = []; // rỗng => full data
+//   loadPlatformSummary(ids);
+//   loadSpendPlatform(ids);
+//   loadAgeGenderSpendChart(ids);
+//   loadRegionSpendChart(ids);
+//   const dailyData = await fetchDailySpendByCampaignIDs(ids);
+//   renderDetailDailyChart2(dailyData, "spend");
 
-  // render lại chart mục tiêu
-  const allAds = window._ALL_CAMPAIGNS.flatMap((c) =>
-    c.adsets.flatMap((as) =>
-      (as.ads || []).map((ad) => ({
-        optimization_goal: as.optimization_goal,
-        insights: { spend: ad.spend || 0 },
-      }))
-    )
-  );
-  renderGoalChart(allAds);
-}
+//   // render lại chart mục tiêu
+//   const allAds = window._ALL_CAMPAIGNS.flatMap((c) =>
+//     c.adsets.flatMap((as) =>
+//       (as.ads || []).map((ad) => ({
+//         optimization_goal: as.optimization_goal,
+//         insights: { spend: ad.spend || 0 },
+//       }))
+//     )
+//   );
+//   renderGoalChart(allAds);
+// }
 function resetUIFilter() {
   // ✅ 1. Reset quick filter dropdown về Ampersand
   const quickFilter = document.querySelector(".quick_filter_detail");
@@ -4934,4 +5909,1453 @@ function resetUIFilter() {
       ul.querySelectorAll("li").forEach((li) => li.classList.remove("active"));
     }
   }
+
+  // ✅ 2. Reset ô search input
+  const searchInput = document.getElementById("campaign_filter");
+  if (searchInput) searchInput.value = "";
 }
+
+// === Safe setup for campaign filter UI ===
+(function initCampaignFilterSafe() {
+  // Guard: ensure DOM exists
+  const filterInputC = document.getElementById("campaign_filter");
+  const filterBox = document.querySelector(".dom_campaign_filter");
+  const filterList = filterBox?.querySelector("ul");
+  const filterBtn = document.getElementById("filter_button");
+
+  // If core DOM parts missing, bail out gracefully
+  if (!filterInputC || !filterBox || !filterList) {
+    console.warn(
+      "[campaign-filter] Required DOM elements not found — skipping setup."
+    );
+    return;
+  }
+
+  // Guard: ensure helpers exist (provide no-op fallbacks)
+  const safeGetCampaignIcon =
+    typeof getCampaignIcon === "function"
+      ? getCampaignIcon
+      : () => "fa-solid fa-bullseye"; // fallback icon class
+
+  const safeApplyCampaignFilter =
+    typeof applyCampaignFilter === "function"
+      ? applyCampaignFilter
+      : async (k) => {
+        console.warn(
+          "[campaign-filter] applyCampaignFilter missing. Keyword:",
+          k
+        );
+      };
+
+  const safeDebounce =
+    typeof debounce === "function"
+      ? debounce
+      : (fn, d = 500) => {
+        let t;
+        return (...a) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...a), d);
+        };
+      };
+
+  // ✅ Render 1 campaign <li>
+  function formatCampaignHTML(c) {
+    const thumb = c?.adsets?.[0]?.ads?.[0]?.thumbnail || "";
+    const optGoal = c?.adsets?.[0]?.ads?.[0]?.optimization_goal;
+    const iconClass = safeGetCampaignIcon(optGoal);
+    const isActiveClass = c._isActive ? "active" : "";
+
+    // escape name/id to avoid injection (basic)
+    const safeName = String(c?.name ?? "")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const safeId = String(c?.id ?? "")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    return `
+      <li data-id="${safeId}">
+        <p>
+          <img src="${thumb}" alt="${safeName}" />
+          <span>
+            <span>${safeName}</span>
+            <span>ID:${safeId}</span>
+          </span>
+        </p>
+        <p>
+          <i class="${iconClass} ${isActiveClass}"></i>
+          ${optGoal || "Unknown"}
+        </p>
+      </li>
+    `;
+  }
+
+  // ✅ Render danh sách hoặc trả "No results"
+  function renderFilteredCampaigns(list = []) {
+    try {
+      if (!Array.isArray(list) || list.length === 0) {
+        filterList.innerHTML = `<li style="color:#999;padding:10px;text-align:center;">No results found</li>`;
+        filterBox.classList.add("active");
+        return;
+      }
+
+      filterList.innerHTML = list.map(formatCampaignHTML).join("");
+      filterBox.classList.add("active");
+    } catch (err) {
+      console.error("[campaign-filter] renderFilteredCampaigns error:", err);
+    }
+  }
+
+  // ✅ Lọc theo _ALL_CAMPAIGNS (safe)
+  function filterCampaigns() {
+    try {
+      const keyword = filterInputC.value.trim().toLowerCase();
+
+      if (!keyword) {
+        filterList.innerHTML = "";
+        filterBox.classList.remove("active");
+        // call RESET only if applyCampaignFilter exists (we use safeApply)
+        safeApplyCampaignFilter("RESET");
+        return;
+      }
+
+      const all = Array.isArray(window._ALL_CAMPAIGNS)
+        ? window._ALL_CAMPAIGNS
+        : [];
+      const filtered = all.filter((c) =>
+        String(c?.name || "")
+          .toLowerCase()
+          .includes(keyword)
+      );
+
+      renderFilteredCampaigns(filtered);
+    } catch (err) {
+      console.error("[campaign-filter] filterCampaigns error:", err);
+    }
+  }
+
+  // ✅ Debounced search (safe)
+  const debouncedSearch = safeDebounce(filterCampaigns, 500);
+
+  // --- Listeners ---
+  filterInputC.addEventListener("input", (e) => {
+    const keyword = e.target.value.trim();
+    if (keyword === "") {
+      // immediate reset when input cleared
+      filterList.innerHTML = "";
+      filterBox.classList.remove("active");
+      safeApplyCampaignFilter("RESET");
+      return;
+    }
+    debouncedSearch();
+  });
+
+  if (filterBtn) {
+    filterBtn.addEventListener("click", filterCampaigns);
+  }
+
+  filterInputC.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      // prevent accidental form submit if inside a form
+      e.preventDefault();
+      filterCampaigns();
+    }
+  });
+
+  // Click on list item => apply filter by the campaign's name (safe)
+  filterList.addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-id]");
+    if (!li) return;
+
+    const id = li.getAttribute("data-id");
+    if (!id) return;
+
+    // find campaign safely
+    const all = Array.isArray(window._ALL_CAMPAIGNS)
+      ? window._ALL_CAMPAIGNS
+      : [];
+    const campaign = all.find((c) => String(c?.id) === String(id));
+    if (!campaign) {
+      console.warn(
+        "[campaign-filter] clicked campaign not found in _ALL_CAMPAIGNS:",
+        id
+      );
+      return;
+    }
+
+    // UX: close list, set input, and apply filter by campaign name
+    try {
+      filterBox.classList.remove("active");
+      filterList.innerHTML = "";
+      filterInputC.value = campaign.name || "";
+      safeApplyCampaignFilter(campaign.name || "");
+    } catch (err) {
+      console.error("[campaign-filter] error on campaign click:", err);
+    }
+  });
+
+  // Optional: click outside to close
+  document.addEventListener("click", (e) => {
+    if (!filterBox.contains(e.target)) {
+      filterBox.classList.remove("active");
+    }
+  });
+
+  // Done
+  console.debug("[campaign-filter] initialized safely");
+})();
+
+async function fetchAdPreview(adId) {
+  try {
+    if (!adId || !META_TOKEN) throw new Error("Missing adId or token");
+
+    const url = `${BASE_URL}/${adId}/previews?ad_format=DESKTOP_FEED_STANDARD&access_token=${META_TOKEN}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data || !data.data?.length) {
+      console.warn("⚠️ No preview data found for this ad.");
+      return null;
+    }
+
+    // 📋 Preview HTML (iframe)
+    const html = data.data[0].body;
+    console.log("✅ Preview HTML:", html);
+
+    const previewBox = document.getElementById("preview_box");
+    if (previewBox) {
+      previewBox.innerHTML = html; // Meta trả về HTML iframe tự render
+    }
+
+    return html;
+  } catch (err) {
+    console.error("❌ Error fetching ad preview:", err);
+    return null;
+  }
+}
+
+/**
+ * ===================================================================
+ * HÀM PHÂN TÍCH CHUYÊN SÂU (PHIÊN BẢN NÂNG CẤP)
+ * Tập trung vào Phễu, Mâu thuẫn & Cơ hội, thay vì liệt kê Top 3.
+ * ===================================================================
+ */
+
+/**
+ * ===================================================================
+ * HÀM PHÂN TÍCH CHUYÊN SÂU (PHIÊN BẢN NÂNG CẤP V2)
+ * ===================================================================
+ * - Giữ lại Top 3 Spend, Top 3 Result, Top 3 Best CPR.
+ * - Loại bỏ hoàn toàn "Worst CPR" (CPR Kém nhất).
+ * - Format giờ thành "2h - 3h".
+ * - Nâng cấp Insights (Phễu, Creative, Hook, Mâu thuẫn)
+ */
+async function generateDeepReportDetailed({
+  byDate = {},
+  byHour = {},
+  byAgeGender = {},
+  byRegion = {},
+  byPlatform = {},
+  targeting = {},
+  goal = VIEW_GOAL,
+} = {}) {
+  // -------------------------
+  // Helpers (Sử dụng các hàm format toàn cục nếu có)
+  // -------------------------
+  const safeNumber = (v) =>
+    typeof v === "number" && !Number.isNaN(v) ? v : +v || 0;
+
+  const formatMoney = (n) => {
+    if (typeof window !== "undefined" && window.formatMoney)
+      return window.formatMoney(n);
+    try {
+      return n === 0
+        ? "0đ"
+        : n.toLocaleString("vi-VN", {
+          style: "currency",
+          currency: "VND",
+          maximumFractionDigits: 0,
+        });
+    } catch {
+      return `${Math.round(n)}đ`;
+    }
+  };
+
+  const formatNumber = (n) => {
+    if (typeof window !== "undefined" && window.formatNumber)
+      return window.formatNumber(n);
+    if (n === null || typeof n === "undefined" || Number.isNaN(+n)) return 0;
+    return Math.round(n);
+  };
+
+  const formatPercent = (n) => `${(safeNumber(n) * 100).toFixed(2)}%`;
+
+  // Hàm getResultsSafe (từ code của bạn, đã tốt)
+  const getResultsSafe = (dataSegment) => {
+    if (window.getResults)
+      return safeNumber(window.getResults(dataSegment, VIEW_GOAL));
+    const actions = dataSegment?.actions || {};
+    const g = (VIEW_GOAL || goal || "").toUpperCase();
+    if (g === "REACH") return safeNumber(dataSegment.reach || 0);
+    if (g === "LEAD_GENERATION" || g === "QUALITY_LEAD") {
+      const leadKeys = ["onsite_conversion.lead_grouped"];
+      let leadSum = 0;
+      for (const k of leadKeys) {
+        if (actions[k]) leadSum += safeNumber(actions[k]);
+      }
+      if (leadSum > 0) return leadSum;
+    }
+    if (g === "REPLIES" || g === "MESSAGE") {
+      if (actions["onsite_conversion.total_messaging_connection"])
+        return safeNumber(
+          actions["onsite_conversion.total_messaging_connection"]
+        );
+    }
+    const preferred = [
+      "offsite_conversion.purchase",
+      "purchase",
+      "onsite_conversion.lead_grouped",
+      "onsite_conversion.total_messaging_connection",
+      "landing_page_view",
+      "link_click",
+      "post_engagement",
+    ];
+    for (const k of preferred) {
+      if (actions[k]) return safeNumber(actions[k]);
+    }
+    return 0;
+  };
+
+  const calculateCPR = (spend, result, VIEW_GOAL = "") => {
+    spend = safeNumber(spend);
+    result = safeNumber(result);
+    if (spend <= 0 || result <= 0) return 0;
+    if ((VIEW_GOAL || goal).toUpperCase() === "REACH")
+      return (spend / result) * 1000;
+    return spend / result;
+  };
+
+  const formatCPR = (cprValue, VIEW_GOAL = "") => {
+    if (!cprValue || cprValue === 0) return "N/A";
+    const formatted = formatMoney(Math.round(cprValue));
+    return (VIEW_GOAL || goal).toUpperCase() === "REACH"
+      ? `${formatted} / 1000 reach`
+      : formatted;
+  };
+
+  const topN = (arr, keyFn, n = 3, asc = false) => {
+    const copy = (arr || []).slice();
+    copy.sort((x, y) => {
+      const vx = keyFn(x),
+        vy = keyFn(y);
+      return asc ? vx - vy : vy - vx;
+    });
+    return copy.slice(0, n);
+  };
+
+  // <<< THAY ĐỔI: Hàm format tên/key
+  const formatKeyName = (key, type) => {
+    if (!key) return "N/A";
+    try {
+      if (type === "hour") {
+        const hour = parseInt((key || "0").split(":")[0], 10);
+        if (isNaN(hour)) return key;
+        return `${hour}h - ${hour + 1}h`; // Format 2h - 3h
+      }
+      if (type === "platform" || type === "age_gender") {
+        return (key || "")
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+    } catch (e) {
+      console.warn("Lỗi format key:", key, e);
+      return key; // Trả về key gốc nếu lỗi
+    }
+    return key; // Default cho Region
+  };
+
+  const toArray = (obj) =>
+    Object.entries(obj || {}).map(([k, v]) => ({ key: k, ...v }));
+
+  // -------------------------
+  // Tính toán Metrics Phễu (Funnel Metrics)
+  // -------------------------
+
+  const computeBreakdownMetrics = (keyedObj) => {
+    const arr = toArray(keyedObj);
+    return arr.map((item) => {
+      const spend = safeNumber(item.spend);
+      const impressions = safeNumber(item.impressions);
+      const reach = safeNumber(item.reach);
+      const result = getResults(item);
+      const linkClicks = safeNumber(
+        item.actions?.link_click || item.actions?.link_clicks || 0
+      );
+      return {
+        key: item.key,
+        spend,
+        impressions,
+        reach,
+        result,
+        linkClicks,
+        cpr: calculateCPR(spend, result, goal),
+        cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+        ctr: impressions > 0 ? linkClicks / impressions : 0, // Tỷ lệ Click
+        cvr_proxy: linkClicks > 0 ? result / linkClicks : 0, // Tỷ lệ Chuyển đổi từ Click
+      };
+    });
+  };
+
+  const byDateArr = computeBreakdownMetrics(byDate);
+  const byAgeGenderArr = computeBreakdownMetrics(byAgeGender);
+  const byRegionArr = computeBreakdownMetrics(byRegion);
+  const byPlatformArr = computeBreakdownMetrics(byPlatform);
+  const byHourArr = computeBreakdownMetrics(byHour);
+
+  let totalSpend = 0,
+    totalImpressions = 0,
+    totalReach = 0,
+    totalResults = 0,
+    totalLinkClicks = 0;
+  byDateArr.forEach((d) => {
+    totalSpend += d.spend;
+    totalImpressions += d.impressions;
+    totalReach += d.reach;
+    totalResults += d.result;
+    totalLinkClicks += d.linkClicks;
+  });
+
+  const overallCPR = calculateCPR(totalSpend, totalResults, goal);
+  const overallCPM =
+    totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+  const overallFreq = totalReach > 0 ? totalImpressions / totalReach : 0;
+  const overallCTR =
+    totalImpressions > 0 ? totalLinkClicks / totalImpressions : 0;
+  const overallCVRProxy =
+    totalLinkClicks > 0 ? totalResults / totalLinkClicks : 0;
+
+  const summary = {
+    goal: goal || "Not specified",
+    totalSpend,
+    totalImpressions,
+    totalReach,
+    totalResults,
+    totalLinkClicks,
+    overallCPR,
+    overallCPM,
+    overallFreq,
+    overallCTR,
+    overallCVRProxy,
+    formatted: {
+      totalSpend: formatMoney(totalSpend),
+      totalResults: formatNumber(totalResults),
+      overallCPR: formatCPR(overallCPR, goal),
+      overallCPM: formatMoney(Math.round(overallCPM)),
+      overallFreq: overallFreq.toFixed(2),
+      overallCTR: formatPercent(overallCTR),
+      overallCVRProxy: formatPercent(overallCVRProxy),
+    },
+  };
+
+  // -------------------------
+  // TẠO INSIGHTS (Trọng tâm của chuyên gia)
+  // -------------------------
+  const recommendations = [];
+
+  // 1. Phân tích Phễu (Funnel Analysis) - Nâng cấp theo yêu cầu
+  (function analyzeFunnel() {
+    const LOW_CTR_THRESHOLD = 0.005; // 0.5%
+    const LOW_CVR_THRESHOLD = 0.02; // 2%
+
+    if (totalResults === 0 && totalLinkClicks === 0 && totalImpressions > 0) {
+      recommendations.push({
+        area: "Creative & Hook",
+        reason: `Quảng cáo đã chạy (CPM: ${summary.formatted.overallCPM}) nhưng có **CTR (Tỷ lệ click) cực thấp (${summary.formatted.overallCTR})**.`,
+        action: `Đây là dấu hiệu **Creative (Hình ảnh/Video/Copy) không hiệu quả** hoặc **Targeting sai** hoàn toàn. Nội dung "hook" (điểm thu hút) 3 giây đầu tiên đã thất bại. Cần A/B test khẩn cấp creative mới, đặc biệt là hook.`,
+      });
+    } else if (totalResults === 0 && totalLinkClicks > 0) {
+      recommendations.push({
+        area: "Landing Page & Offer",
+        reason: `Quảng cáo thu hút được người click (CTR: ${summary.formatted.overallCTR}) nhưng **không tạo ra BẤT KỲ kết quả nào (CVR: 0.00%)**.`,
+        action: `Vấn đề nghiêm trọng nằm ở *sau khi click*. Kiểm tra ngay: 1. **Alignment**: Lời hứa trên quảng cáo có khớp với nội dung landing page không? 2. **Form Friction**: Form đăng ký có quá dài, khó hiểu, hoặc yêu cầu thông tin nhạy cảm không? 3. **Tốc độ tải trang** (Page Speed).`,
+      });
+    } else if (overallCTR < LOW_CTR_THRESHOLD) {
+      recommendations.push({
+        area: "Creative (CTR)",
+        reason: `Tỷ lệ Click (CTR) đang ở mức rất thấp (${summary.formatted.overallCTR}).`,
+        action: `Creative chưa đủ thu hút. Tập trung cải thiện **Hook** (3 giây đầu video / ảnh chính) và **CTA (Call-to-Action)**. Đảm bảo quảng cáo nổi bật trên newsfeed.`,
+      });
+    } else if (
+      overallCVRProxy < LOW_CVR_THRESHOLD &&
+      overallCTR >= LOW_CTR_THRESHOLD
+    ) {
+      recommendations.push({
+        area: "Landing Page (CVR)",
+        reason: `CTR ở mức chấp nhận được (${summary.formatted.overallCTR}) nhưng **Tỷ lệ Chuyển đổi (CVR) sau click rất thấp (${summary.formatted.overallCVRProxy})**.`,
+        action: `Người dùng quan tâm (click) nhưng không chuyển đổi. Tối ưu **Landing Page**: 1. Tăng tốc độ tải trang. 2. Đảm bảo thông điệp khớp 100% với quảng cáo. 3. Đơn giản hóa Form đăng ký.`,
+      });
+    } else if (
+      overallCTR >= LOW_CTR_THRESHOLD &&
+      overallCVRProxy >= LOW_CVR_THRESHOLD
+    ) {
+      // <<< THAY ĐỔI: Thêm insight "TỐT"
+      recommendations.push({
+        area: "Funnel Performance",
+        reason: `Phễu hoạt động tốt: CTR (${summary.formatted.overallCTR}) và CVR (${summary.formatted.overallCVRProxy}) đều ở mức chấp nhận được.`,
+        action: `Tiếp tục theo dõi. Có thể bắt đầu test A/B các creative/offer mới để tìm điểm tối ưu hơn nữa (scale-up).`,
+      });
+    }
+  })();
+
+  // 2. Phân tích Tần suất (Frequency)
+  (function analyzeFrequency() {
+    if (overallFreq > 2.5) {
+      recommendations.push({
+        area: "Frequency (Mỏi quảng cáo)",
+        reason: `Tần suất trung bình cao (${summary.formatted.overallFreq}). Khách hàng có thể đã thấy quảng cáo này quá nhiều.`,
+        action: `Chuẩn bị làm mới creative (nội dung/hình ảnh) để tránh "mỏi quảng cáo". Xem xét loại trừ tệp những người đã tương tác/click nhưng không chuyển đổi.`,
+      });
+    }
+  })();
+
+  // 3. Phân tích Mâu thuẫn Ngân sách (Budget Mismatch)
+  (function analyzeBudgetMismatch() {
+    if (totalResults === 0) return;
+    const topSpendSegment = topN(byAgeGenderArr, (x) => x.spend, 1)[0];
+    const bestCprSegment = topN(
+      byAgeGenderArr.filter((x) => x.cpr > 0),
+      (x) => x.cpr,
+      1,
+      true
+    )[0];
+
+    if (
+      topSpendSegment &&
+      bestCprSegment &&
+      topSpendSegment.key !== bestCprSegment.key
+    ) {
+      recommendations.push({
+        area: "Budget Mismatch (Age/Gender)",
+        reason: `Ngân sách đang tập trung nhiều nhất vào nhóm <b>${formatKeyName(
+          topSpendSegment.key,
+          "age_gender"
+        )}</b> (CPR: ${formatCPR(topSpendSegment.cpr, goal)}).`,
+        action: `Tuy nhiên, nhóm hiệu quả nhất (CPR rẻ nhất) lại là <b>${formatKeyName(
+          bestCprSegment.key,
+          "age_gender"
+        )}</b> (CPR: ${formatCPR(
+          bestCprSegment.cpr,
+          goal
+        )}). Cân nhắc *chuyển dịch ngân sách* từ nhóm kém hiệu quả sang nhóm hiệu quả nhất.`,
+      });
+    }
+  })();
+
+  // 4. Phân tích Cơ hội Bỏ lỡ (Untapped Opportunity)
+  (function analyzeOpportunity() {
+    if (totalResults === 0) return;
+    const bestCprPlatforms = topN(
+      byPlatformArr.filter((x) => x.cpr > 0),
+      (x) => x.cpr,
+      3,
+      true
+    );
+    const lowSpendOpportunities = bestCprPlatforms.filter(
+      (p) => p.spend < totalSpend * 0.1
+    );
+
+    if (lowSpendOpportunities.length > 0) {
+      const opportunity = lowSpendOpportunities[0];
+      recommendations.push({
+        area: "Untapped Opportunity (Placement)",
+        reason: `Vị trí <b>${formatKeyName(
+          opportunity.key,
+          "platform"
+        )}</b> đang có CPR cực kỳ tốt (${formatCPR(
+          opportunity.cpr,
+          goal
+        )}) nhưng mới chỉ tiêu ${formatMoney(opportunity.spend)}.`,
+        action: `Đây là một "mỏ vàng" chưa khai thác. <b>Tạo chiến dịch riêng (CBO) hoặc nhóm quảng cáo riêng</b> chỉ nhắm vào vị trí này và tăng ngân sách cho nó để scale.`,
+      });
+    }
+  })();
+
+  // -------------------------
+  // Tạo Sections Data (Giữ lại Best CPR)
+  // -------------------------
+  const N_TOP = 3; // Đã định nghĩa ở trên
+  const sections = [];
+
+  // 1) Timing (Hours)
+  (function () {
+    const arr = byHourArr;
+
+    if (!arr.length)
+      return sections.push({ title: "Timing (Hourly)", note: "No data" });
+    const formatList = (list) =>
+      list.map((item) => ({ ...item, key: formatKeyName(item.key, "hour") }));
+    sections.push({
+      title: "Timing (Hourly)",
+      topSpend: formatList(topN(arr, (x) => x.spend, N_TOP)),
+      topResult: formatList(topN(arr, (x) => x.result, N_TOP)),
+      bestCpr: formatList(
+        topN(
+          arr.filter((x) => x.cpr > 0),
+          (x) => x.cpr,
+          N_TOP,
+          true
+        )
+      ),
+    });
+  })();
+
+  // 2) Age & Gender
+  (function () {
+    const arr = byAgeGenderArr;
+    if (!arr.length)
+      return sections.push({ title: "Age & Gender", note: "No data" });
+    const formatList = (list) =>
+      list.map((item) => ({
+        ...item,
+        key: formatKeyName(item.key, "age_gender"),
+      }));
+    sections.push({
+      title: "Age & Gender",
+      topSpend: formatList(topN(arr, (x) => x.spend, N_TOP)),
+      topResult: formatList(topN(arr, (x) => x.result, N_TOP)), // <<< THÊM Top Result
+      bestCpr: formatList(
+        topN(
+          arr.filter((x) => x.cpr > 0),
+          (x) => x.cpr,
+          N_TOP,
+          true
+        )
+      ),
+    });
+  })();
+
+  // 3) Region
+  (function () {
+    const arr = byRegionArr;
+    if (!arr.length) return sections.push({ title: "Region", note: "No data" });
+    sections.push({
+      title: "Region",
+      topSpend: topN(arr, (x) => x.spend, N_TOP),
+      topResult: topN(arr, (x) => x.result, N_TOP), // <<< THÊM Top Result
+      bestCpr: topN(
+        arr.filter((x) => x.cpr > 0),
+        (x) => x.cpr,
+        N_TOP,
+        true
+      ),
+    });
+  })();
+
+  // 4) Platform & Placement
+  (function () {
+    const arr = byPlatformArr;
+    if (!arr.length)
+      return sections.push({ title: "Platform & Placement", note: "No data" });
+    const formatList = (list) =>
+      list.map((item) => ({
+        ...item,
+        key: formatKeyName(item.key, "platform"),
+      }));
+    sections.push({
+      title: "Platform & Placement",
+      topSpend: formatList(topN(arr, (x) => x.spend, N_TOP)),
+      topResult: formatList(topN(arr, (x) => x.result, N_TOP)), // <<< THÊM Top Result
+      bestCpr: formatList(
+        topN(
+          arr.filter((x) => x.cpr > 0),
+          (x) => x.cpr,
+          N_TOP,
+          true
+        )
+      ),
+    });
+  })();
+
+  // 5) Device
+  // (function () {
+  //   const arr = byDeviceArr;
+  //   if (!arr.length) return sections.push({ title: "Device", note: "No data" });
+  //   sections.push({
+  //     title: "Device",
+  //     topSpend: topN(arr, (x) => x.spend, N_TOP),
+  //     topResult: topN(arr, (x) => x.result, N_TOP), // <<< THÊM Top Result
+  //     bestCpr: topN(
+  //       arr.filter((x) => x.cpr > 0),
+  //       (x) => x.cpr,
+  //       N_TOP,
+  //       true
+  //     ),
+  //   });
+  // })();
+
+  // 6) Creative (Section rỗng, chỉ có insight)
+  sections.push({
+    title: "Creative & Frequency",
+    note: "Phân tích đã được gộp trong phần Đề xuất.",
+  });
+
+  // -------------------------
+  // Trả về Report Object (ĐÃ CẬP NHẬT)
+  // -------------------------
+  const reportObject = {
+    generatedAt: new Date().toISOString(),
+    summary,
+    recommendations, // Chỉ trả về insight
+    sections, // <<< THAY ĐỔI: Trả về sections (chứa Top 3)
+  };
+
+  // Log ra console (Đã cập nhật)
+  console.table([
+    {
+      Spend: summary.formatted.totalSpend,
+      Results: summary.formatted.totalResults,
+      CPR: summary.formatted.overallCPR,
+      CPM: summary.formatted.overallCPM,
+      CTR: summary.formatted.overallCTR,
+      CVR_Click: summary.formatted.overallCVRProxy,
+      Freq: summary.formatted.overallFreq,
+    },
+  ]);
+
+  sections.forEach((sec) => {
+    console.groupCollapsed(`🔹 ${sec.title}`);
+    if (sec.note) {
+      console.log(sec.note);
+    } else {
+      if (sec.topSpend) {
+        console.log("Top 3 Chi tiêu (Spend):");
+        console.table(
+          sec.topSpend.map((s) => ({
+            Key: s.key,
+            Spend: formatMoney(s.spend),
+            Results: s.result,
+            CPR: formatCPR(s.cpr, goal),
+          }))
+        );
+      }
+      if (sec.topResult) {
+        console.log("Top 3 Kết quả (Result):");
+        console.table(
+          sec.topResult.map((s) => ({
+            Key: s.key,
+            Spend: formatMoney(s.spend),
+            Results: s.result,
+            CPR: formatCPR(s.cpr, goal),
+          }))
+        );
+      }
+      if (sec.bestCpr) {
+        console.log("Top 3 CPR Tốt nhất (Best CPR):");
+        console.table(
+          sec.bestCpr.map((s) => ({
+            Key: s.key,
+            Spend: formatMoney(s.spend),
+            Results: s.result,
+            CPR: formatCPR(s.cpr, goal),
+          }))
+        );
+      }
+      // Đã bỏ worstCpr
+    }
+    console.groupEnd();
+  });
+
+  console.group("✅ Recommendations");
+  if (recommendations.length === 0) {
+    console.log("Hiệu suất ổn định, chưa có đề xuất rõ ràng.");
+  } else {
+    recommendations.forEach((r, idx) => {
+      console.log(`${idx + 1}. [${r.area}] ${r.reason}`);
+      console.log(`   → Đề xuất: ${r.action}`);
+    });
+  }
+  console.groupEnd();
+  console.groupEnd();
+
+  return reportObject;
+}
+
+async function runDeepReport() {
+  const report = await generateDeepReportDetailed({
+    meta: window.campaignSummaryData,
+    byDate: window.dataByDate,
+    byHour: window.processedByHour,
+    byAgeGender: window.processedByAgeGender,
+    byRegion: window.processedByRegion,
+    byPlatform: window.processedByPlatform,
+    byDevice: window.processedByDevice,
+    targeting: window.targetingData,
+    goal: VIEW_GOAL,
+  });
+  renderAdReportWithVibe(report);
+}
+/**
+ * ===================================================================
+ * HÀM RENDER CHÍNH
+ * Render dữ liệu JSON báo cáo quảng cáo theo "vibe" của VTCI.
+ * ===================================================================
+ */
+
+// Đảm bảo bạn đã có 2 hàm này ở đâu đó
+// const formatMoney = (v) => v != null && !isNaN(v) ? Math.round(v).toLocaleString("vi-VN") + "đ" : "0đ";
+// const formatNumber = (v) => v != null && !isNaN(v) ? Math.round(v).toLocaleString("vi-VN") : "0";
+
+/**
+ * Render báo cáo vào UI.
+ * @param {object} rawReportData - Đối tượng JSON thô bạn đã cung cấp.
+ */
+/**
+ * ===================================================================
+ * HÀM RENDER UI (PHIÊN BẢN NÂNG CẤP V2)
+ * ===================================================================
+ */
+
+/**
+ * Render báo cáo vào UI.
+ * @param {object} report - Đối tượng report đã được generate.
+ */
+function renderAdReportWithVibe(report) {
+  console.log("Rendering Ad Report (V2)...", report);
+  const container = document.querySelector(".dom_ai_report_content");
+  if (!container) {
+    console.error("Không tìm thấy container .dom_ai_report_content");
+    return;
+  }
+
+  const adNameEl = document.querySelector(".dom_detail_id > span:first-child");
+  const adName = adNameEl ? adNameEl.textContent.trim() : "Quảng cáo";
+
+  const { summary, recommendations, sections, generatedAt } = report;
+
+  const html = [];
+  let delay = 1;
+
+  // --- Bắt đầu khối báo cáo ---
+  html.push('<div class="ai_report_block ads">');
+  html.push(
+    `<h4><i class="fa-solid fa-magnifying-glass-chart"></i> Phân tích: ${adName}</h4>`
+  );
+  html.push('<div class="ai_report_inner"><section class="ai_section">');
+
+  // --- 1. Phần Tóm tắt Phễu (Funnel KPI Grid) ---
+  html.push(createKpiGrid(summary, delay));
+  delay += 2;
+
+  // --- 2. Phần Insights & Đề xuất ---
+  html.push(createInsightList(recommendations, delay));
+  delay += 2;
+
+  // --- 3. Phần Breakdown (Sections) ---
+  if (sections) {
+    for (const section of sections) {
+      // Bỏ qua section "Creative" vì nó chỉ có insight (đã hiển thị ở trên)
+      if (section.title.includes("Creative")) {
+        continue;
+      }
+
+      let type = "default";
+      if (section.title.includes("Timing")) type = "hour";
+      else if (section.title.includes("Age & Gender")) type = "age";
+      else if (section.title.includes("Region")) type = "region";
+      else if (section.title.includes("Platform")) type = "platform";
+      else if (section.title.includes("Device")) type = "device";
+
+      // <<< THAY ĐỔI: Gọi hàm render breakdown MỚI
+      html.push(createBreakdownSection(section, type, delay));
+      delay += 4; // Tăng delay cho mỗi section
+    }
+  }
+
+  // --- Kết thúc khối báo cáo ---
+  html.push("</section></div>");
+  html.push(
+    `<small class="timestamp">Generated: ${new Date(generatedAt).toLocaleString(
+      "vi-VN"
+    )}</small>`
+  );
+  html.push("</div>");
+
+  container.innerHTML = html.join("");
+
+  // Kích hoạt animation
+  setTimeout(() => {
+    container
+      .querySelectorAll(".fade_in_item")
+      .forEach((el, i) => setTimeout(() => el.classList.add("show"), i * 200));
+  }, 3000);
+}
+
+/**
+ * Tạo lưới KPI tóm tắt (Đã cập nhật)
+ */
+
+/**
+ * Tạo danh sách Insights/Đề xuất.
+ */
+function createInsightList(recommendations, delayStart = 1) {
+  let listItems =
+    '<li><i class="fa-solid fa-check-circle" style="color:#28a745;"></i> <strong>[TỔNG QUAN]</strong> Hiệu suất ổn định, chưa phát hiện vấn đề nghiêm trọng.</li>';
+
+  if (recommendations && recommendations.length > 0) {
+    listItems = recommendations
+      .map((rec) => {
+        let icon = "fa-solid fa-lightbulb";
+        let color = "#ffc107"; // Vàng
+        if (
+          rec.area.includes("Mismatch") ||
+          rec.reason.includes("thấp") ||
+          rec.reason.includes("cao") ||
+          rec.area.includes("Creative")
+        ) {
+          icon = "fa-solid fa-triangle-exclamation";
+          color = "#e17055"; // Đỏ cam
+        } else if (
+          rec.area.includes("Opportunity") ||
+          rec.reason.includes("tốt nhất")
+        ) {
+          icon = "fa-solid fa-wand-magic-sparkles";
+          color = "#007bff"; // Xanh dương
+        } else if (rec.area.includes("Funnel Performance")) {
+          icon = "fa-solid fa-check-circle";
+          color = "#28a745"; // Xanh lá
+        }
+
+        return `<li><i class="${icon}" style="color:${color};"></i> <strong>[${rec.area
+          }]</strong> ${rec.reason
+          }<br><span class="recommendation-action">→ Đề xuất: ${rec.action || ""
+          }</span></li>`;
+      })
+      .join("");
+  }
+
+  return `
+        <h5 class="fade_in_item delay-${delayStart}"><i class="fa-solid fa-user-check"></i> Đề xuất từ Chuyên gia</h5>
+        <ul class="insight_list fade_in_item delay-${delayStart + 1}">
+            ${listItems}
+        </ul>
+    `;
+}
+
+/**
+ * <<< THAY ĐỔI: Hàm tạo section breakdown MỚI
+ * Tạo một section breakdown đầy đủ (Tiêu đề + 3 bảng).
+ */
+function createBreakdownSection(section, type, delayStart = 1) {
+  if (!section || section.note === "No data") {
+    return ""; // Bỏ qua nếu section không có data
+  }
+
+  const icon = getIconForType(type);
+  const hasResults =
+    (section.topResult && section.topResult.length > 0) ||
+    (section.bestCpr && section.bestCpr.length > 0);
+
+  return `
+        <h5 class="fade_in_item delay-${delayStart}"><i class="${icon}"></i> Phân tích ${section.title
+    }</h5>
+        
+        <div class="fade_in_item delay-${delayStart + 1}">
+            <h6>Top 3 Chi tiêu (Spend)</h6>
+            ${createBreakdownTable(section.topSpend, type)}
+        </div>
+        
+        ${hasResults
+      ? `
+            <div class="fade_in_item delay-${delayStart + 2}">
+                <h6>Top 3 Kết quả (Result)</h6>
+                ${createBreakdownTable(section.topResult, type)}
+            </div>
+            
+            <div class="fade_in_item delay-${delayStart + 3}">
+                <h6>Top 3 CPR Tốt nhất (Best CPR)</h6>
+                ${createBreakdownTable(section.bestCpr, type)}
+            </div>
+        `
+      : `
+            <div class="fade_in_item delay-${delayStart + 2}">
+                <p class="no-result-note"><i class="fa-solid fa-info-circle"></i> Không có dữ liệu Kết quả (Result) để phân tích CPR cho mục này.</p>
+            </div>
+        `
+    }
+    `;
+}
+
+/**
+ * Tạo HTML cho một bảng 'mini_table'.
+ */
+function createBreakdownTable(dataArray, type) {
+  if (!dataArray || dataArray.length === 0)
+    return '<p class="no-result-note" style="margin-left: 0;">Không có dữ liệu.</p>';
+
+  // Dùng hàm formatMoney và formatNumber (đảm bảo chúng tồn tại)
+  const formatMoneySafe = (n) =>
+    window.formatMoney ? window.formatMoney(n) : `${Math.round(n || 0)}đ`;
+  const formatNumberSafe = (n) =>
+    window.formatNumber ? window.formatNumber(n) : Math.round(n || 0);
+  const formatCPRSafe = (n, goal) =>
+    window.formatCPR
+      ? window.formatCPR(n, goal)
+      : n > 0
+        ? formatMoneySafe(n)
+        : "N/A";
+
+  const rows = dataArray
+    .map(
+      (item) => `
+        <tr>
+            <td>${item.key}</td> <td>${formatMoneySafe(item.spend)}</td>
+            <td>${formatNumberSafe(item.result)}</td>
+            <td>${formatCPRSafe(item.cpr, item.goal)}</td>
+            <td>${formatMoneySafe(item.cpm)}</td>
+        </tr>
+    `
+    )
+    .join("");
+
+  return `
+        <table class="mini_table">
+            <thead>
+                <tr>
+                    <th>Phân khúc</th>
+                    <th>Chi phí</th>
+                    <th>Kết quả</th>
+                    <th>CPR</th>
+                    <th>CPM</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * Helper lấy icon Font Awesome dựa trên loại breakdown.
+ */
+function getIconForType(type) {
+  switch (type) {
+    case "hour":
+      return "fa-solid fa-clock";
+    case "age":
+      return "fa-solid fa-users";
+    case "region":
+      return "fa-solid fa-map-location-dot";
+    case "platform":
+      return "fa-solid fa-laptop-device";
+    case "device":
+      return "fa-solid fa-mobile-screen-button";
+    default:
+      return "fa-solid fa-chart-bar";
+  }
+}
+
+/**
+ * Tạo lưới KPI tóm tắt (Đã cập nhật
+ */
+function createKpiGrid(summary, delayStart = 1) {
+  if (!summary || !summary.formatted) return "";
+  const { formatted, goal } = summary;
+
+  // Thêm CTR và CVR vào lưới KPI
+  return `
+    <h5 class="fade_in_item delay-${delayStart}"><i class="fa-solid fa-chart-pie"></i> Tóm tắt Phễu Hiệu suất</h5>
+    <div class="ai_kpi_grid fade_in_item delay-${delayStart + 1}">
+        <div class="kpi_item">
+            <span>Tổng chi phí</span>
+            <b>${formatted.totalSpend || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>Tổng kết quả</span>
+            <b>${formatted.totalResults || "N/A"} (${goal || "N/A"})</b>
+        </div>
+        <div class="kpi_item">
+            <span>CPR (Chi phí/Kết quả)</span>
+            <b>${formatted.overallCPR || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>CPM (Chi phí/1000 Lượt xem)</span>
+            <b>${formatted.overallCPM || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>CTR (Tỷ lệ Click)</span>
+            <b class="${summary.overallCTR < 0.005 ? "metric-bad" : "metric-good"
+    }">${formatted.overallCTR || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>CVR (Click -> Kết quả)</span>
+             <b class="${summary.overallCVRProxy < 0.02 ? "metric-bad" : "metric-good"
+    }">${formatted.overallCVRProxy || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>Tiếp cận (Reach)</span>
+            <b>${summary.totalReach || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>Tần suất (Freq)</span>
+            <b>${formatted.overallFreq || "N/A"}</b>
+        </div>
+    </div>
+  `;
+}
+
+/**
+ * Tạo danh sách Insights/Đề xuất.
+ */
+function createInsightList(recommendations, delayStart = 1) {
+  let listItems =
+    '<li><i class="fa-solid fa-check-circle" style="color:#28a745;"></i> <strong>[TỔNG QUAN]</strong> Hiệu suất ổn định, chưa phát hiện vấn đề nghiêm trọng.</li>';
+
+  if (recommendations && recommendations.length > 0) {
+    listItems = recommendations
+      .map((rec) => {
+        // Xác định icon và màu
+        let icon = "fa-solid fa-lightbulb"; // Insight (Vàng)
+        let color = "#ffc107";
+        if (
+          rec.area.includes("Mismatch") ||
+          rec.reason.includes("thấp") ||
+          rec.reason.includes("cao")
+        ) {
+          icon = "fa-solid fa-triangle-exclamation"; // Vấn đề (Đỏ cam)
+          color = "#e17055";
+        } else if (
+          rec.area.includes("Opportunity") ||
+          rec.reason.includes("tốt nhất")
+        ) {
+          icon = "fa-solid fa-wand-magic-sparkles"; // Cơ hội (Xanh dương)
+          color = "#007bff";
+        }
+
+        return `<li><i class="${icon}" style="color:${color};"></i> <strong>[${rec.area
+          }]</strong> ${rec.reason
+          }<br><span class="recommendation-action">→ Đề xuất: ${rec.action || ""
+          }</span></li>`;
+      })
+      .join("");
+  }
+
+  return `
+    <h5 class="fade_in_item delay-${delayStart}"><i class="fa-solid fa-user-check"></i> Đề xuất từ Chuyên gia</h5>
+    <ul class="insight_list fade_in_item delay-${delayStart + 1}">
+        ${listItems}
+    </ul>
+  `;
+}
+/**
+ * ===================================================================
+ * CÁC HÀM HELPER CHO VIỆC RENDER
+ * ===================================================================
+ */
+
+/**
+ * Tạo lưới KPI tóm tắt.
+ * @param {object} summary - Object summary từ JSON.
+ * @param {number} delayStart - Số delay bắt đầu cho animation.
+ */
+
+/**
+ * Tạo danh sách Insights/Đề xuất.
+ * @param {Array} recommendations - Mảng recommendations từ JSON.
+ * @param {number} delayStart - Số delay bắt đầu cho animation.
+ */
+function createInsightList(recommendations, delayStart = 1) {
+  let listItems = "<li>Không có đề xuất nổi bật.</li>"; // Mặc định
+
+  if (recommendations && recommendations.length > 0) {
+    listItems = recommendations
+      .map((rec) => {
+        // Xác định icon và màu dựa trên reason/area
+        let icon = "fa-solid fa-lightbulb";
+        let color = "#007bff"; // Màu xanh dương mặc định
+        if (rec.reason.includes("thấp")) {
+          icon = "fa-solid fa-triangle-exclamation";
+          color = "#e17055"; // Màu đỏ cam
+        }
+
+        return `<li><i class="${icon}" style="color:${color}"></i> <b>[${rec.area
+          }]</b> ${rec.reason} ${rec.action || ""}</li>`;
+      })
+      .join("");
+  }
+
+  return `
+      <h5 class="fade_in_item delay-${delayStart}"><i class="fa-solid fa-lightbulb"></i> Insights & Đề xuất</h5>
+      <ul class="insight_list fade_in_item delay-${delayStart + 1}">
+          ${listItems}
+      </ul>
+  `;
+}
+
+function createBreakdownSection(section, type, delayStart = 1) {
+  if (!section || section.note === "No data") {
+    return ""; // Bỏ qua nếu section không có data
+  }
+
+  const icon = getIconForType(type); // Lấy icon dựa trên loại
+
+  // Dữ liệu JSON có result=0 và cpr=0 ở mọi nơi.
+  // Nếu không có kết quả, bảng 'Best CPR' và 'Worst CPR' sẽ giống hệt nhau
+  // và không có ý nghĩa. Chúng ta sẽ chỉ hiển thị 'Top Spend' trong trường hợp này.
+  const hasResults = parseFloat(section.topSpend[0]?.result || 0) > 0; // Kiểm tra xem có kết quả nào không
+
+  return `
+      <h5 class="fade_in_item delay-${delayStart}"><i class="${icon}"></i> Phân tích ${section.title
+    }</h5>
+      
+      <div class="fade_in_item delay-${delayStart + 1}">
+          <h6>Top chi tiêu (Spend)</h6>
+          ${createBreakdownTable(section.topSpend, type)}
+      </div>
+      
+      ${hasResults
+      ? `
+          <div class="fade_in_item delay-${delayStart + 2}">
+              <h6>Top CPR Tốt nhất (Best CPR)</h6>
+              ${createBreakdownTable(section.bestCpr, type)}
+          </div>
+         
+      `
+      : `
+          <div class="fade_in_item delay-${delayStart + 2}">
+              <p class="no-result-note"><i class="fa-solid fa-info-circle"></i> Không có dữ liệu Kết quả (Result) để phân tích CPR cho mục này.</p>
+          </div>
+      `
+    }
+  `;
+}
+
+/**
+ * Tạo HTML cho một bảng 'mini_table'.
+ * @param {Array} dataArray - Mảng dữ liệu (ví dụ: section.topSpend).
+ * @param {string} type - 'hour', 'age', 'region', 'platform'.
+ */
+function createBreakdownTable(dataArray, type) {
+  if (!dataArray || dataArray.length === 0) return "<p>Không có dữ liệu.</p>";
+
+  const rows = dataArray
+    .map(
+      (item) => `
+      <tr>
+          <td>${formatKeyName(item.key, type)}</td>
+          <td>${formatMoney(item.spend)}</td>
+          <td>${formatNumber(item.result)}</td>
+          <td>${item.cpr === 0 ? "N/A" : formatMoney(item.cpr)}</td>
+          <td>${formatMoney(item.cpm)}</td>
+      </tr>
+  `
+    )
+    .join("");
+
+  return `
+      <table class="mini_table">
+          <thead>
+              <tr>
+                  <th>Phân khúc</th>
+                  <th>Chi phí</th>
+                  <th>Kết quả</th>
+                  <th>CPR</th>
+                  <th>CPM</th>
+              </tr>
+          </thead>
+          <tbody>
+              ${rows}
+          </tbody>
+      </table>
+  `;
+}
+
+/**
+ * Helper lấy icon Font Awesome dựa trên loại breakdown.
+ */
+function getIconForType(type) {
+  switch (type) {
+    case "hour":
+      return "fa-solid fa-clock";
+    case "age":
+      return "fa-solid fa-users";
+    case "region":
+      return "fa-solid fa-map-location-dot";
+    case "platform":
+      return "fa-solid fa-laptop-device";
+    default:
+      return "fa-solid fa-chart-bar";
+  }
+}
+
+/**
+ * Helper làm đẹp tên (key) của breakdown.
+ */
+function formatKeyName(key, type) {
+  if (!key) return "N/A";
+  return key
+    .replace(/_/g, " ")
+    .replace(
+      /\b(facebook|instagram)\b/gi,
+      (match) => match.charAt(0).toUpperCase() + match.slice(1)
+    ) // Viết hoa Facebook, Instagram
+    .replace("unknown", "Không xác định");
+}
+
+function setupAIReportModal() {
+  // 1. Tìm các phần tử DOM cần thiết
+  const openButton = document.querySelector(".ai_report_compare");
+  const reportContainer = document.querySelector(".dom_ai_report");
+  const closeButton = reportContainer.querySelector(".dom_ai_report_close");
+  const reportTitle = reportContainer.querySelector("h3");
+
+  // 2. Kiểm tra xem các phần tử có tồn tại không
+  if (!openButton || !reportContainer || !closeButton || !reportTitle) {
+    console.warn(
+      "Không tìm thấy các phần tử AI Report (nút mở, container, nút đóng hoặc tiêu đề)."
+    );
+    return;
+  }
+
+  // 3. Gán sự kiện Click cho nút MỞ report
+  openButton.addEventListener("click", (e) => {
+    e.preventDefault(); // Ngăn hành vi mặc định (nếu là thẻ <a>)
+
+    // Lấy ngày tháng từ .dom_date
+    const dateEl = document.querySelector(".dom_date");
+    const dateText = dateEl ? dateEl.textContent.trim() : "N/A";
+
+    // Cập nhật tiêu đề
+    reportTitle.innerHTML = `
+    
+    <p><img src="https://dev-trongphuc.github.io/DOM_MISA_IDEAS_CRM/logotarget.png">
+      <span>DOM AI REPORT </span></p>
+    <p class="report_time">${dateText}</p>
+   `;
+
+    // Hiển thị modal
+    reportContainer.classList.add("active");
+
+    // Gọi hàm chạy phân tích
+    if (typeof runDeepReport === "function") {
+      runDeepReport(); // Gọi hàm của bạn
+    } else {
+      console.error("Hàm runDeepReport() không được định nghĩa.");
+      // Hiển thị lỗi trên UI nếu cần
+      const contentEl = reportContainer.querySelector(".dom_ai_report_content");
+      if (contentEl) {
+        contentEl.innerHTML =
+          '<p style="color:red; padding: 20px;">Lỗi: Không tìm thấy hàm runDeepReport().</p>';
+      }
+    }
+  });
+
+  // 4. Gán sự kiện Click cho nút ĐÓNG report
+  closeButton.addEventListener("click", () => {
+    reportContainer.classList.remove("active");
+
+    // Tùy chọn: Xóa nội dung report cũ khi đóng
+    const contentEl = reportContainer.querySelector(".dom_ai_report_content");
+    if (contentEl) {
+      contentEl.innerHTML = ""; // Xóa nội dung để lần sau load lại
+    }
+  });
+}
+
+/**
+ * 📊 Export ads data to CSV
+ * Báo cáo nghiệm thu chi tiết ads theo thời gian đang xem
+ */
+function exportAdsToCSV() {
+  const data = window._ALL_CAMPAIGNS;
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    alert("Không có dữ liệu để xuất!");
+    return;
+  }
+
+  // 1. Định nghĩa headers
+  const headers = [
+    "Time Range",
+    "Campaign ID",
+    "Campaign Name",
+    "Adset ID",
+    "Adset Name",
+    "Ad ID",
+    "Ad Name",
+    "Status",
+    "Goal",
+    "Spent (VND)",
+    "Results",
+    "Cost per Result",
+    "Impressions",
+    "Reach",
+    "Frequency",
+    "CPM",
+    "Link Clicks",
+    "Messages",
+    "Leads"
+  ];
+
+  // 2. Chuyển đổi data sang rows
+  const rows = [];
+  const timeRange = `${startDate} - ${endDate}`;
+
+  data.forEach((campaign) => {
+    const adsets = campaign.adsets || [];
+    adsets.forEach((adset) => {
+      const ads = adset.ads || [];
+      ads.forEach((ad) => {
+        const frequency = ad.reach > 0 ? (ad.impressions / ad.reach).toFixed(2) : "0";
+        const cpm = ad.impressions > 0 ? ((ad.spend / ad.impressions) * 1000).toFixed(0) : "0";
+        const cpr = ad.result > 0 ? (ad.spend / ad.result).toFixed(0) : "0";
+
+        rows.push([
+          timeRange,
+          campaign.id,
+          campaign.name,
+          adset.id,
+          adset.name,
+          ad.id,
+          ad.name,
+          ad.status,
+          ad.optimization_goal || "Unknown",
+          ad.spend.toFixed(0),
+          ad.result || 0,
+          cpr,
+          ad.impressions || 0,
+          ad.reach || 0,
+          frequency,
+          cpm,
+          ad.link_clicks || 0,
+          ad.message || 0,
+          ad.lead || 0
+        ]);
+      });
+    });
+  });
+
+  // 3. Tạo nội dung CSV (Dùng BOM để Excel hiển thị đúng tiếng Việt UTF-8)
+  let csvContent = "\uFEFF";
+  csvContent += headers.map(h => `"${h}"`).join(",") + "\r\n";
+
+  rows.forEach((row) => {
+    const rowString = row.map(val => {
+      const str = String(val).replace(/"/g, '""'); // Escape double quotes
+      return `"${str}"`;
+    }).join(",");
+    csvContent += rowString + "\r\n";
+  });
+
+  // 4. Tạo download link và click tự động
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `Meta_Ads_Report_${startDate}_${endDate}.csv`);
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+
