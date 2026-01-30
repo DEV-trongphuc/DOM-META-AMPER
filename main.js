@@ -245,8 +245,8 @@ async function initAccountSelector() {
   // Xóa danh sách cũ (hardcoded)
   dropdownUl.innerHTML = "";
 
-  // 🚩 Lọc danh sách nếu có setup ALLOWED_ACCOUNTS
-  const allowedIds = window.ALLOWED_ACCOUNTS;
+  // 🚩 Lọc danh sách: Ưu tiên ALLOWED_ACCOUNTS, nếu không có thì dùng ACCOUNT_ID hiện tại
+  const allowedIds = window.ALLOWED_ACCOUNTS || (typeof ACCOUNT_ID !== 'undefined' ? [ACCOUNT_ID] : null);
   const filteredAccounts = (Array.isArray(allowedIds) && allowedIds.length > 0)
     ? accounts.filter(acc => allowedIds.includes(acc.account_id))
     : accounts;
@@ -3071,15 +3071,7 @@ function renderChartByDevice(dataByDevice) {
             padding: 10,
           },
         },
-        tooltip: {
-          callbacks: {
-            label: (ctx) =>
-              `${ctx.label}: ${formatNumber(ctx.raw)} (${(
-                (ctx.raw / total) *
-                100
-              ).toFixed(1)}%)`,
-          },
-        },
+        tooltip: { enabled: false }, // ❌ Tắt tooltip để tránh đè chữ giữa hình
         datalabels: { display: false },
       },
       hoverOffset: 8,
@@ -4407,15 +4399,7 @@ function renderPlatformSpendUI(summary) {
       cutout: "70%",
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) =>
-              `${ctx.label}: ${formatMoneyShort(ctx.raw)} (${(
-                (ctx.raw / total) *
-                100
-              ).toFixed(1)}%)`,
-          },
-        },
+        tooltip: { enabled: false }, // ❌ Tắt tooltip để tránh đè chữ giữa hình
         datalabels: { display: false }, // ❌ ẩn % trong từng miếng
       },
     },

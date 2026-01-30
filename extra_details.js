@@ -348,7 +348,7 @@ async function loadDeviceChart() {
                 <!-- List items -->
             </div>
             <div style="flex: 1; position:relative; display:flex; justify-content:center; align-items:center;">
-                <div class="chart-wrapper circular" style="max-width: 300px;">
+                <div class="chart-wrapper circular" style="max-width: 220px;">
                     <canvas id="device_chart_canvas"></canvas>
                     <div style="position:absolute; text-align:center; pointer-events:none; top:50%; left:50%; transform:translate(-50%, -50%); width: 100%;">
                         <p style="font-size:1.8rem; font-weight:800; color:#333; margin:0; line-height:1;">
@@ -367,7 +367,7 @@ async function loadDeviceChart() {
     const listContainer = document.getElementById("device_list_left");
 
     labels.forEach((label, index) => {
-        if (index > 4) return; // Top 5 only to fit space
+        if (index > 3) return; // Top 4 only to fit space
 
         const spend = deviceStats[label];
         const percent = totalSpend > 0 ? (spend / totalSpend) * 100 : 0;
@@ -380,21 +380,28 @@ async function loadDeviceChart() {
         // Styles copied from .dom_platform_item in main.css
         item.style.cssText = `
             display: flex;
-            flex-direction: column;
-            padding: 1rem 1.25rem; /* Adjusted padding to match screenshot scale */
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.2rem 1.5rem;
             border-radius: 12px;
-            gap: 0.5rem;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
             border: 1px solid #f0f0f0;
             background: #fff;
         `;
 
         item.innerHTML = `
-            <p style="display:flex; align-items:center; gap:0.8rem; font-weight:600; color:#555; font-size:1rem;">
-                <i class="fa-solid ${icon}" style="color:${index === 0 ? '#4267B2' : '#E1306C'}; font-size:1.2rem;"></i>
-                <span>${label.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span>
-            </p>
-            <p style="font-weight:700; font-size:1.4rem; color:#333; padding-left: 2rem;">${parseInt(spend).toLocaleString('vi-VN')}₫</p>
+            <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                <p style="display:flex; align-items:center; gap:0.8rem; font-weight:600; color:#555; font-size:1rem;">
+                    <i class="fa-solid ${icon}" style="color:${index === 0 ? '#4267B2' : '#E1306C'}; font-size:1.2rem;"></i>
+                    <span>${label.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span>
+                </p>
+                <p style="font-weight:700; font-size:1.4rem; color:#333; padding-left: 2rem;">${parseInt(spend).toLocaleString('vi-VN')}₫</p>
+            </div>
+            <div style="text-align:right;">
+                <span style="background: rgba(255,169,0,0.1); color: #ffa900; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 1.1rem; font-weight: 700;">
+                    ${percent.toFixed(1)}%
+                </span>
+            </div>
         `;
         listContainer.appendChild(item);
     });
