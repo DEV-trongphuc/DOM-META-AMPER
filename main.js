@@ -1515,6 +1515,8 @@ function exportAiToWord() {
   const modalTitle = document.querySelector(".ai_modal_header span")?.innerText || "Báo cáo AI";
   const dateRange = document.getElementById("ai_date_range")?.innerText || "";
   const timestamp = new Date().toLocaleString("vi-VN");
+  const brandFilter = document.querySelector(".dom_selected")?.textContent?.trim() || "Tất cả";
+  const dateText = document.querySelector(".dom_date")?.textContent?.trim() || dateRange || "N/A";
 
   const wordHtml = `
     <!DOCTYPE html>
@@ -1525,36 +1527,199 @@ function exportAiToWord() {
       <meta charset="utf-8">
       <title>${modalTitle}</title>
       <!--[if gte mso 9]>
-      <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
+      <xml><w:WordDocument>
+        <w:View>Print</w:View>
+        <w:Zoom>100</w:Zoom>
+        <w:DoNotOptimizeForBrowser/>
+      </w:WordDocument></xml>
       <![endif]-->
       <style>
-        body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; margin: 2.5cm 2cm; line-height: 1.55; }
-        h1 { font-size: 16pt; font-weight: bold; color: #111; border-bottom: 2pt solid #333; padding-bottom: 5pt; margin-bottom: 10pt; }
-        h2 { font-size: 13pt; font-weight: bold; color: #111; border-left: 4pt solid #555; padding-left: 8pt; margin-top: 18pt; margin-bottom: 4pt; text-transform: uppercase; letter-spacing: 0.03em; }
-        h3 { font-size: 11.5pt; font-weight: bold; color: #222; margin-top: 12pt; margin-bottom: 3pt; }
-        h4 { font-size: 11pt; font-weight: bold; color: #444; margin-top: 8pt; margin-bottom: 2pt; }
-        p  { margin: 4pt 0; color: #333; }
-        ul { margin: 4pt 0 4pt 14pt; padding: 0; }
-        ul li { margin: 2pt 0; color: #333; }
-        ol { margin: 6pt 0 6pt 14pt; padding: 0; }
-        ol li { margin: 4pt 0; color: #222; padding: 2pt 0; }
+        @page { margin: 2cm 2.5cm 2.5cm 2.5cm; }
+
+        body {
+          font-family: "Calibri", "Arial", sans-serif;
+          font-size: 11pt;
+          color: #222;
+          line-height: 1.65;
+          margin: 0;
+          background: #f0f2f5;
+        }
+
+        /* ── Header ── */
+        .doc-header {
+          background: #1e293b;
+          color: #fff;
+          padding: 20pt 28pt 16pt;
+          text-align: center;
+        }
+        .doc-header-logo {
+          font-size: 8.5pt;
+          color: #94a3b8;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          margin-bottom: 6pt;
+        }
+        .doc-header h1 {
+          font-size: 22pt;
+          font-weight: bold;
+          color: #fff;
+          margin: 0 0 4pt;
+          text-align: center;
+          border: none;
+          padding: 0;
+          letter-spacing: -0.01em;
+        }
+        .doc-header-sub {
+          font-size: 9.5pt;
+          color: #cbd5e1;
+          margin: 0;
+          text-align: center;
+        }
+
+        /* ── Meta bar ── */
+        .doc-meta {
+          background: #e8eaf0;
+          border-left: 4pt solid #1e293b;
+          padding: 9pt 16pt;
+          margin: 0 0 18pt;
+          font-size: 9pt;
+          color: #475569;
+        }
+        .doc-meta span { font-weight: bold; color: #1e293b; }
+
+        /* ── White content card ── */
+        .doc-body {
+          background: #fff;
+          padding: 20pt 24pt;
+          margin-bottom: 0;
+        }
+
+        /* ── Headings ── */
+        h1 {
+          font-size: 18pt;
+          font-weight: bold;
+          color: #1e293b;
+          text-align: center;
+          border-bottom: 2pt solid #cbd5e1;
+          padding-bottom: 5pt;
+          margin: 20pt 0 8pt;
+        }
+        h2 {
+          font-size: 12.5pt;
+          font-weight: bold;
+          color: #fff;
+          background: #334155;
+          padding: 6pt 12pt;
+          border: none;
+          margin: 20pt 0 7pt;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        h3 {
+          font-size: 11.5pt;
+          font-weight: bold;
+          color: #1e293b;
+          margin: 14pt 0 4pt;
+          border-bottom: 1pt solid #e2e8f0;
+          padding-bottom: 2pt;
+        }
+        h4 {
+          font-size: 11pt;
+          font-weight: bold;
+          color: #374151;
+          margin: 10pt 0 3pt;
+        }
+
+        /* ── Body text ── */
+        p { margin: 5pt 0; color: #374151; }
+
+        /* ── Lists ── */
+        ul { margin: 4pt 0; padding: 0 0 0 18pt; list-style-type: disc; }
+        ul li { margin: 2pt 0; color: #374151; padding-left: 2pt; }
+        ol { margin: 4pt 0; padding: 0 0 0 18pt; }
+        ol li { margin: 2pt 0; color: #1e293b; padding-left: 2pt; }
+        ul ul, ol ol, ul ol, ol ul { margin: 2pt 0; padding-left: 16pt; }
+
+        /* ── Inline ── */
         strong { font-weight: bold; color: #111; }
-        em { font-style: italic; color: #555; }
-        table { border-collapse: collapse; width: 100%; margin: 10pt 0; font-size: 10pt; }
-        table th { background: #ebebeb; font-weight: bold; text-transform: uppercase; padding: 5pt 8pt; border: 1pt solid #aaa; color: #333; text-align: left; }
-        table td { padding: 4pt 8pt; border: 1pt solid #ccc; color: #222; }
-        table tr:nth-child(even) td { background: #f7f7f7; }
-        .report-meta { color: #666; font-size: 10pt; margin-bottom: 12pt; padding-bottom: 8pt; border-bottom: 1pt solid #ccc; }
-        hr { border: none; border-top: 1pt solid #ddd; margin: 10pt 0; }
+        em { font-style: italic; color: #64748b; }
+
+        /* ── Tables ── */
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 12pt 0 14pt;
+          font-size: 9.5pt;
+        }
+        table th {
+          background: #334155;
+          color: #fff;
+          font-weight: bold;
+          text-transform: uppercase;
+          font-size: 8.5pt;
+          letter-spacing: 0.04em;
+          padding: 7pt 9pt;
+          border: 1pt solid #475569;
+          text-align: left;
+        }
+        table td {
+          padding: 6pt 9pt;
+          border: 1pt solid #d1d5db;
+          color: #1e293b;
+          vertical-align: top;
+        }
+        table tr:nth-child(even) td { background: #f4f6f8; }
+        table tr:nth-child(odd) td  { background: #ffffff; }
+
+        /* ── Blockquote ── */
+        blockquote {
+          border-left: 3pt solid #94a3b8;
+          background: #f1f5f9;
+          padding: 8pt 12pt;
+          margin: 10pt 0;
+          color: #475569;
+          font-style: italic;
+        }
+
+        hr { border: none; border-top: 1.5pt solid #e2e8f0; margin: 14pt 0; }
+
+        /* ── Footer ── */
+        .doc-footer {
+          background: #1e293b;
+          padding: 8pt 16pt;
+          font-size: 8pt;
+          color: #94a3b8;
+          text-align: center;
+        }
+        .doc-footer-brand { color: #fff; font-weight: bold; }
       </style>
     </head>
     <body>
-      <h1>${modalTitle}</h1>
-      <div class="report-meta">
-        ${dateRange ? `<p><strong>Khoảng thời gian:</strong> ${dateRange}</p>` : ""}
-        <p><strong>Xuất lúc:</strong> ${timestamp}</p>
+
+      <!-- Header -->
+      <div class="doc-header">
+        <div class="doc-header-logo">DOM AI &mdash; Báo cáo phân tích quảng cáo</div>
+        <h1>${modalTitle}</h1>
+        <p class="doc-header-sub">${brandFilter !== "Tất cả" ? "Brand: " + brandFilter + " &nbsp;|&nbsp; " : ""}${dateText}</p>
       </div>
-      ${content.innerHTML}
+
+      <!-- Meta bar -->
+      <div class="doc-meta">
+        📅 Khoảng thời gian: <span>${dateText}</span>
+        ${brandFilter !== "Tất cả" ? `&nbsp;&nbsp;|&nbsp;&nbsp; 🏷️ Brand: <span>${brandFilter}</span>` : ""}
+        &nbsp;&nbsp;|&nbsp;&nbsp; 🕐 Phân tích lúc: <span>${timestamp}</span>
+      </div>
+
+      <!-- Content -->
+      <div class="doc-body">
+        ${content.innerHTML}
+      </div>
+
+      <!-- Footer -->
+      <div class="doc-footer">
+        <span class="doc-footer-brand">DOM Report AI</span> &mdash; Được tạo tự động bởi hệ thống phân tích AI &mdash; ${timestamp}
+      </div>
+
     </body>
     </html>
   `;
@@ -1580,6 +1745,7 @@ function exportAiToWord() {
 }
 
 
+
 const AI_HISTORY_KEY = "dom_ai_summary_history";
 const AI_HISTORY_MAX = 10;
 
@@ -1596,7 +1762,7 @@ function saveAiHistory(html, label) {
     id: Date.now(),
     timestamp: new Date().toLocaleString("vi-VN"),
     label: label || "Tóm tắt chiến dịch",
-    dateRange: (dateFrom && dateTo) ? `${dateFrom} — ${dateTo}` : "N/A",
+    dateRange: (dateFrom && dateTo) ? `${dateFrom} — ${dateTo} ` : "N/A",
     html,
     preview: document.getElementById("ai_summary_content")?.innerText?.slice(0, 120) || ""
   };
@@ -1610,17 +1776,17 @@ function confirmDeleteAiHistory(id) {
   const overlay = document.createElement("div");
   overlay.id = "ai_delete_confirm";
   overlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;
-    display:flex;align-items:center;justify-content:center;
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z - index: 99999;
+  display: flex; align - items: center; justify - content: center;
   `;
   overlay.innerHTML = `
-    <div style="
-      background:#fff;border-radius:16px;padding:3.2rem 3.6rem;
-      max-width:42rem;width:90%;text-align:center;
-      box-shadow:0 20px 60px rgba(0,0,0,0.18);
-      animation: fadeInScale .18s ease;
-    ">
-      <div style="font-size:3.6rem;margin-bottom:1.2rem;">🗑️</div>
+    < div style = "
+  background: #fff; border - radius: 16px; padding: 3.2rem 3.6rem;
+  max - width: 42rem; width: 90 %; text - align: center;
+  box - shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  animation: fadeInScale .18s ease;
+  ">
+    < div style = "font-size:3.6rem;margin-bottom:1.2rem;" >🗑️</div >
       <h3 style="font-size:1.8rem;font-weight:700;color:#111;margin:0 0 0.8rem;">Xóa bản tóm tắt?</h3>
       <p style="color:#64748b;font-size:1.4rem;margin:0 0 2.4rem;">Hành động này không thể hoàn tác. Bản tóm tắt này sẽ bị xóa vĩnh viễn.</p>
       <div style="display:flex;gap:1.2rem;justify-content:center;">
@@ -1635,8 +1801,8 @@ function confirmDeleteAiHistory(id) {
           cursor:pointer;transition:all .2s;
         "><i class='fa-solid fa-trash'></i> Xóa</button>
       </div>
-    </div>
-  `;
+    </div >
+    `;
   document.body.appendChild(overlay);
   overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
 }
@@ -1677,7 +1843,7 @@ function renderAiHistory() {
   if (!list) return;
   const history = loadAiHistory();
   if (!history.length) {
-    list.innerHTML = `<div class="ai_history_empty"><i class="fa-solid fa-clock-rotate-left"></i>Chưa có bản tóm tắt nào được lưu.</div>`;
+    list.innerHTML = `<div class="ai_history_empty"><i class="fa-solid fa-clock-rotate-left"></i> Chưa có bản tóm tắt nào được lưu.</div>`;
     return;
   }
   list.innerHTML = history.map(e => `
@@ -1735,7 +1901,7 @@ async function runAiSummary() {
   if (dateBadge) {
     const start = document.getElementById("date_from")?.value || "N/A";
     const end = document.getElementById("date_to")?.value || "N/A";
-    dateBadge.innerText = `${start} — ${end}`;
+    dateBadge.innerText = `${start} — ${end} `;
   }
 
   if (loading) loading.style.display = "block";
@@ -1763,7 +1929,7 @@ async function runAiSummary() {
     const brandFilter = document.querySelector(".dom_selected")?.textContent?.trim() || "Tất cả";
     const modalTitle = document.querySelector(".ai_modal_header span");
     if (modalTitle) {
-      modalTitle.innerHTML = `AI Tóm tắt${isFiltered ? ` — ${brandFilter}` : " chiến dịch"}`;
+      modalTitle.innerHTML = `AI Tóm tắt${isFiltered ? ` — ${brandFilter}` : " chiến dịch"} `;
     }
 
     // ====== Xây dựng dữ liệu chi tiết từng campaign + adset ======
@@ -1781,19 +1947,19 @@ async function runAiSummary() {
         const cpr = fmtCpr(as.spend, as.result);
         const cpm = as.impressions > 0 ? fmtMoney((as.spend / as.impressions) * 1000) : "N/A";
         const budget = as.daily_budget > 0
-          ? `daily ${fmtMoney(as.daily_budget)}`
-          : as.lifetime_budget > 0 ? `lifetime ${fmtMoney(as.lifetime_budget)}` : "N/A";
-        return `    • Adset: "${as.name}" | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Impressions: ${fmt(as.impressions)} | Freq: ${freq} | Results: ${as.result} | CPR: ${cpr} | CPM: ${cpm} | Clicks: ${fmt(as.link_clicks || 0)} | Reactions: ${fmt(as.reactions || 0)} | Budget: ${budget}`;
+          ? `daily ${fmtMoney(as.daily_budget)} `
+          : as.lifetime_budget > 0 ? `lifetime ${fmtMoney(as.lifetime_budget)} ` : "N/A";
+        return `    • Adset: "${as.name}" | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Impressions: ${fmt(as.impressions)} | Freq: ${freq} | Results: ${as.result} | CPR: ${cpr} | CPM: ${cpm} | Clicks: ${fmt(as.link_clicks || 0)} | Reactions: ${fmt(as.reactions || 0)} | Budget: ${budget} `;
       }).join("\n");
 
       return `Campaign: "${c.name}"
   Status: ${c.status || "N/A"} | Spent: ${fmtMoney(c.spend)} | Reach: ${fmt(c.reach)} | Impressions: ${fmt(c.impressions)} | Freq: ${cFreq} | Results: ${c.result} | CPR: ${cCpr} | CPM: ${cCpm} | Reactions: ${fmt(c.reactions || 0)} | Messages: ${fmt(c.message || 0)} | Leads: ${fmt(c.lead || 0)}
-${adsetLines}`;
+${adsetLines} `;
     });
 
     const dateRange = document.querySelector(".dom_date")?.textContent?.trim() || "N/A";
     const filterNote = isFiltered
-      ? `Brand đang lọc: **${brandFilter}** (${campaigns.length}/${(window._ALL_CAMPAIGNS || []).length} campaign)`
+      ? `Brand đang lọc: ** ${brandFilter}** (${campaigns.length}/${(window._ALL_CAMPAIGNS || []).length} campaign)`
       : `Toàn bộ tài khoản — ${campaigns.length} campaign`;
 
     // Tổng hợp nhanh toàn account
@@ -1801,15 +1967,15 @@ ${adsetLines}`;
     const totalReach = campaigns.reduce((s, c) => s + (c.reach || 0), 0);
     const totalResult = campaigns.reduce((s, c) => s + (c.result || 0), 0);
 
-    const prompt = `Bạn là chuyên gia phân tích quảng cáo Facebook Ads cao cấp. Hãy phân tích toàn diện và chi tiết dữ liệu sau, viết bằng tiếng Việt chuyên nghiệp.
+    const prompt = `Bạn là chuyên gia phân tích quảng cáo Facebook Ads cao cấp.Hãy phân tích toàn diện và chi tiết dữ liệu sau, viết bằng tiếng Việt chuyên nghiệp.
 
 ═══════════════════════════════
 THÔNG TIN CHUNG
 ═══════════════════════════════
-- Khoảng thời gian: ${dateRange}
-- ${filterNote}
-- Tổng chi phí: ${fmtMoney(totalSpend)} | Tổng reach: ${fmt(totalReach)} | Tổng kết quả: ${fmt(totalResult)}
-- CPR trung bình toàn account: ${fmtCpr(totalSpend, totalResult)}
+  - Khoảng thời gian: ${dateRange}
+  - ${filterNote}
+  - Tổng chi phí: ${fmtMoney(totalSpend)} | Tổng reach: ${fmt(totalReach)} | Tổng kết quả: ${fmt(totalResult)}
+  - CPR trung bình toàn account: ${fmtCpr(totalSpend, totalResult)}
 
 ═══════════════════════════════
 DỮ LIỆU CHI TIẾT THEO CAMPAIGN & ADSET
@@ -1817,40 +1983,40 @@ DỮ LIỆU CHI TIẾT THEO CAMPAIGN & ADSET
 ${campaignBlocks.join("\n\n")}
 
 ═══════════════════════════════
-YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
+YÊU CẦU PHÂN TÍCH(đầy đủ, chi tiết, có số liệu cụ thể)
 ═══════════════════════════════
 ## 1. Tổng quan hiệu suất
-- Tổng hợp spend/reach/result/CPR/CPM toàn bộ
-- So sánh hiệu quả giữa các mục tiêu tối ưu (optimization goal)
+    - Tổng hợp spend / reach / result / CPR / CPM toàn bộ
+      - So sánh hiệu quả giữa các mục tiêu tối ưu(optimization goal)
 
 ## 2. Phân tích Campaign & Adset nổi bật
-- Top 3 adset hiệu quả nhất (lý do: CPR thấp / reach cao / kết quả tốt)
-- Top 3 adset kém nhất cần xem xét (lý do cụ thể)
-- Campaign nào chi nhiều nhất nhưng kết quả không tương xứng?
+    - Top 3 adset hiệu quả nhất(lý do: CPR thấp / reach cao / kết quả tốt)
+  - Top 3 adset kém nhất cần xem xét(lý do cụ thể)
+  - Campaign nào chi nhiều nhất nhưng kết quả không tương xứng ?
 
 ## 3. Phân tích theo Optimization Goal
-- So sánh hiệu quả giữa các nhóm: Awareness / Consideration / Conversion
-- Goal nào đang cho ROI tốt nhất? Goal nào chi phí quá cao?
+    - So sánh hiệu quả giữa các nhóm: Awareness / Consideration / Conversion
+      - Goal nào đang cho ROI tốt nhất ? Goal nào chi phí quá cao ?
 
 ## 4. Phân tích Frequency & CPM
-- Adset nào có frequency cao (>3) — nguy cơ banner blindness?
-- CPM nào bất thường (quá cao hoặc quá thấp)?
+    - Adset nào có frequency cao(> 3) — nguy cơ banner blindness ?
+      - CPM nào bất thường(quá cao hoặc quá thấp) ?
 
 ## 5. Điểm mạnh & điểm cần cải thiện
-- Liệt kê vài điểm mạnh với dẫn chứng số liệu
-- Liệt kê vài điểm yếu cụ thể cần khắc phục
+    - Liệt kê vài điểm mạnh với dẫn chứng số liệu
+      - Liệt kê vài điểm yếu cụ thể cần khắc phục
 
 ## 6. Đề xuất hành động
-- 5-7 gợi ý hành động cụ thể, có ưu tiên (cao/trung/thấp)
-- Đề xuất phân bổ ngân sách tối ưu hơn nếu có thể
+    - 5 - 7 gợi ý hành động cụ thể, có ưu tiên(cao / trung / thấp)
+      - Đề xuất phân bổ ngân sách tối ưu hơn nếu có thể
 
-⚠️ QUY TẮC ĐỊNH DẠNG OUTPUT (bắt buộc tuân thủ):
-- Dùng ## cho section headers (ví dụ: ## 1. Tổng quan hiệu suất)
-- Dùng ### cho sub-section nếu cần
-- Dùng **bold** cho số liệu và từ khóa quan trọng
-- Dùng bullet points (-) cho danh sách, indent 2 dấu cách cho sub-bullet
-- KHÔNG dùng ký tự đặc biệt như ═══ hay ───
-- Có thể dùng markdown table (|---|) cho các phần so sánh dữ liệu hoặc phân đoạn khách hàng để báo cáo chuyên nghiệp hơn.
+⚠️ QUY TẮC ĐỊNH DẠNG OUTPUT(bắt buộc tuân thủ):
+  - Dùng ## cho section headers(ví dụ: ## 1. Tổng quan hiệu suất)
+    - Dùng ### cho sub - section nếu cần
+      - Dùng ** bold ** cho số liệu và từ khóa quan trọng
+        - Dùng bullet points(-) cho danh sách, indent 2 dấu cách cho sub - bullet
+          - KHÔNG dùng ký tự đặc biệt như ═══ hay ───
+  - Có thể dùng markdown table(| ---|) cho các phần so sánh dữ liệu hoặc phân đoạn khách hàng để báo cáo chuyên nghiệp hơn.
 - Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
 
     // ── Huỷ request cũ nếu còn đang chạy ──
@@ -1869,7 +2035,7 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
     });
 
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data?.error || `Proxy error: ${resp.status}`);
+    if (!resp.ok) throw new Error(data?.error || `Proxy error: ${resp.status} `);
     const text = data?.text || "Không nhận được phản hồi từ AI.";
 
     // Render markdown
@@ -1882,7 +2048,7 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
     // Lưu vào lịch sử
     const hBrand = document.querySelector(".dom_selected")?.textContent?.trim() || "";
     const hDate = document.querySelector(".dom_date")?.textContent?.trim() || "";
-    const hLabel = `${hDate}${hBrand && hBrand !== "Ampersand" ? " — " + hBrand : ""}`;
+    const hLabel = `${hDate}${hBrand && hBrand !== "Ampersand" ? " — " + hBrand : ""} `;
     saveAiHistory(content.innerHTML, hLabel || "Tóm tắt chiến dịch");
 
   } catch (err) {
@@ -2173,7 +2339,7 @@ async function handleAdsetInsightClick(btn) {
     const img = domDetail.querySelector(".dom_detail_header img");
     const idEl = domDetail.querySelector(".dom_detail_id");
     if (img) img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-    if (idEl) idEl.innerHTML = `<span>${name}</span> <span>ID: ${adsetId}</span>`;
+    if (idEl) idEl.innerHTML = `< span > ${name}</span > <span>ID: ${adsetId}</span>`;
   }
 
   const loadingEl = document.querySelector(".loading");
@@ -2206,10 +2372,12 @@ async function showAdsetDetail(adset_id) {
   window.chart_by_device_instance = null;
 
   try {
-    const timeRangeParam = `&time_range[since]=${startDate}&time_range[until]=${endDate}`;
+    const timeRangeParam = `& time_range[since]=${startDate}& time_range[until]=${endDate} `;
     const batchRequests = [
-      { method: "GET", name: "targeting", relative_url: `${adset_id}?fields=targeting` },
-      { method: "GET", name: "byHour", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=hourly_stats_aggregated_by_advertiser_time_zone${timeRangeParam}` },
+      { method: "GET", name: "targeting", relative_url: `${adset_id}?fields = targeting` },
+      {
+        method: "GET", name: "byHour", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=hourly_stats_aggregated_by_advertiser_time_zone${timeRangeParam}`
+      },
       { method: "GET", name: "byAgeGender", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=age,gender${timeRangeParam}` },
       { method: "GET", name: "byRegion", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=region${timeRangeParam}` },
       { method: "GET", name: "byPlatform", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=publisher_platform,platform_position${timeRangeParam}` },
