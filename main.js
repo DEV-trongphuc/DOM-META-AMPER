@@ -1258,6 +1258,77 @@ function switchAiTab(tab) {
 }
 
 // ── localStorage history helpers ──
+
+function exportAiToWord() {
+  const content = document.getElementById("ai_summary_content");
+  if (!content || !content.innerHTML.trim()) return;
+
+  const modalTitle = document.querySelector(".ai_modal_header span")?.innerText || "Báo cáo AI";
+  const dateRange = document.getElementById("ai_date_range")?.innerText || "";
+  const timestamp = new Date().toLocaleString("vi-VN");
+
+  const wordHtml = `
+    <!DOCTYPE html>
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:w="urn:schemas-microsoft-com:office:word"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <title>${modalTitle}</title>
+      <!--[if gte mso 9]>
+      <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
+      <![endif]-->
+      <style>
+        body { font-family: 'Times New Roman', serif; font-size: 13pt; color: #1e1e2e; margin: 2cm; }
+        h1 { font-size: 18pt; font-weight: bold; color: #111; border-bottom: 2px solid #e2e8f0; padding-bottom: 6pt; margin-bottom: 12pt; }
+        h2 { font-size: 14pt; font-weight: bold; color: #111; background: #fff8ee; border-left: 4px solid #f59e0b; padding: 6pt 10pt; margin-top: 20pt; text-transform: uppercase; }
+        h3 { font-size: 13pt; font-weight: bold; color: #1e293b; margin-top: 14pt; }
+        p  { line-height: 1.7; margin: 6pt 0; color: #334155; }
+        ul { margin: 6pt 0 6pt 20pt; }
+        ul li { margin: 4pt 0; color: #475569; }
+        ol { margin: 6pt 0 6pt 20pt; }
+        ol li { margin: 6pt 0; color: #334155; background: #f8fafc; border: 1px solid #e9eef5; padding: 6pt 10pt; border-radius: 4pt; }
+        strong { font-weight: bold; color: #0f172a; }
+        em { font-style: italic; color: #64748b; }
+        table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+        table th { background: #f1f5f9; font-weight: bold; font-size: 11pt; text-transform: uppercase; padding: 8pt; border: 1px solid #cbd5e1; color: #475569; }
+        table td { padding: 8pt; border: 1px solid #e2e8f0; color: #334155; font-size: 12pt; }
+        table tr:nth-child(even) td { background: #f8fafc; }
+        .report-meta { color: #64748b; font-size: 11pt; margin-bottom: 16pt; border-bottom: 1px solid #f1f5f9; padding-bottom: 10pt; }
+      </style>
+    </head>
+    <body>
+      <h1>${modalTitle}</h1>
+      <div class="report-meta">
+        ${dateRange ? `<p><strong>Khoảng thời gian:</strong> ${dateRange}</p>` : ""}
+        <p><strong>Xuất lúc:</strong> ${timestamp}</p>
+      </div>
+      ${content.innerHTML}
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(["\ufeff", wordHtml], { type: "application/msword;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const fileName = `bao-cao-ai-${new Date().toISOString().slice(0, 10)}.doc`;
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  // Feedback visual
+  const btn = document.getElementById("ai_export_word_btn");
+  if (btn) {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã xuất!';
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+  }
+}
+
+
 const AI_HISTORY_KEY = "dom_ai_summary_history";
 const AI_HISTORY_MAX = 10;
 
@@ -1335,8 +1406,10 @@ function loadAiHistoryItem(id) {
   if (emptyBox) emptyBox.style.display = "none";
   const copyBtn = document.getElementById("ai_copy_btn");
   const regenBtn = document.getElementById("ai_regenerate_btn");
+  const wordBtn = document.getElementById("ai_export_word_btn");
   if (copyBtn) copyBtn.style.display = "flex";
   if (regenBtn) regenBtn.style.display = "flex";
+  if (wordBtn) wordBtn.style.display = "flex";
   switchAiTab("result");
 }
 
@@ -1411,6 +1484,8 @@ async function runAiSummary() {
   if (content) content.innerHTML = "";
   if (copyBtn) copyBtn.style.display = "none";
   if (regenBtn) regenBtn.style.display = "none";
+  const wordBtn = document.getElementById("ai_export_word_btn");
+  if (wordBtn) wordBtn.style.display = "none";
 
   try {
     // Dùng _FILTERED_CAMPAIGNS nếu đang lọc, fallback về _ALL_CAMPAIGNS
@@ -1519,25 +1594,25 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
 - Có thể dùng markdown table (|---|) cho các phần so sánh dữ liệu hoặc phân đoạn khách hàng để báo cáo chuyên nghiệp hơn.
 - Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
 
-    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+    // ── Gọi qua PHP proxy (API key ẩn phía server) ──
+    const PROXY_URL = "http://automation.ideas.edu.vn/dom.php";
 
-    const resp = await fetch(GEMINI_URL, {
+    const resp = await fetch(PROXY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 16000 },
-      }),
+      body: JSON.stringify({ prompt }),
     });
 
-    if (!resp.ok) throw new Error(`Gemini API error: ${resp.status}`);
     const data = await resp.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Không nhận được phản hồi từ AI.";
+    if (!resp.ok) throw new Error(data?.error || `Proxy error: ${resp.status}`);
+    const text = data?.text || "Không nhận được phản hồi từ AI.";
 
     // Render markdown
     if (content) content.innerHTML = simpleMarkdown(text);
     if (copyBtn) copyBtn.style.display = "flex";
     if (regenBtn) regenBtn.style.display = "flex";
+    const wordBtnFinal = document.getElementById("ai_export_word_btn");
+    if (wordBtnFinal) wordBtnFinal.style.display = "flex";
 
     // Lưu vào lịch sử
     const hBrand = document.querySelector(".dom_selected")?.textContent?.trim() || "";
