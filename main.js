@@ -103,6 +103,7 @@ function toggleSkeletons(scopeSelector, isLoading) {
     // Tìm các thẻ card/chart chính
     const cards = scope.querySelectorAll(".dom_inner");
     cards.forEach((card) => {
+      card.classList.add("is-loading"); // Thêm cho từng card để bắt CSS absolute
       let skeleton = card.querySelector(".skeleton-container");
       if (!skeleton) {
         skeleton = document.createElement("div");
@@ -115,10 +116,9 @@ function toggleSkeletons(scopeSelector, isLoading) {
             <div class="skeleton skeleton-title" style="margin-bottom:2rem"></div>
             <div class="skeleton skeleton-chart"></div>
           `;
-        } else if (isList || card.id === "detail_total_report") {
+        } else if (isList || card.id === "detail_total_report" || card.id === "interaction_stats_card") {
           skeleton.innerHTML = `
             <div class="skeleton skeleton-title"></div>
-            <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text"></div>
             <div class="skeleton skeleton-text" style="width:70%"></div>
@@ -142,7 +142,13 @@ function toggleSkeletons(scopeSelector, isLoading) {
     });
   } else {
     scope.classList.remove("is-loading");
-    scope.querySelectorAll(".hide-on-load").forEach((el) => el.classList.remove("hide-on-load"));
+    const cards = scope.querySelectorAll(".dom_inner");
+    cards.forEach((card) => {
+      card.classList.remove("is-loading");
+      const skeletons = card.querySelectorAll(".skeleton-container");
+      skeletons.forEach((s) => s.remove()); // Xóa hẳn khỏi DOM
+      card.querySelectorAll(".hide-on-load").forEach((el) => el.classList.remove("hide-on-load"));
+    });
   }
 }
 
