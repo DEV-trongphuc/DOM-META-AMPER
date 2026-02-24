@@ -1595,7 +1595,7 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
 - Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
 
     // ── Gọi qua PHP proxy (API key ẩn phía server) ──
-    const PROXY_URL = "http://automation.ideas.edu.vn/dom.php";
+    const PROXY_URL = "https://automation.ideas.edu.vn/dom.php";
 
     const resp = await fetch(PROXY_URL, {
       method: "POST",
