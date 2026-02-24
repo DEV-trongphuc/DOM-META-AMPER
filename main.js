@@ -1196,6 +1196,203 @@ async function main() {
       resetAllFilters();
     }
   });
+
+  // 🤖 AI Summary button
+  const aiBtn = document.getElementById("ai_summary_btn");
+  if (aiBtn) aiBtn.addEventListener("click", openAiSummaryModal);
+
+  const aiClose = document.getElementById("ai_modal_close");
+  if (aiClose) aiClose.addEventListener("click", closeAiSummaryModal);
+
+  const aiCopy = document.getElementById("ai_copy_btn");
+  if (aiCopy) aiCopy.addEventListener("click", () => {
+    const content = document.getElementById("ai_summary_content");
+    if (content) {
+      navigator.clipboard.writeText(content.innerText || "");
+      aiCopy.innerHTML = '<i class="fa-solid fa-check"></i> Đã sao chép';
+      setTimeout(() => { aiCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Sao chép'; }, 2000);
+    }
+  });
+
+  const aiRegen = document.getElementById("ai_regenerate_btn");
+  if (aiRegen) aiRegen.addEventListener("click", runAiSummary);
+
+  // Close modal khi click overlay
+  const overlay = document.getElementById("ai_summary_modal");
+  if (overlay) overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeAiSummaryModal();
+  });
+}
+
+function openAiSummaryModal() {
+  const modal = document.getElementById("ai_summary_modal");
+  if (modal) modal.style.display = "flex";
+  runAiSummary();
+}
+
+function closeAiSummaryModal() {
+  const modal = document.getElementById("ai_summary_modal");
+  if (modal) modal.style.display = "none";
+}
+
+async function runAiSummary() {
+  const loading = document.getElementById("ai_summary_loading");
+  const content = document.getElementById("ai_summary_content");
+  const copyBtn = document.getElementById("ai_copy_btn");
+  const regenBtn = document.getElementById("ai_regenerate_btn");
+
+  if (loading) loading.style.display = "block";
+  if (content) content.innerHTML = "";
+  if (copyBtn) copyBtn.style.display = "none";
+  if (regenBtn) regenBtn.style.display = "none";
+
+  try {
+    // Dùng _FILTERED_CAMPAIGNS nếu đang lọc, fallback về _ALL_CAMPAIGNS
+    const isFiltered = window._FILTERED_CAMPAIGNS
+      && window._FILTERED_CAMPAIGNS !== window._ALL_CAMPAIGNS
+      && window._FILTERED_CAMPAIGNS.length < (window._ALL_CAMPAIGNS || []).length;
+
+    const campaigns = (window._FILTERED_CAMPAIGNS ?? window._ALL_CAMPAIGNS) || [];
+    if (!campaigns.length) {
+      if (content) content.innerHTML = "<p>⚠️ Chưa có dữ liệu campaign. Vui lòng load dữ liệu trước.</p>";
+      if (loading) loading.style.display = "none";
+      return;
+    }
+
+    // Cập nhật tiêu đề modal hiển thị filter context
+    const brandFilter = document.querySelector(".dom_selected")?.textContent?.trim() || "Tất cả";
+    const modalTitle = document.querySelector(".ai_modal_header span");
+    if (modalTitle) {
+      modalTitle.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> AI Tóm tắt${isFiltered ? ` — ${brandFilter}` : " chiến dịch"}`;
+    }
+
+    // ====== Xây dựng dữ liệu chi tiết từng campaign + adset ======
+    const fmt = (n) => Math.round(n || 0).toLocaleString("vi-VN");
+    const fmtMoney = (n) => fmt(n) + "đ";
+    const fmtCpr = (spend, result) => result > 0 ? fmtMoney(spend / result) : "N/A";
+
+    const campaignBlocks = campaigns.map((c) => {
+      const cFreq = c.reach > 0 ? (c.impressions / c.reach).toFixed(2) : "N/A";
+      const cCpr = fmtCpr(c.spend, c.result);
+      const cCpm = c.impressions > 0 ? fmtMoney((c.spend / c.impressions) * 1000) : "N/A";
+
+      const adsetLines = (c.adsets || []).map((as) => {
+        const freq = as.reach > 0 ? (as.impressions / as.reach).toFixed(2) : "N/A";
+        const cpr = fmtCpr(as.spend, as.result);
+        const cpm = as.impressions > 0 ? fmtMoney((as.spend / as.impressions) * 1000) : "N/A";
+        const budget = as.daily_budget > 0
+          ? `daily ${fmtMoney(as.daily_budget)}`
+          : as.lifetime_budget > 0 ? `lifetime ${fmtMoney(as.lifetime_budget)}` : "N/A";
+        return `    • Adset: "${as.name}" | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Impressions: ${fmt(as.impressions)} | Freq: ${freq} | Results: ${as.result} | CPR: ${cpr} | CPM: ${cpm} | Clicks: ${fmt(as.link_clicks || 0)} | Reactions: ${fmt(as.reactions || 0)} | Budget: ${budget}`;
+      }).join("\n");
+
+      return `Campaign: "${c.name}"
+  Status: ${c.status || "N/A"} | Spent: ${fmtMoney(c.spend)} | Reach: ${fmt(c.reach)} | Impressions: ${fmt(c.impressions)} | Freq: ${cFreq} | Results: ${c.result} | CPR: ${cCpr} | CPM: ${cCpm} | Reactions: ${fmt(c.reactions || 0)} | Messages: ${fmt(c.message || 0)} | Leads: ${fmt(c.lead || 0)}
+${adsetLines}`;
+    });
+
+    const dateRange = document.querySelector(".dom_date")?.textContent?.trim() || "N/A";
+    const filterNote = isFiltered
+      ? `Brand đang lọc: **${brandFilter}** (${campaigns.length}/${(window._ALL_CAMPAIGNS || []).length} campaign)`
+      : `Toàn bộ tài khoản — ${campaigns.length} campaign`;
+
+    // Tổng hợp nhanh toàn account
+    const totalSpend = campaigns.reduce((s, c) => s + (c.spend || 0), 0);
+    const totalReach = campaigns.reduce((s, c) => s + (c.reach || 0), 0);
+    const totalResult = campaigns.reduce((s, c) => s + (c.result || 0), 0);
+
+    const prompt = `Bạn là chuyên gia phân tích quảng cáo Facebook Ads cao cấp. Hãy phân tích toàn diện và chi tiết dữ liệu sau, viết bằng tiếng Việt chuyên nghiệp.
+
+═══════════════════════════════
+THÔNG TIN CHUNG
+═══════════════════════════════
+- Khoảng thời gian: ${dateRange}
+- ${filterNote}
+- Tổng chi phí: ${fmtMoney(totalSpend)} | Tổng reach: ${fmt(totalReach)} | Tổng kết quả: ${fmt(totalResult)}
+- CPR trung bình toàn account: ${fmtCpr(totalSpend, totalResult)}
+
+═══════════════════════════════
+DỮ LIỆU CHI TIẾT THEO CAMPAIGN & ADSET
+═══════════════════════════════
+${campaignBlocks.join("\n\n")}
+
+═══════════════════════════════
+YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
+═══════════════════════════════
+## 1. Tổng quan hiệu suất
+- Tổng hợp spend/reach/result/CPR/CPM toàn bộ
+- So sánh hiệu quả giữa các mục tiêu tối ưu (optimization goal)
+
+## 2. Phân tích Campaign & Adset nổi bật
+- Top 3 adset hiệu quả nhất (lý do: CPR thấp / reach cao / kết quả tốt)
+- Top 3 adset kém nhất cần xem xét (lý do cụ thể)
+- Campaign nào chi nhiều nhất nhưng kết quả không tương xứng?
+
+## 3. Phân tích theo Optimization Goal
+- So sánh hiệu quả giữa các nhóm: Awareness / Consideration / Conversion
+- Goal nào đang cho ROI tốt nhất? Goal nào chi phí quá cao?
+
+## 4. Phân tích Frequency & CPM
+- Adset nào có frequency cao (>3) — nguy cơ banner blindness?
+- CPM nào bất thường (quá cao hoặc quá thấp)?
+
+## 5. Điểm mạnh & điểm cần cải thiện
+- Liệt kê 3-5 điểm mạnh với dẫn chứng số liệu
+- Liệt kê 3-5 điểm yếu cụ thể cần khắc phục
+
+## 6. Đề xuất hành động
+- 5-7 gợi ý hành động cụ thể, có ưu tiên (cao/trung/thấp)
+- Đề xuất phân bổ ngân sách tối ưu hơn nếu có thể
+
+Định dạng output: dùng ## cho section headers, **bold** cho số liệu quan trọng, bullet points rõ ràng, có dẫn chứng số liệu cụ thể từ dữ liệu được cung cấp.`;
+
+    const GEMINI_KEY = "AIzaSyBurjNSjPWihO2VTTIU5QZ2TmiyLO7TTMc";
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+
+    const resp = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 16000 },
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`Gemini API error: ${resp.status}`);
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Không nhận được phản hồi từ AI.";
+
+    // Render markdown
+    if (content) content.innerHTML = simpleMarkdown(text);
+    if (copyBtn) copyBtn.style.display = "flex";
+    if (regenBtn) regenBtn.style.display = "flex";
+
+  } catch (err) {
+    console.error("❌ AI Summary error:", err);
+    if (content) content.innerHTML = `<p style="color:#e05c1a">❌ Lỗi: ${err.message}</p>`;
+  } finally {
+    if (loading) loading.style.display = "none";
+  }
+}
+
+/**
+ * Chuyển markdown đơn giản sang HTML
+ */
+function simpleMarkdown(text) {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/^---$/gm, "<hr>")
+    .replace(/^\s*[-*] (.+)$/gm, "<li>$1</li>")
+    .replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>")
+    .replace(/\n{2,}/g, "</p><p>")
+    .replace(/^(?!<[hul]|<\/[hul]|<li|<hr)(.+)$/gm, "<p>$1</p>")
+    .replace(/<p><\/p>/g, "");
 }
 
 /**
@@ -2211,6 +2408,7 @@ async function applyCampaignFilter(keyword) {
 
   // 🚩 Nếu filter = "RESET" thì load full data
   if (keyword && keyword.toUpperCase() === "RESET") {
+    window._FILTERED_CAMPAIGNS = window._ALL_CAMPAIGNS; // 👈 lưu lại
     renderCampaignView(window._ALL_CAMPAIGNS); // FULL_CAMPAIGN
     const allAds = window._ALL_CAMPAIGNS.flatMap((c) =>
       c.adsets.flatMap((as) =>
@@ -2234,10 +2432,12 @@ async function applyCampaignFilter(keyword) {
     : window._ALL_CAMPAIGNS;
 
   // 🔹 Render lại danh sách campaign
+  window._FILTERED_CAMPAIGNS = filtered; // 👈 lưu lại cho AI Summary
   renderCampaignView(filtered);
 
   // 🚩 Nếu không có campaign nào khớp → show empty state dashboard ngay
   if (filtered.length === 0) {
+    window._FILTERED_CAMPAIGNS = [];
     document.querySelector(".dom_container")?.classList.add("is-empty");
     return;
   }

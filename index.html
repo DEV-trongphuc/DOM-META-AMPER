@@ -146,51 +146,51 @@
           </div>
           <p class="dom_date">-/-/- - -/-/-</p>
         </div>
-        <div class="dom_campaign_filter">
-          <input placeholder="Filter by Campaign name" id="campaign_filter" />
-          <div>
-            <i class="fa-solid fa-magnifying-glass" id="reset_button"></i>
-            <p>Search</p>
-          </div>
-          <ul></ul>
-        </div>
-        <div class="dom_filter">
-          <div class="dom_select quick_filter_detail">
-            <img src="./adset/ampersand/ampersand_img.jpg" />
-            <div class="flex">
-              <p class="dom_selected">Ampersand</p>
+        <!-- Nhóm bên phải: AI Tóm tắt + Brand filter -->
+        <div style="display:flex;align-items:center;gap:1.2rem;">
+          <button id="ai_summary_btn" class="ai_report" title="Tóm tắt dữ liệu bằng AI"
+            style="border:none;font-size:1.3rem;margin:0;">
+            <i class="fa-solid fa-wand-magic-sparkles" style="font-size:1.6rem;"></i>
+            AI Tóm tắt
+          </button>
+          <div class="dom_filter">
+            <div class="dom_select quick_filter_detail">
+              <img src="./adset/ampersand/ampersand_img.jpg" />
+              <div class="flex">
+                <p class="dom_selected">Ampersand</p>
+              </div>
+              <i class="fa-solid fa-angle-down"></i>
+              <ul class="dom_select_show">
+                <li data-filter="TRB" class="">
+                  <img src="./adset/ampersand/TRB.jpg" />
+                  <span>The Running Bean</span>
+                </li>
+                <li data-filter="Haagen Dazs" class="">
+                  <img src="./adset/ampersand/HD.jpg" />
+                  <span>Häagen-Dazs</span>
+                </li>
+                <li data-filter="BEAN" class="">
+                  <img src="./adset/ampersand/BEAN.jpg" />
+                  <span> Be An Vegetarian</span>
+                </li>
+                <li data-filter="Esta" class="">
+                  <img src="./adset/ampersand/Esta.jpg" />
+                  <span> Esta Saigon</span>
+                </li>
+                <li data-filter="Le Petit" class="">
+                  <img src="./adset/ampersand/LPT.jpg" />
+                  <span> Le Petit</span>
+                </li>
+                <li data-filter="SNOWEE" class="">
+                  <img src="./adset/ampersand/SNOWEE.jpg" />
+                  <span> SNOWEE</span>
+                </li>
+                <li data-filter="" class="">
+                  <img src="./adset/ampersand/ampersand_img.jpg" />
+                  <span> Ampersand</span>
+                </li>
+              </ul>
             </div>
-            <i class="fa-solid fa-angle-down"></i>
-            <ul class="dom_select_show">
-              <li data-filter="TRB" class="">
-                <img src="./adset/ampersand/TRB.jpg" />
-                <span>The Running Bean</span>
-              </li>
-              <li data-filter="Haagen Dazs" class="">
-                <img src="./adset/ampersand/HD.jpg" />
-                <span>Häagen-Dazs</span>
-              </li>
-              <li data-filter="BEAN" class="">
-                <img src="./adset/ampersand/BEAN.jpg" />
-                <span> Be An Vegetarian</span>
-              </li>
-              <li data-filter="Esta" class="">
-                <img src="./adset/ampersand/Esta.jpg" />
-                <span> Esta Saigon</span>
-              </li>
-              <li data-filter="Le Petit" class="">
-                <img src="./adset/ampersand/LPT.jpg" />
-                <span> Le Petit</span>
-              </li>
-              <li data-filter="SNOWEE" class="">
-                <img src="./adset/ampersand/SNOWEE.jpg" />
-                <span> SNOWEE</span>
-              </li>
-              <li data-filter="" class="">
-                <img src="./adset/ampersand/ampersand_img.jpg" />
-                <span> Ampersand</span>
-              </li>
-            </ul>
           </div>
         </div>
       </div>
@@ -939,6 +939,28 @@
   <div class="dom_accounts_overlay"></div>
   <div class="loading">
     <span class="loader"></span>
+  </div>
+  <!-- ========== AI SUMMARY MODAL ========== -->
+  <div id="ai_summary_modal" class="ai_modal_overlay" style="display:none">
+    <div class="ai_modal_box">
+      <div class="ai_modal_header">
+        <span><i class="fa-solid fa-wand-magic-sparkles"></i> AI Tóm tắt chiến dịch</span>
+        <button id="ai_modal_close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="ai_modal_body">
+        <div id="ai_summary_loading" style="display:none">
+          <div class="ai_loader_dots">
+            <span></span><span></span><span></span>
+          </div>
+          <p>DOM AI đang phân tích dữ liệu...</p>
+        </div>
+        <div id="ai_summary_content"></div>
+      </div>
+      <div class="ai_modal_footer">
+        <button id="ai_copy_btn" style="display:none"><i class="fa-solid fa-copy"></i> Sao chép</button>
+        <button id="ai_regenerate_btn" style="display:none"><i class="fa-solid fa-rotate-right"></i> Tạo lại</button>
+      </div>
+    </div>
   </div>
 </body>
 <script src="./token.js"></script>
