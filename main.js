@@ -1311,29 +1311,21 @@ function renderCompareCampaigns() {
       <div class="ai_compare_item_body">
         <div class="ai_cmp_top_row">
           <div class="ai_compare_item_name">${c.name || "Campaign " + (i + 1)}</div>
+          <div class="ai_cmp_spend_badge">${spend}đ</div>
         </div>
         <div class="ai_cmp_spend_bar_wrap">
           <div class="ai_cmp_spend_bar" style="width:${spendPct}%"></div>
         </div>
         <div class="ai_compare_item_stats">
-          <span class="ai_cmp_stat spend"><i class="fa-solid fa-sack-dollar"></i> ${spend}đ</span>
-          <span class="ai_cmp_stat"><i class="fa-solid fa-users"></i> ${reach}</span>
-          <span class="ai_cmp_stat"><i class="fa-solid fa-bullseye"></i> ${result} KQ</span>
-          <span class="ai_cmp_stat"><i class="fa-solid fa-tag"></i> ${cpr}</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-users"></i> Reach: ${reach}</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-bullseye"></i> KQ: ${result}</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-tag"></i> CPR: ${cpr}</span>
           <span class="ai_cmp_stat"><i class="fa-solid fa-layer-group"></i> ${adsetCnt} adset</span>
+          ${goalBadge}
         </div>
       </div>
     </label>`;
   }).join("");
-
-  // Sync real checkbox với custom UI
-  document.querySelectorAll(".ai_compare_item").forEach(label => {
-    label.addEventListener("click", e => {
-      if (e.target.closest(".ai_cmp_checkbox") || e.target.classList.contains("ai_compare_cb")) return;
-      const cb = label.querySelector(".ai_compare_cb");
-      if (cb) { cb.checked = !cb.checked; updateCompareCount(); }
-    });
-  });
 
   updateCompareCount();
 }
