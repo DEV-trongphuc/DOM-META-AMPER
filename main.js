@@ -1471,8 +1471,10 @@ function exportAiToWord() {
   const modalTitle = document.querySelector(".ai_modal_header span")?.innerText || "Báo cáo AI";
   const dateRange = document.getElementById("ai_date_range")?.innerText || "";
   const timestamp = new Date().toLocaleString("vi-VN");
-  const brandFilter = document.querySelector(".dom_selected")?.textContent?.trim() || "Tất cả";
-  const dateText = document.querySelector(".dom_date")?.textContent?.trim() || dateRange || "N/A";
+  const brandFilter = document.getElementById("ai_summary_content")?.getAttribute("data-brand")
+    || document.querySelector(".dom_selected")?.textContent?.trim()
+    || "Tất cả";
+  const dateText = dateRange || document.querySelector(".dom_date")?.textContent?.trim() || "N/A";
 
   const wordHtml = `
     <!DOCTYPE html>
@@ -1490,63 +1492,62 @@ function exportAiToWord() {
       </w:WordDocument></xml>
       <![endif]-->
       <style>
-        @page { margin: 2cm 2.5cm 2.5cm 2.5cm; }
+        @page { margin: 1.8cm 2cm 2cm 2cm; }
 
         body {
           font-family: "Calibri", "Arial", sans-serif;
           font-size: 11pt;
-          color: #222;
-          line-height: 1.65;
+          color: #333;
+          line-height: 1.6;
           margin: 0;
-          background: #f0f2f5;
+          background: #fff;
         }
 
         /* ── Header ── */
         .doc-header {
-          background: #1e293b;
-          color: #fff;
-          padding: 20pt 28pt 16pt;
+          background: #ffffff;
+          color: #111;
+          padding: 20pt 0 10pt;
           text-align: center;
+          border-bottom: 1pt solid #ddd;
         }
         .doc-header-logo {
           font-size: 8.5pt;
-          color: #94a3b8;
-          letter-spacing: 0.14em;
+          color: #666;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
-          margin-bottom: 6pt;
+          margin-bottom: 4pt;
         }
         .doc-header h1 {
-          font-size: 22pt;
+          font-size: 20pt;
           font-weight: bold;
-          color: #fff;
+          color: #111;
           margin: 0 0 4pt;
           text-align: center;
           border: none;
           padding: 0;
-          letter-spacing: -0.01em;
         }
         .doc-header-sub {
           font-size: 9.5pt;
-          color: #cbd5e1;
+          color: #666;
           margin: 0;
           text-align: center;
         }
 
         /* ── Meta bar ── */
         .doc-meta {
-          background: #e8eaf0;
-          border-left: 4pt solid #1e293b;
-          padding: 9pt 16pt;
-          margin: 0 0 18pt;
+          background: #f8f8f8;
+          border: 1pt solid #eee;
+          padding: 8pt 12pt;
+          margin: 10pt 0 15pt;
           font-size: 9pt;
-          color: #475569;
+          color: #555;
         }
-        .doc-meta span { font-weight: bold; color: #1e293b; }
+        .doc-meta span { font-weight: bold; color: #111; }
 
-        /* ── White content card ── */
+        /* ── Content ── */
         .doc-body {
-          background: #fff;
-          padding: 20pt 24pt;
+          padding: 15pt 0;
           margin-bottom: 0;
         }
 
@@ -1554,29 +1555,27 @@ function exportAiToWord() {
         h1 {
           font-size: 18pt;
           font-weight: bold;
-          color: #1e293b;
+          color: #111;
           text-align: center;
-          border-bottom: 2pt solid #cbd5e1;
-          padding-bottom: 5pt;
-          margin: 20pt 0 8pt;
+          border-bottom: 1.5pt solid #eee;
+          padding-bottom: 6pt;
+          margin: 20pt 0 10pt;
         }
         h2 {
-          font-size: 12.5pt;
+          font-size: 13pt;
           font-weight: bold;
-          color: #fff;
-          background: #334155;
-          padding: 6pt 12pt;
-          border: none;
-          margin: 20pt 0 7pt;
+          color: #111;
+          border-bottom: 1.5pt solid #333;
+          padding: 0 0 3pt;
+          margin: 18pt 0 6pt;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
         }
         h3 {
           font-size: 11.5pt;
           font-weight: bold;
-          color: #1e293b;
+          color: #333;
           margin: 14pt 0 4pt;
-          border-bottom: 1pt solid #e2e8f0;
+          border-bottom: 1pt solid #eee;
           padding-bottom: 2pt;
         }
         h4 {
@@ -1608,14 +1607,13 @@ function exportAiToWord() {
           font-size: 9.5pt;
         }
         table th {
-          background: #334155;
-          color: #fff;
+          background: #f0f0f0;
+          color: #111;
           font-weight: bold;
           text-transform: uppercase;
           font-size: 8.5pt;
-          letter-spacing: 0.04em;
           padding: 7pt 9pt;
-          border: 1pt solid #475569;
+          border: 1pt solid #ccc;
           text-align: left;
         }
         table td {
@@ -1641,13 +1639,13 @@ function exportAiToWord() {
 
         /* ── Footer ── */
         .doc-footer {
-          background: #1e293b;
-          padding: 8pt 16pt;
+          border-top: 1pt solid #ddd;
+          padding: 10pt 0;
           font-size: 8pt;
-          color: #94a3b8;
+          color: #888;
           text-align: center;
         }
-        .doc-footer-brand { color: #fff; font-weight: bold; }
+        .doc-footer-brand { color: #333; font-weight: bold; }
       </style>
     </head>
     <body>
@@ -1714,11 +1712,14 @@ function saveAiHistory(html, label) {
   const history = loadAiHistory();
   const dateFrom = document.getElementById("date_from")?.value || "";
   const dateTo = document.getElementById("date_to")?.value || "";
+  const brand = document.querySelector(".dom_selected")?.textContent?.trim() || "Tất cả";
+
   const entry = {
     id: Date.now(),
     timestamp: new Date().toLocaleString("vi-VN"),
     label: label || "Tóm tắt chiến dịch",
-    dateRange: (dateFrom && dateTo) ? `${dateFrom} — ${dateTo} ` : "N/A",
+    brand: brand,
+    dateRange: (dateFrom && dateTo) ? `${dateFrom} — ${dateTo}` : "",
     html,
     preview: document.getElementById("ai_summary_content")?.innerText?.slice(0, 120) || ""
   };
@@ -1775,7 +1776,15 @@ function loadAiHistoryItem(id) {
   if (!entry) return;
   const content = document.getElementById("ai_summary_content");
   const emptyBox = document.getElementById("ai_empty_state");
-  if (content) content.innerHTML = entry.html;
+  const dateBadge = document.getElementById("ai_date_range");
+
+  if (content) {
+    content.innerHTML = entry.html;
+    content.setAttribute("data-brand", entry.brand || "Tất cả");
+  }
+  if (dateBadge) {
+    dateBadge.innerText = entry.dateRange || "N/A";
+  }
   if (emptyBox) emptyBox.style.display = "none";
   const copyBtn = document.getElementById("ai_copy_btn");
   const regenBtn = document.getElementById("ai_regenerate_btn");
@@ -1893,29 +1902,28 @@ async function runAiSummary() {
     const fmtMoney = (n) => fmt(n) + "đ";
     const fmtCpr = (spend, result) => result > 0 ? fmtMoney(spend / result) : "N/A";
 
-    const campaignBlocks = campaigns.map((c) => {
+    // ====== Xây dựng danh sách Campaign riêng ======
+    const campaignLines = campaigns.map((c) => {
       const cFreq = c.reach > 0 ? (c.impressions / c.reach).toFixed(2) : "N/A";
       const cCpr = fmtCpr(c.spend, c.result);
       const cCpm = c.impressions > 0 ? fmtMoney((c.spend / c.impressions) * 1000) : "N/A";
+      return `• Campaign: "${c.name}" | Status: ${c.status || "N/A"} | Spent: ${fmtMoney(c.spend)} | Reach: ${fmt(c.reach)} | Impressions: ${fmt(c.impressions)} | Freq: ${cFreq} | Results: ${c.result} | CPR: ${cCpr} | CPM: ${cCpm}`;
+    }).join("\n");
 
-      const adsetLines = (c.adsets || []).map((as) => {
-        const freq = as.reach > 0 ? (as.impressions / as.reach).toFixed(2) : "N/A";
-        const cpr = fmtCpr(as.spend, as.result);
-        const cpm = as.impressions > 0 ? fmtMoney((as.spend / as.impressions) * 1000) : "N/A";
-        const budget = as.daily_budget > 0
-          ? `daily ${fmtMoney(as.daily_budget)} `
-          : as.lifetime_budget > 0 ? `lifetime ${fmtMoney(as.lifetime_budget)} ` : "N/A";
-        return `    • Adset: "${as.name}" | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Impressions: ${fmt(as.impressions)} | Freq: ${freq} | Results: ${as.result} | CPR: ${cpr} | CPM: ${cpm} | Clicks: ${fmt(as.link_clicks || 0)} | Reactions: ${fmt(as.reactions || 0)} | Budget: ${budget} `;
-      }).join("\n");
-
-      return `Campaign: "${c.name}"
-  Status: ${c.status || "N/A"} | Spent: ${fmtMoney(c.spend)} | Reach: ${fmt(c.reach)} | Impressions: ${fmt(c.impressions)} | Freq: ${cFreq} | Results: ${c.result} | CPR: ${cCpr} | CPM: ${cCpm} | Reactions: ${fmt(c.reactions || 0)} | Messages: ${fmt(c.message || 0)} | Leads: ${fmt(c.lead || 0)}
-${adsetLines} `;
-    });
+    // ====== Xây dựng danh sách Adset riêng ======
+    const adsetLines = campaigns.flatMap(c => (c.adsets || []).map(as => {
+      const freq = as.reach > 0 ? (as.impressions / as.reach).toFixed(2) : "N/A";
+      const cpr = fmtCpr(as.spend, as.result);
+      const cpm = as.impressions > 0 ? fmtMoney((as.spend / as.impressions) * 1000) : "N/A";
+      const budget = as.daily_budget > 0
+        ? `daily ${fmtMoney(as.daily_budget)}`
+        : as.lifetime_budget > 0 ? `lifetime ${fmtMoney(as.lifetime_budget)}` : "N/A";
+      return `• Adset: "${as.name}" (thuộc Campaign: "${c.name}") | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Results: ${as.result} | CPR: ${cpr} | Budget: ${budget}`;
+    })).join("\n");
 
     const dateRange = document.querySelector(".dom_date")?.textContent?.trim() || "N/A";
     const filterNote = isFiltered
-      ? `Brand đang lọc: ** ${brandFilter}** (${campaigns.length}/${(window._ALL_CAMPAIGNS || []).length} campaign)`
+      ? `Brand đang lọc: **${brandFilter}** (${campaigns.length}/${(window._ALL_CAMPAIGNS || []).length} campaign)`
       : `Toàn bộ tài khoản — ${campaigns.length} campaign`;
 
     // Tổng hợp nhanh toàn account
@@ -1927,7 +1935,7 @@ ${adsetLines} `;
 
 ⚠️ QUY TẮC QUAN TRỌNG VỀ DỮ LIỆU:
 - Dữ liệu của từng Campaign và từng Adset được cung cấp là số liệu thực tế ĐỘC LẬP. 
-- **TUYỆT ĐỐI KHÔNG** tự ý cộng dồn (sum) các chỉ số (Chi phí, Kết quả, Reach...) của Adset để tính lại cho Campaign. Hãy sử dụng trực tiếp số liệu của Campaign đã cung cấp để phân tích.
+- **TUYỆT ĐỐI KHÔNG** tự ý cộng dồn (sum) các chỉ số của Adset để tính lại cho Campaign. Hãy sử dụng trực tiếp số liệu của Campaign đã cung cấp để phân tích.
 - Tránh việc tính toán dư thừa gây ra sai số không đáng có.
 
 ═══════════════════════════════
@@ -1936,12 +1944,16 @@ THÔNG TIN CHUNG
   - Khoảng thời gian: ${dateRange}
   - ${filterNote}
   - Tổng chi phí: ${fmtMoney(totalSpend)} | Tổng reach: ${fmt(totalReach)} | Tổng kết quả: ${fmt(totalResult)}
-  - CPR trung bình toàn account: ${fmtCpr(totalSpend, totalResult)}
 
 ═══════════════════════════════
-DỮ LIỆU CHI TIẾT THEO CAMPAIGN & ADSET
+DANH SÁCH CAMPAIGN
 ═══════════════════════════════
-${campaignBlocks.join("\n\n")}
+${campaignLines}
+
+═══════════════════════════════
+DANH SÁCH ADSET CHI TIẾT
+═══════════════════════════════
+${adsetLines}
 
 ═══════════════════════════════
 YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
@@ -2006,11 +2018,10 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
     const wordBtnFinal = document.getElementById("ai_export_word_btn");
     if (wordBtnFinal) wordBtnFinal.style.display = "flex";
 
-    // Lưu vào lịch sử
+    // Lưu vào lịch sử: Chỉ lấy tên Brand làm label để tránh lặp ngày
     const hBrand = document.querySelector(".dom_selected")?.textContent?.trim() || "";
-    const hDate = document.querySelector(".dom_date")?.textContent?.trim() || "";
-    const hLabel = `${hDate}${hBrand && hBrand !== "Ampersand" ? " — " + hBrand : ""} `;
-    saveAiHistory(content.innerHTML, hLabel || "Tóm tắt chiến dịch");
+    const hLabel = (hBrand && hBrand !== "Ampersand") ? hBrand : "Tất cả chiến dịch";
+    saveAiHistory(content.innerHTML, hLabel);
 
   } catch (err) {
     if (err.name === "AbortError") {
