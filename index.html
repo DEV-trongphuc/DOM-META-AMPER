@@ -944,24 +944,57 @@
   <div id="ai_summary_modal" class="ai_modal_overlay" style="display:none">
     <div class="ai_modal_box">
       <div class="ai_modal_header">
-        <span><i class="fa-solid fa-wand-magic-sparkles"></i> AI Tóm tắt chiến dịch</span>
-        <button id="ai_modal_close"><i class="fa-solid fa-xmark"></i></button>
+        <div class="ai_modal_header_left">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Trợ lý Phân tích báo cáo AI</span>
+        </div>
+        <button onclick="closeAiSummaryModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="ai_modal_body">
+
+
+      <!-- Tab bar -->
+      <div class="ai_modal_tabs">
+        <button class="ai_tab active" id="ai_tab_result" onclick="switchAiTab('result')">
+          <i class="fa-solid fa-file-lines"></i> Kết quả
+        </button>
+        <button class="ai_tab" id="ai_tab_history" onclick="switchAiTab('history')">
+          <i class="fa-solid fa-clock-rotate-left"></i> Lịch sử
+          <span id="ai_history_badge" class="ai_history_badge" style="display:none">0</span>
+        </button>
+      </div>
+      <!-- Panel: Kết quả -->
+      <div id="ai_panel_result" class="ai_modal_body" style="display:none">
         <div id="ai_summary_loading" style="display:none">
           <div class="ai_loader_dots">
             <span></span><span></span><span></span>
           </div>
           <p>DOM AI đang phân tích dữ liệu...</p>
         </div>
+        <!-- Empty state khi chưa tạo -->
+        <div id="ai_empty_state" style="text-align:center;padding:4rem 2rem;color:#aaa;">
+          <i class="fa-solid fa-wand-magic-sparkles"
+            style="font-size:4rem;opacity:0.2;display:block;margin-bottom:1.2rem;"></i>
+          <p style="font-size:1.5rem;color:#888;margin-bottom:1.6rem;">Bấm <strong style="color:#555">"Tạo tóm tắt
+              mới"</strong> để bắt đầu phân tích</p>
+        </div>
         <div id="ai_summary_content"></div>
       </div>
-      <div class="ai_modal_footer">
-        <button id="ai_copy_btn" style="display:none"><i class="fa-solid fa-copy"></i> Sao chép</button>
-        <button id="ai_regenerate_btn" style="display:none"><i class="fa-solid fa-rotate-right"></i> Tạo lại</button>
+      <!-- Panel: Lịch sử -->
+      <div id="ai_panel_history" class="ai_modal_body">
+        <div id="ai_history_list"></div>
+      </div>
+      <div class="ai_modal_footer" style="justify-content:space-between;">
+        <button id="ai_new_btn" onclick="switchAiTab('result');runAiSummary();">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Tạo tóm tắt mới
+        </button>
+        <div style="display:flex;gap:0.8rem;">
+          <button id="ai_copy_btn" style="display:none"><i class="fa-solid fa-copy"></i> Sao chép</button>
+          <button id="ai_regenerate_btn" style="display:none"><i class="fa-solid fa-rotate-right"></i> Tạo lại</button>
+        </div>
       </div>
     </div>
   </div>
+
 </body>
 <script src="./token.js"></script>
 <script src="./setup.js"></script>

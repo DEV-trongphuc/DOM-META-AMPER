@@ -1227,7 +1227,161 @@ async function main() {
 function openAiSummaryModal() {
   const modal = document.getElementById("ai_summary_modal");
   if (modal) modal.style.display = "flex";
-  runAiSummary();
+  updateAiHistoryBadge();
+  // Nếu có lịch sử → mở tab lịch sử trước để chọn
+  const hist = loadAiHistory();
+  switchAiTab(hist.length > 0 ? "history" : "result");
+}
+
+function switchAiTab(tab) {
+  const resultPanel = document.getElementById("ai_panel_result");
+  const historyPanel = document.getElementById("ai_panel_history");
+  const tabResult = document.getElementById("ai_tab_result");
+  const tabHistory = document.getElementById("ai_tab_history");
+  // footer luôn hiển thị (có nút Tạo tóm tắt mới)
+  // const footer = document.querySelector(".ai_modal_footer"); // Keep footer reference for potential future use, but remove conditional display logic
+
+  if (!resultPanel || !historyPanel) return;
+
+  if (tab === "history") {
+    resultPanel.style.display = "none";
+    historyPanel.style.display = "block";
+    tabResult?.classList.remove("active");
+    tabHistory?.classList.add("active");
+    renderAiHistory();
+  } else {
+    resultPanel.style.display = "block";
+    historyPanel.style.display = "none";
+    tabResult?.classList.add("active");
+    tabHistory?.classList.remove("active");
+  }
+}
+
+// ── localStorage history helpers ──
+const AI_HISTORY_KEY = "dom_ai_summary_history";
+const AI_HISTORY_MAX = 10;
+
+function loadAiHistory() {
+  try { return JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveAiHistory(html, label) {
+  const history = loadAiHistory();
+  const dateFrom = document.getElementById("date_from")?.value || "";
+  const dateTo = document.getElementById("date_to")?.value || "";
+  const entry = {
+    id: Date.now(),
+    timestamp: new Date().toLocaleString("vi-VN"),
+    label: label || "Tóm tắt chiến dịch",
+    dateRange: (dateFrom && dateTo) ? `${dateFrom} — ${dateTo}` : "N/A",
+    html,
+    preview: document.getElementById("ai_summary_content")?.innerText?.slice(0, 120) || ""
+  };
+  history.unshift(entry);
+  if (history.length > AI_HISTORY_MAX) history.splice(AI_HISTORY_MAX);
+  try { localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history)); } catch { }
+  updateAiHistoryBadge();
+}
+
+function confirmDeleteAiHistory(id) {
+  const overlay = document.createElement("div");
+  overlay.id = "ai_delete_confirm";
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;
+    display:flex;align-items:center;justify-content:center;
+  `;
+  overlay.innerHTML = `
+    <div style="
+      background:#fff;border-radius:16px;padding:3.2rem 3.6rem;
+      max-width:42rem;width:90%;text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,0.18);
+      animation: fadeInScale .18s ease;
+    ">
+      <div style="font-size:3.6rem;margin-bottom:1.2rem;">🗑️</div>
+      <h3 style="font-size:1.8rem;font-weight:700;color:#111;margin:0 0 0.8rem;">Xóa bản tóm tắt?</h3>
+      <p style="color:#64748b;font-size:1.4rem;margin:0 0 2.4rem;">Hành động này không thể hoàn tác. Bản tóm tắt này sẽ bị xóa vĩnh viễn.</p>
+      <div style="display:flex;gap:1.2rem;justify-content:center;">
+        <button onclick="document.getElementById('ai_delete_confirm').remove()" style="
+          padding:0.9rem 2.4rem;border-radius:10px;border:1.5px solid #e2e8f0;
+          background:#fff;color:#64748b;font-size:1.4rem;font-weight:600;
+          cursor:pointer;transition:all .2s;
+        ">Hủy</button>
+        <button onclick="_doDeleteAiHistory(${id});document.getElementById('ai_delete_confirm').remove()" style="
+          padding:0.9rem 2.4rem;border-radius:10px;border:none;
+          background:#ef4444;color:#fff;font-size:1.4rem;font-weight:600;
+          cursor:pointer;transition:all .2s;
+        "><i class='fa-solid fa-trash'></i> Xóa</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function _doDeleteAiHistory(id) {
+  const history = loadAiHistory().filter(e => e.id !== id);
+  try { localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history)); } catch { }
+  updateAiHistoryBadge();
+  renderAiHistory();
+}
+
+function loadAiHistoryItem(id) {
+  const entry = loadAiHistory().find(e => e.id === id);
+  if (!entry) return;
+  const content = document.getElementById("ai_summary_content");
+  const emptyBox = document.getElementById("ai_empty_state");
+  if (content) content.innerHTML = entry.html;
+  if (emptyBox) emptyBox.style.display = "none";
+  const copyBtn = document.getElementById("ai_copy_btn");
+  const regenBtn = document.getElementById("ai_regenerate_btn");
+  if (copyBtn) copyBtn.style.display = "flex";
+  if (regenBtn) regenBtn.style.display = "flex";
+  switchAiTab("result");
+}
+
+function updateAiHistoryBadge() {
+  const count = loadAiHistory().length;
+  const badge = document.getElementById("ai_history_badge");
+  if (!badge) return;
+  badge.textContent = count;
+  badge.style.display = count > 0 ? "inline-block" : "none";
+}
+
+function renderAiHistory() {
+  const list = document.getElementById("ai_history_list");
+  if (!list) return;
+  const history = loadAiHistory();
+  if (!history.length) {
+    list.innerHTML = `<div class="ai_history_empty"><i class="fa-solid fa-clock-rotate-left"></i>Chưa có bản tóm tắt nào được lưu.</div>`;
+    return;
+  }
+  list.innerHTML = history.map(e => `
+    <div class="ai_history_item">
+      <!-- Status bar bên trong từng card -->
+      <div class="ai_status_bar">
+        <div class="ai_status_left">
+          <span>Chiến dịch phân tích:</span>
+          <div class="ai_badge_orange"><i class="fa-solid fa-bolt"></i> ${e.label}</div>
+          ${e.dateRange ? `<div class="ai_badge_gray"><i class="fa-solid fa-calendar-days"></i> ${e.dateRange}</div>` : ""}
+        </div>
+        <div class="ai_status_right">
+          <i class="fa-solid fa-circle" style="font-size:0.7rem"></i> ĐÃ HOÀN THÀNH
+        </div>
+      </div>
+      <!-- Footer card: thời gian + actions -->
+      <div class="ai_history_item_header">
+        <div class="ai_history_meta">
+          <span class="ai_history_time"><i class="fa-regular fa-clock"></i> ${e.timestamp}</span>
+        </div>
+        <div class="ai_history_actions">
+          <button class="ai_history_btn primary" onclick="loadAiHistoryItem(${e.id})"><i class="fa-solid fa-eye"></i> Xem</button>
+          <button class="ai_history_btn" onclick="confirmDeleteAiHistory(${e.id})"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+      <div class="ai_history_preview">${e.preview}</div>
+    </div>
+  `).join("");
 }
 
 function closeAiSummaryModal() {
@@ -1236,12 +1390,24 @@ function closeAiSummaryModal() {
 }
 
 async function runAiSummary() {
+  // Chuyển sang tab kết quả khi bắt đầu
+  switchAiTab("result");
   const loading = document.getElementById("ai_summary_loading");
   const content = document.getElementById("ai_summary_content");
+  const emptyBox = document.getElementById("ai_empty_state");
   const copyBtn = document.getElementById("ai_copy_btn");
   const regenBtn = document.getElementById("ai_regenerate_btn");
+  const dateBadge = document.getElementById("ai_date_range");
+
+  // Hiển thị dải ngày thực tế (nếu có trong app)
+  if (dateBadge) {
+    const start = document.getElementById("date_from")?.value || "N/A";
+    const end = document.getElementById("date_to")?.value || "N/A";
+    dateBadge.innerText = `${start} — ${end}`;
+  }
 
   if (loading) loading.style.display = "block";
+  if (emptyBox) emptyBox.style.display = "none";
   if (content) content.innerHTML = "";
   if (copyBtn) copyBtn.style.display = "none";
   if (regenBtn) regenBtn.style.display = "none";
@@ -1337,16 +1503,22 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
 - CPM nào bất thường (quá cao hoặc quá thấp)?
 
 ## 5. Điểm mạnh & điểm cần cải thiện
-- Liệt kê 3-5 điểm mạnh với dẫn chứng số liệu
-- Liệt kê 3-5 điểm yếu cụ thể cần khắc phục
+- Liệt kê vài điểm mạnh với dẫn chứng số liệu
+- Liệt kê vài điểm yếu cụ thể cần khắc phục
 
 ## 6. Đề xuất hành động
 - 5-7 gợi ý hành động cụ thể, có ưu tiên (cao/trung/thấp)
 - Đề xuất phân bổ ngân sách tối ưu hơn nếu có thể
 
-Định dạng output: dùng ## cho section headers, **bold** cho số liệu quan trọng, bullet points rõ ràng, có dẫn chứng số liệu cụ thể từ dữ liệu được cung cấp.`;
+⚠️ QUY TẮC ĐỊNH DẠNG OUTPUT (bắt buộc tuân thủ):
+- Dùng ## cho section headers (ví dụ: ## 1. Tổng quan hiệu suất)
+- Dùng ### cho sub-section nếu cần
+- Dùng **bold** cho số liệu và từ khóa quan trọng
+- Dùng bullet points (-) cho danh sách, indent 2 dấu cách cho sub-bullet
+- KHÔNG dùng ký tự đặc biệt như ═══ hay ───
+- Có thể dùng markdown table (|---|) cho các phần so sánh dữ liệu hoặc phân đoạn khách hàng để báo cáo chuyên nghiệp hơn.
+- Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
 
-    const GEMINI_KEY = "AIzaSyBurjNSjPWihO2VTTIU5QZ2TmiyLO7TTMc";
     const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
 
     const resp = await fetch(GEMINI_URL, {
@@ -1367,6 +1539,12 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
     if (copyBtn) copyBtn.style.display = "flex";
     if (regenBtn) regenBtn.style.display = "flex";
 
+    // Lưu vào lịch sử
+    const hBrand = document.querySelector(".dom_selected")?.textContent?.trim() || "";
+    const hDate = document.querySelector(".dom_date")?.textContent?.trim() || "";
+    const hLabel = `${hDate}${hBrand && hBrand !== "Ampersand" ? " — " + hBrand : ""}`;
+    saveAiHistory(content.innerHTML, hLabel || "Tóm tắt chiến dịch");
+
   } catch (err) {
     console.error("❌ AI Summary error:", err);
     if (content) content.innerHTML = `<p style="color:#e05c1a">❌ Lỗi: ${err.message}</p>`;
@@ -1376,23 +1554,95 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
 }
 
 /**
- * Chuyển markdown đơn giản sang HTML
+ * Chuyển markdown sang HTML — với table support
  */
 function simpleMarkdown(text) {
-  return text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
     .replace(/^# (.+)$/gm, "<h1>$1</h1>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/`(.+?)`/g, "<code>$1</code>")
-    .replace(/^---$/gm, "<hr>")
-    .replace(/^\s*[-*] (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>")
-    .replace(/\n{2,}/g, "</p><p>")
-    .replace(/^(?!<[hul]|<\/[hul]|<li|<hr)(.+)$/gm, "<p>$1</p>")
-    .replace(/<p><\/p>/g, "");
+    .replace(/^---$/gm, "<hr>");
+
+  const lines = html.split("\n");
+  const out = [];
+  let inUl = false, depth = 0;
+  let tblRows = [];
+
+  const closeUl = (d) => { while (depth > d) { out.push("</ul>"); depth--; } };
+
+  const flushTable = () => {
+    if (!tblRows.length) return;
+    const isSep = r => /^\|[\s\-:| ]+\|$/.test(r);
+    const parse = r => r.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+    const dataRows = tblRows.filter(r => !isSep(r));
+    if (!dataRows.length) { tblRows = []; return; }
+    const hdr = parse(dataRows[0]);
+    const body = dataRows.slice(1);
+    let t = `<table class="ai_tbl"><thead><tr>`;
+    hdr.forEach(h => t += `<th>${h}</th>`);
+    t += `</tr></thead><tbody>`;
+    body.forEach(r => {
+      const cells = parse(r);
+      t += `<tr>`;
+      hdr.forEach((_, i) => t += `<td>${cells[i] || ""}</td>`);
+      t += `</tr>`;
+    });
+    t += `</tbody></table>`;
+    out.push(t);
+    tblRows = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Table row
+    if (/^\|.+\|$/.test(trimmed)) {
+      closeUl(0);
+      if (inUl) { out.push("</ul>"); inUl = false; }
+      tblRows.push(trimmed);
+      continue;
+    }
+    flushTable();
+
+    // Sub-list (2+ leading spaces)
+    if (/^ {2,}[-*] (.+)$/.test(line)) {
+      const content = line.replace(/^ +[-*] /, "");
+      if (!inUl) { out.push("<ul>"); inUl = true; depth = 0; }
+      if (depth < 1) { out.push("<ul class='ai_sub'>"); depth = 1; }
+      out.push(`<li>${content}</li>`);
+      continue;
+    }
+
+    // Top-level bullet
+    if (/^[-*] (.+)$/.test(line)) {
+      const content = line.replace(/^[-*] /, "");
+      closeUl(0);
+      if (!inUl) { out.push("<ul>"); inUl = true; }
+      out.push(`<li>${content}</li>`);
+      continue;
+    }
+
+    // Non-list / non-table
+    closeUl(0);
+    if (inUl) { out.push("</ul>"); inUl = false; }
+    if (/^<h[1-4]|^<hr/.test(line)) {
+      out.push(line);
+    } else if (line.trim()) {
+      out.push(`<p>${line}</p>`);
+    }
+  }
+  flushTable();
+  closeUl(0);
+  if (inUl) out.push("</ul>");
+
+  return out.join("\n").replace(/<p><\/p>/g, "");
 }
 
 /**
