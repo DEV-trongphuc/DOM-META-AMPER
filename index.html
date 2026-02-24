@@ -968,20 +968,9 @@
             <i class="fa-solid fa-chart-line"></i>
           </div>
           <div class="ai_home_card_content">
-            <h3>Phân tích theo thời gian</h3>
-            <p>AI tổng hợp và phân tích toàn bộ hiệu suất campaign trong khoảng thời gian chọn.</p>
-            <div class="ai_home_date_pills" id="ai_date_pills">
-              <button class="ai_date_pill active" onclick="setAiDatePreset('current', this)">Hiện tại</button>
-              <button class="ai_date_pill" onclick="setAiDatePreset('7d', this)">7 ngày</button>
-              <button class="ai_date_pill" onclick="setAiDatePreset('14d', this)">14 ngày</button>
-              <button class="ai_date_pill" onclick="setAiDatePreset('30d', this)">30 ngày</button>
-              <button class="ai_date_pill" onclick="setAiDatePreset('custom', this)">Tùy chỉnh</button>
-            </div>
-            <div id="ai_custom_date_row" style="display:none;">
-              <input type="date" id="ai_custom_from" class="ai_date_input">
-              <span style="color:#94a3b8;font-size:1.2rem;">→</span>
-              <input type="date" id="ai_custom_to" class="ai_date_input">
-            </div>
+            <h3>Phân tích dữ liệu hiện tại</h3>
+            <p>AI tổng hợp và phân tích toàn bộ hiệu suất campaign dựa trên bộ lọc và thời gian bạn đang xem trên
+              dashboard.</p>
           </div>
           <button class="ai_home_run_btn" onclick="runAiSummaryFromHome()">
             <i class="fa-solid fa-wand-magic-sparkles"></i> Chạy phân tích

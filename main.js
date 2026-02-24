@@ -1229,8 +1229,6 @@ function openAiSummaryModal() {
   if (modal) modal.style.display = "flex";
   updateAiHistoryBadge();
   switchAiTab("home");
-  // Pre-select "Hiện tại" pill
-  setAiDatePreset("current", document.querySelector(".ai_date_pill"));
 }
 
 function switchAiTab(tab) {
@@ -1254,50 +1252,8 @@ function switchAiTab(tab) {
   if (tab === "compare") renderCompareCampaigns();
 }
 
-// ─── Date Preset for Home panel ───────────────────────────────
-
-let _aiDatePreset = "current";
-
-function setAiDatePreset(preset, btn) {
-  _aiDatePreset = preset;
-  document.querySelectorAll(".ai_date_pill").forEach(b => b.classList.remove("active"));
-  if (btn) btn.classList.add("active");
-  const customRow = document.getElementById("ai_custom_date_row");
-  if (customRow) customRow.style.display = preset === "custom" ? "flex" : "none";
-  // Pre-fill custom inputs với ngày hiện tại của app
-  if (preset === "custom") {
-    const cf = document.getElementById("ai_custom_from");
-    const ct = document.getElementById("ai_custom_to");
-    if (cf && !cf.value) cf.value = document.getElementById("date_from")?.value || "";
-    if (ct && !ct.value) ct.value = document.getElementById("date_to")?.value || "";
-  }
-}
-
-function getAiDateRange() {
-  const today = new Date();
-  const fmt = d => d.toISOString().slice(0, 10);
-  if (_aiDatePreset === "7d") return { from: fmt(new Date(today - 7 * 864e5)), to: fmt(today) };
-  if (_aiDatePreset === "14d") return { from: fmt(new Date(today - 14 * 864e5)), to: fmt(today) };
-  if (_aiDatePreset === "30d") return { from: fmt(new Date(today - 30 * 864e5)), to: fmt(today) };
-  if (_aiDatePreset === "custom") return {
-    from: document.getElementById("ai_custom_from")?.value || "",
-    to: document.getElementById("ai_custom_to")?.value || "",
-  };
-  // "current" — dùng filter hiện tại
-  return {
-    from: document.getElementById("date_from")?.value || "",
-    to: document.getElementById("date_to")?.value || "",
-  };
-}
-
+// ─── AI Analysis Home Trigger ──────────────────────────────────
 function runAiSummaryFromHome() {
-  const { from, to } = getAiDateRange();
-  if (_aiDatePreset !== "current" && from && to) {
-    const df = document.getElementById("date_from");
-    const dt = document.getElementById("date_to");
-    if (df) df.value = from;
-    if (dt) dt.value = to;
-  }
   switchAiTab("result");
   runAiSummary();
 }
@@ -1967,7 +1923,12 @@ ${adsetLines} `;
     const totalReach = campaigns.reduce((s, c) => s + (c.reach || 0), 0);
     const totalResult = campaigns.reduce((s, c) => s + (c.result || 0), 0);
 
-    const prompt = `Bạn là chuyên gia phân tích quảng cáo Facebook Ads cao cấp.Hãy phân tích toàn diện và chi tiết dữ liệu sau, viết bằng tiếng Việt chuyên nghiệp.
+    const prompt = `Bạn là chuyên gia phân tích quảng cáo Facebook Ads cao cấp. Hãy phân tích toàn diện và chi tiết dữ liệu sau, viết bằng tiếng Việt chuyên nghiệp.
+
+⚠️ QUY TẮC QUAN TRỌNG VỀ DỮ LIỆU:
+- Dữ liệu của từng Campaign và từng Adset được cung cấp là số liệu thực tế ĐỘC LẬP. 
+- **TUYỆT ĐỐI KHÔNG** tự ý cộng dồn (sum) các chỉ số (Chi phí, Kết quả, Reach...) của Adset để tính lại cho Campaign. Hãy sử dụng trực tiếp số liệu của Campaign đã cung cấp để phân tích.
+- Tránh việc tính toán dư thừa gây ra sai số không đáng có.
 
 ═══════════════════════════════
 THÔNG TIN CHUNG
@@ -1983,41 +1944,41 @@ DỮ LIỆU CHI TIẾT THEO CAMPAIGN & ADSET
 ${campaignBlocks.join("\n\n")}
 
 ═══════════════════════════════
-YÊU CẦU PHÂN TÍCH(đầy đủ, chi tiết, có số liệu cụ thể)
+YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
 ═══════════════════════════════
 ## 1. Tổng quan hiệu suất
     - Tổng hợp spend / reach / result / CPR / CPM toàn bộ
-      - So sánh hiệu quả giữa các mục tiêu tối ưu(optimization goal)
+    - So sánh hiệu quả giữa các mục tiêu tối ưu (optimization goal)
 
 ## 2. Phân tích Campaign & Adset nổi bật
-    - Top 3 adset hiệu quả nhất(lý do: CPR thấp / reach cao / kết quả tốt)
-  - Top 3 adset kém nhất cần xem xét(lý do cụ thể)
-  - Campaign nào chi nhiều nhất nhưng kết quả không tương xứng ?
+    - Top 3 adset hiệu quả nhất (lý do: CPR thấp / reach cao / kết quả tốt)
+    - Top 3 adset kém nhất cần xem xét (lý do cụ thể)
+    - Campaign nào chi nhiều nhất nhưng kết quả không tương xứng?
 
 ## 3. Phân tích theo Optimization Goal
     - So sánh hiệu quả giữa các nhóm: Awareness / Consideration / Conversion
-      - Goal nào đang cho ROI tốt nhất ? Goal nào chi phí quá cao ?
+    - Goal nào đang cho ROI tốt nhất? Goal nào chi phí quá cao?
 
 ## 4. Phân tích Frequency & CPM
-    - Adset nào có frequency cao(> 3) — nguy cơ banner blindness ?
-      - CPM nào bất thường(quá cao hoặc quá thấp) ?
+    - Adset nào có frequency cao (> 3) — nguy cơ banner blindness?
+    - CPM nào bất thường (quá cao hoặc quá thấp)?
 
 ## 5. Điểm mạnh & điểm cần cải thiện
     - Liệt kê vài điểm mạnh với dẫn chứng số liệu
-      - Liệt kê vài điểm yếu cụ thể cần khắc phục
+    - Liệt kê vài điểm yếu cụ thể cần khắc phục
 
 ## 6. Đề xuất hành động
-    - 5 - 7 gợi ý hành động cụ thể, có ưu tiên(cao / trung / thấp)
-      - Đề xuất phân bổ ngân sách tối ưu hơn nếu có thể
+    - 5 - 7 gợi ý hành động cụ thể, có ưu tiên (cao / trung / thấp)
+    - Đề xuất phân bổ ngân sách tối ưu hơn nếu có thể
 
-⚠️ QUY TẮC ĐỊNH DẠNG OUTPUT(bắt buộc tuân thủ):
-  - Dùng ## cho section headers(ví dụ: ## 1. Tổng quan hiệu suất)
-    - Dùng ### cho sub - section nếu cần
-      - Dùng ** bold ** cho số liệu và từ khóa quan trọng
-        - Dùng bullet points(-) cho danh sách, indent 2 dấu cách cho sub - bullet
-          - KHÔNG dùng ký tự đặc biệt như ═══ hay ───
-  - Có thể dùng markdown table(| ---|) cho các phần so sánh dữ liệu hoặc phân đoạn khách hàng để báo cáo chuyên nghiệp hơn.
-- Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
+⚠️ QUY TẮC ĐỊNH DẠNG OUTPUT (bắt buộc tuân thủ):
+  - Dùng ## cho section headers (ví dụ: ## 1. Tổng quan hiệu suất)
+  - Dùng ### cho sub-section nếu cần
+  - Dùng **bold** cho số liệu và từ khóa quan trọng
+  - Dùng bullet points (-) cho danh sách, indent 2 dấu cách cho sub-bullet
+  - KHÔNG dùng ký tự đặc biệt như ═══ hay ───
+  - Có thể dùng markdown table (|---|) cho các phần so sánh dữ liệu để báo cáo chuyên nghiệp hơn.
+  - Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
 
     // ── Huỷ request cũ nếu còn đang chạy ──
     if (_aiController) _aiController.abort();
