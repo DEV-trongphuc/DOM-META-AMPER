@@ -1470,11 +1470,11 @@ function exportAiToWord() {
 
   const modalTitle = document.querySelector(".ai_modal_header span")?.innerText || "Báo cáo AI";
   const dateRange = document.getElementById("ai_date_range")?.innerText || "";
-  const timestamp = new Date().toLocaleString("vi-VN");
-  const brandFilter = document.getElementById("ai_summary_content")?.getAttribute("data-brand")
+  const brandFilter = content.getAttribute("data-brand")
     || document.querySelector(".dom_selected")?.textContent?.trim()
     || "Tất cả";
   const dateText = dateRange || document.querySelector(".dom_date")?.textContent?.trim() || "N/A";
+  const timestamp = content.getAttribute("data-timestamp") || new Date().toLocaleString("vi-VN");
 
   const wordHtml = `
     <!DOCTYPE html>
@@ -1654,7 +1654,6 @@ function exportAiToWord() {
       <div class="doc-header">
         <div class="doc-header-logo">DOM AI &mdash; Báo cáo phân tích quảng cáo</div>
         <h1>${modalTitle}</h1>
-        <p class="doc-header-sub">${brandFilter !== "Tất cả" ? "Brand: " + brandFilter + " &nbsp;|&nbsp; " : ""}${dateText}</p>
       </div>
 
       <!-- Meta bar -->
@@ -1781,6 +1780,7 @@ function loadAiHistoryItem(id) {
   if (content) {
     content.innerHTML = entry.html;
     content.setAttribute("data-brand", entry.brand || "Tất cả");
+    content.setAttribute("data-timestamp", entry.timestamp || "");
   }
   if (dateBadge) {
     dateBadge.innerText = entry.dateRange || "N/A";
@@ -2012,7 +2012,11 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
     const text = data?.text || "Không nhận được phản hồi từ AI.";
 
     // Render markdown
-    if (content) content.innerHTML = simpleMarkdown(text);
+    if (content) {
+      content.innerHTML = simpleMarkdown(text);
+      content.setAttribute("data-brand", brandFilter);
+      content.setAttribute("data-timestamp", new Date().toLocaleString("vi-VN"));
+    }
     if (copyBtn) copyBtn.style.display = "flex";
     if (regenBtn) regenBtn.style.display = "flex";
     const wordBtnFinal = document.getElementById("ai_export_word_btn");
