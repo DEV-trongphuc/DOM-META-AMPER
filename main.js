@@ -1415,6 +1415,7 @@ async function showAdsetDetail(adset_id) {
   try {
     const timeRangeParam = `&time_range[since]=${startDate}&time_range[until]=${endDate}`;
     const batchRequests = [
+      { method: "GET", name: "targeting", relative_url: `${adset_id}?fields=targeting` },
       { method: "GET", name: "byHour", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=hourly_stats_aggregated_by_advertiser_time_zone${timeRangeParam}` },
       { method: "GET", name: "byAgeGender", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=age,gender${timeRangeParam}` },
       { method: "GET", name: "byRegion", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=region${timeRangeParam}` },
@@ -1434,11 +1435,22 @@ async function showAdsetDetail(adset_id) {
     const results = {};
     batchResponse.forEach((item, i) => {
       const name = batchRequests[i].name;
-      results[name] = [];
       if (item && item.code === 200) {
-        try { results[name] = JSON.parse(item.body).data || []; } catch (e) { }
+        try {
+          const parsed = JSON.parse(item.body);
+          // targeting trả về object, còn insights trả về { data: [...] }
+          results[name] = parsed.data ?? parsed;
+        } catch (e) {
+          results[name] = name === "targeting" ? {} : [];
+        }
+      } else {
+        results[name] = name === "targeting" ? {} : [];
       }
     });
+
+    // Render targeting (age, gender, location)
+    const targeting = results.targeting?.targeting || results.targeting || {};
+    renderTargetingToDOM(targeting);
 
     const processBreakdown = (arr, k1, k2 = null) => {
       const out = {};
