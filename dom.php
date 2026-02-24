@@ -6,7 +6,7 @@
  */
 
 // ─── CẤU HÌNH ────────────────────────────────────────────────
-$GEMINI_API_KEY = "AIzaSyDduZLbJhLXs833qWC7MyWZVDY-Lp2aKQc";   // ← Điền key thật vào đây
+$GEMINI_API_KEY = "AIzaSyCt78NC1rK4vFykgwY6jDPb7MXBq-M-_W8";   // ← Điền key thật vào đây
 $GEMINI_MODEL = "gemini-2.5-flash";
 $GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{$GEMINI_MODEL}:generateContent?key={$GEMINI_API_KEY}";
 

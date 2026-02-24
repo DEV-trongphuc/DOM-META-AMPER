@@ -1,3 +1,1 @@
 const META_TOKEN = "EAAUbzkTFG4sBQ5tk49sg92xjuHQxaTP7P4zTNk4XJW0bd6IVPENnwwLipKNmrowZARpxEjqlohbZBKXb2WMGUtZB92GlLDf4rASoZBxTmamW2NIHLJ7UebZAcJuOnvKKVeMwnziSvHTwVpTGcW3hEFZCSj9FnU66sySxozv0CtwSoJhxU5prF0v6Ww13abHde4En6ZB5nAW";
-
-// Gemini API key đã chuyển vào dom.php (server-side) — không còn cần ở đây.
