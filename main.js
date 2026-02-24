@@ -1732,17 +1732,17 @@ function confirmDeleteAiHistory(id) {
   const overlay = document.createElement("div");
   overlay.id = "ai_delete_confirm";
   overlay.style.cssText = `
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z - index: 99999;
-  display: flex; align - items: center; justify - content: center;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999;
+    display: flex; align-items: center; justify-content: center;
   `;
   overlay.innerHTML = `
-    < div style = "
-  background: #fff; border - radius: 16px; padding: 3.2rem 3.6rem;
-  max - width: 42rem; width: 90 %; text - align: center;
-  box - shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-  animation: fadeInScale .18s ease;
-  ">
-    < div style = "font-size:3.6rem;margin-bottom:1.2rem;" >🗑️</div >
+    <div style="
+      background: #fff; border-radius: 16px; padding: 3.2rem 3.6rem;
+      max-width: 42rem; width: 90%; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      animation: fadeInScale .18s ease;
+    ">
+      <div style="font-size:3.6rem;margin-bottom:1.2rem;">🗑️</div>
       <h3 style="font-size:1.8rem;font-weight:700;color:#111;margin:0 0 0.8rem;">Xóa bản tóm tắt?</h3>
       <p style="color:#64748b;font-size:1.4rem;margin:0 0 2.4rem;">Hành động này không thể hoàn tác. Bản tóm tắt này sẽ bị xóa vĩnh viễn.</p>
       <div style="display:flex;gap:1.2rem;justify-content:center;">
@@ -1757,8 +1757,8 @@ function confirmDeleteAiHistory(id) {
           cursor:pointer;transition:all .2s;
         "><i class='fa-solid fa-trash'></i> Xóa</button>
       </div>
-    </div >
-    `;
+    </div>
+  `;
   document.body.appendChild(overlay);
   overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
 }
@@ -2300,7 +2300,7 @@ async function handleAdsetInsightClick(btn) {
     const img = domDetail.querySelector(".dom_detail_header img");
     const idEl = domDetail.querySelector(".dom_detail_id");
     if (img) img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-    if (idEl) idEl.innerHTML = `< span > ${name}</span > <span>ID: ${adsetId}</span>`;
+    if (idEl) idEl.innerHTML = `<span>${name}</span> <span>ID: ${adsetId}</span>`;
   }
 
   const loadingEl = document.querySelector(".loading");
