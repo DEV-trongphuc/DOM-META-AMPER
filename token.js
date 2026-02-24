@@ -2,4 +2,3 @@ const META_TOKEN = "EAAUbzkTFG4sBQ5tk49sg92xjuHQxaTP7P4zTNk4XJW0bd6IVPENnwwLipKN
 
 // 👇 Điền Gemini API key mới vào đây (lấy tại aistudio.google.com/apikey)
 const GEMINI_KEY = "AIzaSyDvJm9wnyIR9RWQs2tpboiJlIdFKU5XvyA";
-

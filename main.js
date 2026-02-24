@@ -1429,7 +1429,7 @@ async function runAiSummary() {
     const brandFilter = document.querySelector(".dom_selected")?.textContent?.trim() || "Tất cả";
     const modalTitle = document.querySelector(".ai_modal_header span");
     if (modalTitle) {
-      modalTitle.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> AI Tóm tắt${isFiltered ? ` — ${brandFilter}` : " chiến dịch"}`;
+      modalTitle.innerHTML = `AI Tóm tắt${isFiltered ? ` — ${brandFilter}` : " chiến dịch"}`;
     }
 
     // ====== Xây dựng dữ liệu chi tiết từng campaign + adset ======
