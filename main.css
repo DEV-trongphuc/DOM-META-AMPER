@@ -68,7 +68,7 @@ body {
 /* ── Skeleton Loaders ── */
 .dom_inner {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .skeleton {
@@ -124,6 +124,7 @@ body {
   background: #fff;
   padding: 2rem;
   z-index: 10;
+  border-radius: inherit;
 }
 
 .is-loading>.skeleton-container {
@@ -4966,6 +4967,52 @@ tbody {
 
 .dom_total_report>ul>li:first-child>p>span:nth-child(2) {
   background-color: #ffffffee;
+}
+
+/* ── Pretty Tooltip ── */
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  background: rgba(38, 42, 83, 0.95);
+  color: #fff;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  font-weight: 500;
+}
+
+[data-tooltip]::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  right: 1.5rem;
+  border: 6px solid transparent;
+  border-top-color: rgba(38, 42, 83, 0.95);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .dom_select.year_filter {

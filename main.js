@@ -5208,15 +5208,27 @@ function updatePlatformSummaryUI(currentData, previousData = []) {
     console.log(previousValue);
     console.log(previousData);
 
-    let titleText = ` ${previousValue.toLocaleString("vi-VN")} - (${previousData?.[0]?.date_start
-      } to ${previousData?.[0]?.date_stop})`;
+    const fmtDate = (d) => {
+      if (!d) return "??/??";
+      const parts = d.split("-");
+      return `${parts[2]}/${parts[1]}`;
+    };
+
+    const s = new Date(startDate + "T00:00:00");
+    const e = new Date(endDate + "T00:00:00");
+    const durationDays = Math.round((e - s) / 86400000) + 1;
+
+    let titleText = `Kỳ trước: ${isCurrency ? formatMoney(previousValue) : previousValue.toLocaleString("vi-VN")} (${fmtDate(previousData?.[0]?.date_start)} - ${fmtDate(previousData?.[0]?.date_stop)}) • ${durationDays} ngày trước đó`;
     const valueEl = document.querySelector(`#${id} span:first-child`);
     const changeEl = document.querySelector(`#${id} span:last-child`);
-    changeEl.setAttribute("title", titleText);
+
     if (!valueEl || !changeEl) {
       console.warn(`Không tìm thấy element cho ID: ${id}`);
       return;
     }
+
+    changeEl.removeAttribute("title");
+    changeEl.setAttribute("data-tooltip", titleText);
 
     // Định dạng giá trị hiện tại
     valueEl.textContent = isCurrency
