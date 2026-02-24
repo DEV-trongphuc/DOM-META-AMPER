@@ -3337,11 +3337,28 @@ async function applyCampaignFilter(keyword) {
     return;
   }
 
-  // 🔹 Lọc campaign theo tên (không phân biệt hoa thường)
+  // 🔹 Lọc campaign theo tên, ID, hoặc chứa adset/ad có tên/ID khớp
   const filtered = keyword
-    ? window._ALL_CAMPAIGNS.filter((c) =>
-      (c.name || "").toLowerCase().includes(keyword.toLowerCase())
-    )
+    ? window._ALL_CAMPAIGNS.filter((c) => {
+      const lowerKw = keyword.toLowerCase();
+      // 1. Tên hoặc ID Campaign
+      if ((c.name || "").toLowerCase().includes(lowerKw)) return true;
+      if (c.id === keyword) return true;
+
+      // 2. Tên hoặc ID Adset trong campaign
+      const hasAdset = (c.adsets || []).some(as =>
+        (as.name || "").toLowerCase().includes(lowerKw) || as.id === keyword
+      );
+      if (hasAdset) return true;
+
+      // 3. Tên hoặc ID Ad trong campaign
+      const hasAd = (c.adsets || []).some(as =>
+        (as.ads || []).some(ad => (ad.name || "").toLowerCase().includes(lowerKw) || ad.id === keyword)
+      );
+      if (hasAd) return true;
+
+      return false;
+    })
     : window._ALL_CAMPAIGNS;
 
   // 🔹 Render lại danh sách campaign
@@ -8931,18 +8948,97 @@ window.saveBrandSettings = saveBrandSettings;
 
 let _activityAllData = [];       // all fetched from API (cur page batch)
 let _activityCursor = null;      // after cursor for next page
-let _activityHasMore = false;
 let _activityLoading = false;
 let _activityCategory = "";      // current filter category
 
-// Category → event_type mapping
+// Category → event_type mapping (source: Meta API doc /ad-activity/)
 const ACTIVITY_CATEGORY_MAP = {
-  CAMPAIGN: ["create_campaign_group", "create_campaign_legacy", "update_campaign_name", "update_campaign_run_status", "update_campaign_budget", "update_campaign_group_spend_cap", "campaign_ended", "update_campaign_group_delivery_type", "update_campaign_budget_optimization_toggling_status"],
-  AD_SET: ["create_ad_set", "update_ad_set_bidding", "update_ad_set_bid_strategy", "update_ad_set_budget", "update_ad_set_duration", "update_ad_set_run_status", "update_ad_set_name", "update_ad_set_optimization_goal", "update_ad_set_target_spec", "update_ad_set_ad_keywords", "update_ad_set_bid_adjustments", "update_ad_set_spend_cap", "update_campaign_ad_scheduling", "update_campaign_delivery_type", "update_campaign_schedule"],
-  AD: ["create_ad", "ad_review_approved", "ad_review_declined", "update_ad_creative", "edit_and_update_ad_creative", "update_ad_bid_info", "update_ad_bid_type", "update_ad_run_status", "update_ad_run_status_to_be_set_after_review", "update_ad_friendly_name", "update_ad_targets_spec", "update_adgroup_stop_delivery"],
-  BUDGET: ["ad_account_billing_charge", "ad_account_billing_charge_failed", "ad_account_billing_chargeback", "ad_account_billing_chargeback_reversal", "ad_account_billing_decline", "ad_account_billing_refund", "ad_account_remove_spend_limit", "ad_account_reset_spend_limit", "ad_account_update_spend_limit", "add_funding_source", "remove_funding_source", "billing_event", "funding_event_initiated", "funding_event_successful", "update_ad_set_budget", "update_campaign_budget", "update_campaign_group_spend_cap", "account_spending_limit_reached", "campaign_spending_limit_reached", "lifetime_budget_spent"],
-  STATUS: ["ad_account_update_status", "update_ad_run_status", "update_ad_run_status_to_be_set_after_review", "update_ad_set_run_status", "update_campaign_run_status"],
-  ACCOUNT: ["ad_account_update_spend_limit", "ad_account_reset_spend_limit", "ad_account_remove_spend_limit", "ad_account_set_business_information", "ad_account_update_status", "ad_account_add_user_to_role", "ad_account_remove_user_from_role", "add_images", "edit_images", "delete_images"],
+  // CAMPAIGN category per doc
+  CAMPAIGN: [
+    "create_campaign_group",
+    "create_campaign_legacy",
+    "update_campaign_duration",
+    "update_campaign_name",
+    "update_campaign_run_status",
+  ],
+  // AD_SET category per doc
+  AD_SET: [
+    "create_ad_set",
+    "update_ad_set_bidding",
+    "update_ad_set_bid_strategy",
+    "update_ad_set_bid_adjustments",
+    "update_ad_set_budget",
+    "update_ad_set_duration",
+    "update_ad_set_name",
+    "update_ad_set_run_status",
+    "update_ad_set_target_spec",
+    "update_ad_set_ad_keywords",
+  ],
+  // AD category per doc
+  AD: [
+    "ad_review_approved",
+    "ad_review_declined",
+    "create_ad",
+    "update_ad_creative",
+    "edit_and_update_ad_creative",
+    "update_ad_friendly_name",
+    "update_ad_run_status",
+    "update_ad_run_status_to_be_set_after_review",
+  ],
+  // BUDGET category per doc
+  BUDGET: [
+    "ad_account_billing_charge",
+    "ad_account_billing_chargeback",
+    "ad_account_billing_chargeback_reversal",
+    "ad_account_billing_decline",
+    "ad_account_billing_refund",
+    "ad_account_remove_spend_limit",
+    "ad_account_reset_spend_limit",
+    "ad_account_update_spend_limit",
+    "add_funding_source",
+    "remove_funding_source",
+    "billing_event",
+    "funding_event_initiated",
+    "funding_event_successful",
+    "update_ad_set_budget",
+    "update_campaign_budget",
+    "update_campaign_group_spend_cap",
+  ],
+  // STATUS category per doc
+  STATUS: [
+    "ad_account_update_status",
+    "update_ad_run_status",
+    "update_ad_run_status_to_be_set_after_review",
+    "update_ad_set_run_status",
+    "update_campaign_run_status",
+  ],
+  // ACCOUNT category per doc
+  ACCOUNT: [
+    "ad_review_approved",
+    "ad_review_declined",
+    "ad_account_set_business_information",
+    "ad_account_update_status",
+    "ad_account_add_user_to_role",
+    "ad_account_remove_user_from_role",
+    "add_images",
+    "edit_images",
+  ],
+  // TARGETING category per doc
+  TARGETING: [
+    "update_ad_set_target_spec",
+    "update_ad_targets_spec",
+  ],
+  // AUDIENCE category per doc
+  AUDIENCE: [
+    "create_audience",
+    "update_audience",
+    "delete_audience",
+    "share_audience",
+    "receive_audience",
+    "unshare_audience",
+    "remove_shared_audience",
+    "update_adgroup_stop_delivery",
+  ],
 };
 
 function getActivityIcon(event_type) {
@@ -8962,11 +9058,42 @@ function getActivityIcon(event_type) {
   return "fa-clock-rotate-left";
 }
 
-// Convert object_type to readable label
-function typeLabel(t) {
-  if (!t) return "";
+// Infer the correct object type label from event_type (more accurate than API's object_type field)
+function inferTypeLabel(event_type, object_type) {
+  const et = (event_type || "").toLowerCase();
+
+  // Ad Set events — API often wrongly returns object_type=CAMPAIGN for these
+  if (
+    et.startsWith("create_ad_set") ||
+    et.startsWith("update_ad_set_")
+  ) return "Ad Set";
+
+  // Campaign events
+  if (
+    et.startsWith("create_campaign") ||
+    et.startsWith("update_campaign_")
+  ) return "Campaign";
+
+  // Ad events
+  if (
+    et === "create_ad" ||
+    et.startsWith("update_ad_") ||
+    et.startsWith("edit_and_update_ad") ||
+    et === "ad_review_approved" ||
+    et === "ad_review_declined" ||
+    et === "update_ad_run_status_to_be_set_after_review"
+  ) return "Ad";
+
+  // Audience events
+  if (et.includes("audience")) return "Audience";
+
+  // Account events
+  if (et.startsWith("ad_account_") || et === "add_images" || et === "edit_images") return "Account";
+
+  // Fallback to API-provided object_type
+  if (!object_type) return "";
   const map = { ADGROUP: "Ad Set", AD_SET: "Ad Set", AD: "Ad", CAMPAIGN: "Campaign", ACCOUNT: "Account" };
-  return map[t.toUpperCase()] || t;
+  return map[object_type.toUpperCase()] || "";
 }
 
 // Convert event_type to short action phrase
@@ -9011,25 +9138,36 @@ function renderActivityRow(item) {
   const actor = item.actor_name || "";
   const action = actionPhrase(item.event_type, item.translated_event_type);
   const objName = item.object_name || "";
-  const objType = typeLabel(item.object_type || "");
+  const objType = inferTypeLabel(item.event_type, item.object_type);
   const timeStr = formatActivityTime(item.event_time);
-  // Use full date_time_in_timezone string — no slice so minutes are intact
   const dtLocal = item.date_time_in_timezone || "";
 
+  // Infer clickability: clickable if we can tell it's a Campaign/AdSet/Ad
+  const inferredType = inferTypeLabel(item.event_type, item.object_type);
+  const isClickable = ["Campaign", "Ad Set", "Ad"].includes(inferredType);
+  const objHtml = objName
+    ? `<span class="act_obj ${isClickable ? 'clickable' : ''}" 
+        ${isClickable ? `onclick="navigateToAdObject('${item.object_id}', '${objName.replace(/'/g, "\\'")}', '${item.object_type}')"` : ''}
+        title="Click to view details">${objName}</span>`
+    : "";
+
+  // Simple gray icons as requested
+  const iconColor = "#94a3b8";
+  const iconBg = "#f1f5f9";
+
   return `
-    <div class="activity_row">
-      <div class="activity_icon">
+    <div class="activity_row premium_row">
+      <div class="activity_icon" style="background: ${iconBg}; color: ${iconColor};">
         <i class="fa-solid ${icon}"></i>
       </div>
       <div class="activity_body">
         <div class="activity_sentence">
           <span class="act_actor">${actor}</span>
-          <span class="act_action"> ${action} </span>${objName
-      ? `<span class="act_obj" title="${objName}">${objName}</span>`
-      : ""}${objType ? `<span class="act_type_badge">${objType}</span>` : ""}
+          <span class="act_action"> ${action} </span>${objHtml}${objType ? `<span class="act_type_badge">${objType}</span>` : ""}
         </div>
         <div class="activity_meta">
           ${dtLocal ? `<span><i class="fa-regular fa-clock"></i> ${dtLocal}</span>` : ""}
+          ${item.object_id ? `<span class="act_id_small"><i class="fa-solid fa-fingerprint"></i> ID: ${item.object_id}</span>` : ""}
         </div>
       </div>
       <div class="activity_time">${timeStr}</div>
@@ -9038,19 +9176,73 @@ function renderActivityRow(item) {
 }
 
 
-function renderActivityList(items, append = false) {
+function renderActivityList(items) {
   const container = document.getElementById("activity_log_list");
   if (!container) return;
-  // Skip system/Meta-generated events (no real actor or actor is literally "Meta")
-  const filtered = items.filter(item => {
+
+  // 1. Filter out system/Meta actor
+  let display = items.filter(item => {
     const a = (item.actor_name || "").trim();
     return a.length > 0 && a.toLowerCase() !== "meta";
   });
-  const html = filtered.map(renderActivityRow).join("");
-  if (append) {
-    container.insertAdjacentHTML("beforeend", html);
-  } else {
-    container.innerHTML = html || `<div style="text-align:center;padding:3rem;color:#94a3b8;font-size:1.3rem;"><i class="fa-solid fa-inbox" style="font-size:2.4rem;display:block;margin-bottom:1rem;"></i>No activities found.</div>`;
+
+  // 2. Client-side category filter
+  if (_activityCategory && ACTIVITY_CATEGORY_MAP[_activityCategory]) {
+    const allowed = new Set(ACTIVITY_CATEGORY_MAP[_activityCategory]);
+    display = display.filter(item => allowed.has(item.event_type));
+  }
+
+  const html = display.map(renderActivityRow).join("");
+  container.innerHTML = html || `
+    <div style="text-align:center;padding:4rem 2rem;color:#94a3b8;font-size:1.3rem;background:#f8fafc;border-radius:12px;border:1.5px dashed #e2e8f0;margin:1rem 0;">
+      <i class="fa-solid fa-inbox" style="font-size:3rem;display:block;margin-bottom:1.5rem;color:#cbd5e1;"></i>
+      No activities found for this category.
+      <p style="font-size:1.1rem;margin-top:0.5rem;color:#cbd5e1;">Try a different filter or load more entries.</p>
+    </div>`;
+}
+
+function handleActivitySearch(val) {
+  // Disabling search for now as requested
+}
+
+function navigateToAdObject(id, name, type) {
+  // 1. Switch to Campaign details view via the menu
+  const menuItems = document.querySelectorAll(".dom_menu li");
+  let detailLi = null;
+  menuItems.forEach(li => {
+    if (li.dataset.view === "ad_detail") detailLi = li;
+  });
+
+  if (detailLi) {
+    detailLi.click();
+
+    // 2. Clear then Fill search filter in that view
+    const filterInput = document.getElementById("filter");
+    if (filterInput) {
+      filterInput.value = id || name;
+      // Trigger the filter logic
+      applyCampaignFilter(id || name);
+
+      // 3. Smooth scroll to the table area
+      setTimeout(() => {
+        const targetView = document.querySelector(".view_campaign");
+        if (targetView) {
+          targetView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+          // 4. Subtle visual feedback (highlighting matches)
+          setTimeout(() => {
+            const rows = document.querySelectorAll(".view_campaign_box .campaign_main");
+            rows.forEach(r => {
+              if (r.innerText.includes(id) || r.innerText.includes(name)) {
+                r.style.backgroundColor = "rgba(245, 158, 11, 0.12)";
+                r.style.transition = "background-color 0.4s";
+                setTimeout(() => r.style.backgroundColor = "", 2500);
+              }
+            });
+          }, 600);
+        }
+      }, 300);
+    }
   }
 }
 
@@ -9058,11 +9250,19 @@ function setActivityCategory(btn) {
   document.querySelectorAll(".act_chip").forEach(c => c.classList.remove("active"));
   btn.classList.add("active");
   _activityCategory = btn.dataset.category || "";
-  // re-filter from existing fetched data and paginate
-  _activityAllData = [];
-  _activityCursor = null;
-  _activityHasMore = false;
-  loadAccountActivities(true);
+  // Client-side filter: re-render from already-fetched data — no new API call needed
+  renderActivityList(_activityAllData, false);
+  // Update badge count to reflect filtered total
+  const allowed = _activityCategory && ACTIVITY_CATEGORY_MAP[_activityCategory]
+    ? new Set(ACTIVITY_CATEGORY_MAP[_activityCategory])
+    : null;
+  const filteredCount = allowed
+    ? _activityAllData.filter(i => allowed.has(i.event_type)).length
+    : _activityAllData.length;
+  const badge = document.getElementById("activity_count_badge");
+  if (badge) {
+    badge.textContent = `${filteredCount}${_activityHasMore ? "+" : ""} entries`;
+  }
 }
 
 async function loadAccountActivities(reset = false) {
@@ -9085,11 +9285,8 @@ async function loadAccountActivities(reset = false) {
     const fields = "actor_id,actor_name,event_time,event_type,object_id,object_name,object_type,translated_event_type,date_time_in_timezone";
     const limit = 30;
 
+    // Fetch ALL events — API ignores event_type filter so we filter client-side
     let url = `${BASE_URL}/act_${ACCOUNT_ID}/activities?fields=${fields}&limit=${limit}&access_token=${META_TOKEN}`;
-    if (_activityCategory && ACTIVITY_CATEGORY_MAP[_activityCategory]) {
-      const types = ACTIVITY_CATEGORY_MAP[_activityCategory].join(",");
-      url += `&event_type=${encodeURIComponent(types)}`;
-    }
     if (_activityCursor) {
       url += `&after=${encodeURIComponent(_activityCursor)}`;
     }
@@ -9105,15 +9302,15 @@ async function loadAccountActivities(reset = false) {
     _activityCursor = hasNextPage ? nextCursor : null;
     _activityHasMore = hasNextPage;
 
-    // Update badge
+    // Update badge (total fetched)
     const badge = document.getElementById("activity_count_badge");
     if (badge) {
       badge.textContent = `${_activityAllData.length}${_activityHasMore ? "+" : ""} entries`;
       badge.style.display = "inline-block";
     }
 
-    // Render
-    renderActivityList(newItems, !reset);
+    // Render (client-side filter applied inside renderActivityList)
+    renderActivityList(_activityAllData, false);
 
     // Load more button
     const wrap = document.getElementById("activity_load_more_wrap");
@@ -9142,6 +9339,8 @@ async function loadMoreActivities() {
 window.loadAccountActivities = loadAccountActivities;
 window.loadMoreActivities = loadMoreActivities;
 window.setActivityCategory = setActivityCategory;
+window.handleActivitySearch = handleActivitySearch;
+window.navigateToAdObject = navigateToAdObject;
 
 // ================================================================
 // =================== KEYBOARD SHORTCUTS =========================
@@ -9426,3 +9625,4 @@ function showToast(msg, duration = 2500) {
   clearTimeout(toast._timer);
   toast._timer = setTimeout(() => toast.classList.remove("show"), duration);
 }
+
