@@ -611,10 +611,6 @@ html {
   text-align: right;
 }
 
-/* Optional hover effect */
-.dom_toplist>li:hover {
-  /* background-color: #f9f9f9; */
-}
 
 #pieCampaign {
   max-height: 30rem;
@@ -735,7 +731,8 @@ html {
 #platform_chart,
 #device_chart_canvas {
   width: 100% !important;
-  max-width: 220px !important;
+  max-width: 200px !important;
+  max-height: 200px !important;
   height: auto !important;
   aspect-ratio: 1 / 1 !important;
   display: block;
@@ -749,21 +746,34 @@ html {
   height: 100% !important;
 }
 
-/* Fallback cho các biểu đồ khác */
-.chart canvas {
+/* Fallback cho các biểu đồ khác (không áp dụng cho circular/donut chart) */
+.chart:not(:has(.chart-wrapper.circular)) canvas,
+.chart .chart-wrapper:not(.circular) canvas {
   width: 100% !important;
   height: 30rem !important;
   display: block;
 }
 
+/* 🛡️ Bảo vệ canvas circular khỏi bị override bởi rule chung */
+.chart-wrapper.circular canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 200px !important;
+  max-height: 200px !important;
+  aspect-ratio: 1 / 1 !important;
+  display: block;
+  margin: 0 auto;
+}
+
 /* 📭 Empty State Styles */
-.dom_empty_state {
+.dom_empty_state,
+.view_campaign_empty {
   display: none;
   width: 100%;
   padding: 8rem 2rem;
   justify-content: center;
   align-items: center;
-  min-height: 60vh;
+  min-height: 40vh;
 }
 
 .empty_card {
@@ -1491,8 +1501,7 @@ tbody {
 
 .dom_row {
   width: 100%;
-  display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 2rem;
   margin-top: 2rem;
 }
@@ -1837,7 +1846,6 @@ tbody {
 .dom_inner.chart {
   height: 40rem;
   padding: 2rem;
-  overflow: hidden;
 }
 
 .dom_frequency {
@@ -2084,10 +2092,6 @@ tbody {
   display: flex !important;
 }
 
-.dom_container.sale .dom_row.table {
-  /* display: flex !important; */
-}
-
 .dom_container.dashboard .dom_table .dom_row {
   display: flex;
 }
@@ -2237,10 +2241,6 @@ tbody {
   opacity: 0;
   pointer-events: none;
   transition: 0.3s;
-}
-
-.dom_container .dom_dashboard {
-  /* transition: 0.3s ease; */
 }
 
 /* Hiệu ứng lướt từ phải sang */
@@ -3175,18 +3175,26 @@ tbody {
   display: flex;
   height: 100%;
   align-items: center;
+  overflow: hidden;
 }
 
 .dom_platform>div:first-child {
   width: 35%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  justify-content: center;
 }
 
 .dom_platform>div:last-child {
   width: 65%;
   margin-left: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .dom_platform_item>p>span {
@@ -3197,9 +3205,10 @@ tbody {
 .dom_platform_item {
   display: flex;
   flex-direction: column;
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  gap: 0.8rem;
+  padding: 1.3rem 2rem;
+  border-radius: 15px;
+  gap: 2rem;
+  /* filter: grayscale(1); */
   box-shadow: 0 0 3px rgb(0, 0, 0, 0.1);
 }
 
@@ -3270,10 +3279,6 @@ tbody {
   width: 100%;
   display: flex;
   column-gap: 1rem;
-}
-
-.dom_active_report>div:nth-child(1) .dom_active_cp {
-  /* background-color: #fff9e7; */
 }
 
 .dom_active_cp {
@@ -3378,9 +3383,6 @@ tbody {
   width: 4rem;
   height: 4rem;
 } */
-.dom_campaign_filter input:focus {
-  /* outline: 1px solid rgb(0, 0, 0, 0.05); */
-}
 
 .dom_total_report>ul>li p span {
   font-size: 1.8rem;
@@ -3711,9 +3713,6 @@ tbody {
 /* .campaign_item.inactive > .campaign_main {
   background: rgb(238, 238, 238);
 } */
-.campaign_item.show .campaign_main {
-  /* background-color: rgb(255, 245, 214); */
-}
 
 .campaign_item.show {
   margin-bottom: 3rem;
@@ -3881,7 +3880,6 @@ tbody {
   border-right: 1px solid rgb(0, 0, 0, 0.05);
 }
 
-.campaign_main .ad_status {}
 
 .ad_status.budget {
   flex-direction: column;
@@ -3964,9 +3962,6 @@ tbody {
   background: unset;
 }
 
-.dom_platform_abs_item.dom_toplist img {
-  /* filter: grayscale(1); */
-}
 
 .dom_platform_abs h2 {
   font-size: 1.6rem;
@@ -4079,7 +4074,30 @@ tbody {
 
 .campaign_view,
 .adset_view {
-  pointer-events: none;
+  gap: 0.6rem;
+}
+
+/* Nút insight adset */
+.adset_insight_btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 6px;
+  transition: 0.2s ease;
+  pointer-events: all;
+}
+
+.adset_insight_btn:hover i {
+  color: var(--mainClr);
+  transform: scale(1.15);
+}
+
+/* Arrow toggle — vẫn giữ click-through cho campaign_view bên trong adset_view */
+.adset_view .campaign_view {
+  cursor: pointer;
+  pointer-events: all;
 }
 
 .campaign_view i,

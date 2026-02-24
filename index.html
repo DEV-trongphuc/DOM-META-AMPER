@@ -40,28 +40,17 @@
         <div class="dom_account_view_block">
           <div class="account_item">
             <div>
-              <img class="account_item_avatar"
-                src="https://ampersand-meta-report.vercel.app/adset/ampersand/ampersand_img.jpg" />
+              <img class="account_item_avatar" src="./img/avatar.png" />
               <div class="account_item_info">
-                <p class="account_item_name">AMPERSAND</p>
-                <p class="account_item_id">676599667843841</p>
+                <p class="account_item_name">Đang tải...</p>
+                <p class="account_item_id">--</p>
               </div>
             </div>
             <i class="fa-solid fa-sort"></i>
           </div>
         </div>
-        <ul class="box_shadow">
-          <li data-acc="437334141328696">
-            <img
-              src="https://ideas.edu.vn/wp-content/uploads/2025/10/520821295_122209126670091888_6779497482843304564_n.webp" />
-            <p><span>VTCI 8696</span></p>
-          </li>
-          <li data-acc="1852318231510577">
-            <img
-              src="https://ideas.edu.vn/wp-content/uploads/2025/10/518336360_122227900856081421_6060559121060410681_n.webp" />
-            <p><span> MBA 577</span></p>
-          </li>
-        </ul>
+        <!-- Dropdown list — được JS render vào khi initAccountSelector() chạy -->
+        <ul class="box_shadow"></ul>
       </div>
       <p class="dom_text_menu">MAIN MENU</p>
       <ul class="dom_menu">
@@ -78,7 +67,16 @@
           <span>Ad Account</span>
         </li>
       </ul>
-   
+      <!-- <p class="dom_text_menu">OTHER APP</p>
+      <ul class="dom_other_menu">
+        <li class="" data-view="ads">
+          <a target="_blank" href="https://dev-trongphuc.github.io/DOM_MISA_IDEAS_CRM/">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>CRM Dashboard </span>
+          </a>
+        </li>
+
+      </ul> -->
     </div>
     <div class="dom_container dashboard">
       <div class="dom_header flex">
@@ -146,16 +144,16 @@
               </div>
             </div>
           </div>
-          <p class="dom_date">01/06/2025 - 28/06/2025</p>
+          <p class="dom_date">-/-/- - -/-/-</p>
         </div>
-        <!-- <div class="dom_campaign_filter">
+        <div class="dom_campaign_filter">
           <input placeholder="Filter by Campaign name" id="campaign_filter" />
           <div>
             <i class="fa-solid fa-magnifying-glass" id="reset_button"></i>
             <p>Search</p>
           </div>
           <ul></ul>
-        </div> -->
+        </div>
         <div class="dom_filter">
           <div class="dom_select quick_filter_detail">
             <img src="./adset/ampersand/ampersand_img.jpg" />
@@ -538,6 +536,15 @@
               </div>
             </div>
             <div class="view_campaign_box"></div>
+            <div class="view_campaign_empty" style="display:none">
+              <div class="empty_card">
+                <i class="fa-solid fa-filter-circle-xmark"></i>
+                <h3>Không tìm thấy kết quả</h3>
+                <p>Không có campaign nào khớp với bộ lọc đã chọn.<br />Thử đổi ngày, bộ lọc nhãn hiệu hoặc reset bộ lọc.
+                </p>
+                <button class="btn_reset_all">Reset tất cả bộ lọc</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -939,6 +946,4 @@
 <script src="./main.js"></script>
 <script src="./extra_details.js"></script>
 
-
 </html>
-
