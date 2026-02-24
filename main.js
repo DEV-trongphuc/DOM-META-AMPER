@@ -1279,22 +1279,24 @@ function exportAiToWord() {
       <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
       <![endif]-->
       <style>
-        body { font-family: 'Times New Roman', serif; font-size: 13pt; color: #1e1e2e; margin: 2cm; }
-        h1 { font-size: 18pt; font-weight: bold; color: #111; border-bottom: 2px solid #e2e8f0; padding-bottom: 6pt; margin-bottom: 12pt; }
-        h2 { font-size: 14pt; font-weight: bold; color: #111; background: #fff8ee; border-left: 4px solid #f59e0b; padding: 6pt 10pt; margin-top: 20pt; text-transform: uppercase; }
-        h3 { font-size: 13pt; font-weight: bold; color: #1e293b; margin-top: 14pt; }
-        p  { line-height: 1.7; margin: 6pt 0; color: #334155; }
-        ul { margin: 6pt 0 6pt 20pt; }
-        ul li { margin: 4pt 0; color: #475569; }
-        ol { margin: 6pt 0 6pt 20pt; }
-        ol li { margin: 6pt 0; color: #334155; background: #f8fafc; border: 1px solid #e9eef5; padding: 6pt 10pt; border-radius: 4pt; }
-        strong { font-weight: bold; color: #0f172a; }
-        em { font-style: italic; color: #64748b; }
-        table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
-        table th { background: #f1f5f9; font-weight: bold; font-size: 11pt; text-transform: uppercase; padding: 8pt; border: 1px solid #cbd5e1; color: #475569; }
-        table td { padding: 8pt; border: 1px solid #e2e8f0; color: #334155; font-size: 12pt; }
-        table tr:nth-child(even) td { background: #f8fafc; }
-        .report-meta { color: #64748b; font-size: 11pt; margin-bottom: 16pt; border-bottom: 1px solid #f1f5f9; padding-bottom: 10pt; }
+        body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; margin: 2.5cm 2cm; line-height: 1.55; }
+        h1 { font-size: 16pt; font-weight: bold; color: #111; border-bottom: 2pt solid #333; padding-bottom: 5pt; margin-bottom: 10pt; }
+        h2 { font-size: 13pt; font-weight: bold; color: #111; border-left: 4pt solid #555; padding-left: 8pt; margin-top: 18pt; margin-bottom: 4pt; text-transform: uppercase; letter-spacing: 0.03em; }
+        h3 { font-size: 11.5pt; font-weight: bold; color: #222; margin-top: 12pt; margin-bottom: 3pt; }
+        h4 { font-size: 11pt; font-weight: bold; color: #444; margin-top: 8pt; margin-bottom: 2pt; }
+        p  { margin: 4pt 0; color: #333; }
+        ul { margin: 4pt 0 4pt 14pt; padding: 0; }
+        ul li { margin: 2pt 0; color: #333; }
+        ol { margin: 6pt 0 6pt 14pt; padding: 0; }
+        ol li { margin: 4pt 0; color: #222; padding: 2pt 0; }
+        strong { font-weight: bold; color: #111; }
+        em { font-style: italic; color: #555; }
+        table { border-collapse: collapse; width: 100%; margin: 10pt 0; font-size: 10pt; }
+        table th { background: #ebebeb; font-weight: bold; text-transform: uppercase; padding: 5pt 8pt; border: 1pt solid #aaa; color: #333; text-align: left; }
+        table td { padding: 4pt 8pt; border: 1pt solid #ccc; color: #222; }
+        table tr:nth-child(even) td { background: #f7f7f7; }
+        .report-meta { color: #666; font-size: 10pt; margin-bottom: 12pt; padding-bottom: 8pt; border-bottom: 1pt solid #ccc; }
+        hr { border: none; border-top: 1pt solid #ddd; margin: 10pt 0; }
       </style>
     </head>
     <body>
