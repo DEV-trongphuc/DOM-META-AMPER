@@ -1228,34 +1228,283 @@ function openAiSummaryModal() {
   const modal = document.getElementById("ai_summary_modal");
   if (modal) modal.style.display = "flex";
   updateAiHistoryBadge();
-  // Nếu có lịch sử → mở tab lịch sử trước để chọn
-  const hist = loadAiHistory();
-  switchAiTab(hist.length > 0 ? "history" : "result");
+  switchAiTab("home");
+  // Pre-select "Hiện tại" pill
+  setAiDatePreset("current", document.querySelector(".ai_date_pill"));
 }
 
 function switchAiTab(tab) {
-  const resultPanel = document.getElementById("ai_panel_result");
-  const historyPanel = document.getElementById("ai_panel_history");
-  const tabResult = document.getElementById("ai_tab_result");
-  const tabHistory = document.getElementById("ai_tab_history");
-  // footer luôn hiển thị (có nút Tạo tóm tắt mới)
-  // const footer = document.querySelector(".ai_modal_footer"); // Keep footer reference for potential future use, but remove conditional display logic
+  const allPanels = ["home", "result", "compare", "history"];
+  allPanels.forEach(p => {
+    const el = document.getElementById(`ai_panel_${p}`);
+    if (el) el.style.display = "none";
+    const ft = document.getElementById(`ai_footer_${p}`);
+    if (ft) ft.style.display = "none";
+  });
 
-  if (!resultPanel || !historyPanel) return;
+  const panel = document.getElementById(`ai_panel_${tab}`);
+  if (panel) {
+    // home panel is a flex container (2-column grid)
+    panel.style.display = tab === "home" ? "flex" : "block";
+  }
+  const footer = document.getElementById(`ai_footer_${tab}`);
+  if (footer) footer.style.display = "flex";
 
-  if (tab === "history") {
-    resultPanel.style.display = "none";
-    historyPanel.style.display = "block";
-    tabResult?.classList.remove("active");
-    tabHistory?.classList.add("active");
-    renderAiHistory();
-  } else {
-    resultPanel.style.display = "block";
-    historyPanel.style.display = "none";
-    tabResult?.classList.add("active");
-    tabHistory?.classList.remove("active");
+  if (tab === "history") renderAiHistory();
+  if (tab === "compare") renderCompareCampaigns();
+}
+
+// ─── Date Preset for Home panel ───────────────────────────────
+
+let _aiDatePreset = "current";
+
+function setAiDatePreset(preset, btn) {
+  _aiDatePreset = preset;
+  document.querySelectorAll(".ai_date_pill").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  const customRow = document.getElementById("ai_custom_date_row");
+  if (customRow) customRow.style.display = preset === "custom" ? "flex" : "none";
+  // Pre-fill custom inputs với ngày hiện tại của app
+  if (preset === "custom") {
+    const cf = document.getElementById("ai_custom_from");
+    const ct = document.getElementById("ai_custom_to");
+    if (cf && !cf.value) cf.value = document.getElementById("date_from")?.value || "";
+    if (ct && !ct.value) ct.value = document.getElementById("date_to")?.value || "";
   }
 }
+
+function getAiDateRange() {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0, 10);
+  if (_aiDatePreset === "7d") return { from: fmt(new Date(today - 7 * 864e5)), to: fmt(today) };
+  if (_aiDatePreset === "14d") return { from: fmt(new Date(today - 14 * 864e5)), to: fmt(today) };
+  if (_aiDatePreset === "30d") return { from: fmt(new Date(today - 30 * 864e5)), to: fmt(today) };
+  if (_aiDatePreset === "custom") return {
+    from: document.getElementById("ai_custom_from")?.value || "",
+    to: document.getElementById("ai_custom_to")?.value || "",
+  };
+  // "current" — dùng filter hiện tại
+  return {
+    from: document.getElementById("date_from")?.value || "",
+    to: document.getElementById("date_to")?.value || "",
+  };
+}
+
+function runAiSummaryFromHome() {
+  const { from, to } = getAiDateRange();
+  if (_aiDatePreset !== "current" && from && to) {
+    const df = document.getElementById("date_from");
+    const dt = document.getElementById("date_to");
+    if (df) df.value = from;
+    if (dt) dt.value = to;
+  }
+  switchAiTab("result");
+  runAiSummary();
+}
+
+// ─── Campaign Compare Feature ──────────────────────────────────
+
+function renderCompareCampaigns() {
+  const list = document.getElementById("ai_compare_list");
+  if (!list) return;
+  const campaigns = (window._FILTERED_CAMPAIGNS ?? window._ALL_CAMPAIGNS) || [];
+  if (!campaigns.length) {
+    list.innerHTML = `<div class="ai_compare_empty">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      Chưa có dữ liệu campaign. Hãy tải dữ liệu trước.
+    </div>`;
+    return;
+  }
+
+  const fmt = n => Math.round(n || 0).toLocaleString("vi-VN");
+  const fmtShort = n => {
+    n = Math.round(n || 0);
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+    if (n >= 1_000) return (n / 1_000).toFixed(0) + "K";
+    return n.toString();
+  };
+
+  // Tính % chi phí tương đối để vẽ bar
+  const maxSpend = Math.max(...campaigns.map(c => c.spend || 0), 1);
+
+  list.innerHTML = campaigns.map((c, i) => {
+    const adsets = c.adsets || [];
+    const adsetCnt = adsets.length;
+    const spend = fmt(c.spend);
+    const reach = fmtShort(c.reach);
+    const result = fmt(c.result);
+    const cpr = c.result > 0 ? fmt(c.spend / c.result) + "đ" : "N/A";
+    const spendPct = Math.round((c.spend / maxSpend) * 100);
+
+    // Top adset theo chi phí
+    const topAdset = [...adsets].sort((a, b) => (b.spend || 0) - (a.spend || 0))[0];
+    const topName = topAdset ? topAdset.name.replace(/^[^_]+_/, "") : null;
+
+    // Goal badge
+    const goals = [...new Set(adsets.map(a => a.optimization_goal).filter(Boolean))];
+    const goalBadge = goals.slice(0, 2).map(g =>
+      `<span class="ai_cmp_goal">${g}</span>`
+    ).join("") + (goals.length > 2 ? `<span class="ai_cmp_goal">+${goals.length - 2}</span>` : "");
+
+    return `
+    <label class="ai_compare_item" data-name="${(c.name || "").toLowerCase()}" data-idx="${i}">
+      <div class="ai_cmp_checkbox">
+        <input type="checkbox" class="ai_compare_cb" value="${i}" id="cmp_cb_${i}" onchange="updateCompareCount()">
+        <i class="fa-solid fa-check"></i>
+      </div>
+      <div class="ai_compare_item_body">
+        <div class="ai_cmp_top_row">
+          <div class="ai_compare_item_name">${c.name || "Campaign " + (i + 1)}</div>
+        </div>
+        <div class="ai_cmp_spend_bar_wrap">
+          <div class="ai_cmp_spend_bar" style="width:${spendPct}%"></div>
+        </div>
+        <div class="ai_compare_item_stats">
+          <span class="ai_cmp_stat spend"><i class="fa-solid fa-sack-dollar"></i> ${spend}đ</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-users"></i> ${reach}</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-bullseye"></i> ${result} KQ</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-tag"></i> ${cpr}</span>
+          <span class="ai_cmp_stat"><i class="fa-solid fa-layer-group"></i> ${adsetCnt} adset</span>
+        </div>
+      </div>
+    </label>`;
+  }).join("");
+
+  // Sync real checkbox với custom UI
+  document.querySelectorAll(".ai_compare_item").forEach(label => {
+    label.addEventListener("click", e => {
+      if (e.target.closest(".ai_cmp_checkbox") || e.target.classList.contains("ai_compare_cb")) return;
+      const cb = label.querySelector(".ai_compare_cb");
+      if (cb) { cb.checked = !cb.checked; updateCompareCount(); }
+    });
+  });
+
+  updateCompareCount();
+}
+
+
+function filterCompareCampaigns(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll(".ai_compare_item").forEach(el => {
+    const name = el.dataset.name || "";
+    el.style.display = (!q || name.includes(q)) ? "" : "none";
+  });
+}
+
+function selectAllCompareCampaigns(checked) {
+  document.querySelectorAll(".ai_compare_cb").forEach(cb => {
+    const item = cb.closest(".ai_compare_item");
+    if (item && item.style.display !== "none") cb.checked = checked;
+  });
+  updateCompareCount();
+}
+
+function updateCompareCount() {
+  const selected = document.querySelectorAll(".ai_compare_cb:checked").length;
+  const countEl = document.getElementById("ai_compare_count");
+  const runBtn = document.getElementById("ai_compare_run_btn");
+  if (countEl) countEl.textContent = `${selected} đã chọn`;
+  if (runBtn) runBtn.disabled = selected < 2;
+  // Đổi màu count
+  if (countEl) countEl.style.color = selected >= 2 ? "var(--mainClr)" : "#aaa";
+}
+
+async function runAiCompare() {
+  const campaigns = (window._FILTERED_CAMPAIGNS ?? window._ALL_CAMPAIGNS) || [];
+  const checked = [...document.querySelectorAll(".ai_compare_cb:checked")];
+  if (checked.length < 2) return;
+
+  const selected = checked.map(cb => campaigns[parseInt(cb.value)]).filter(Boolean);
+
+  // Chuyển sang tab kết quả và show loading
+  switchAiTab("result");
+  const loading = document.getElementById("ai_summary_loading");
+  const content = document.getElementById("ai_summary_content");
+  const emptyBox = document.getElementById("ai_empty_state");
+  const copyBtn = document.getElementById("ai_copy_btn");
+  const regenBtn = document.getElementById("ai_regenerate_btn");
+  const wordBtn = document.getElementById("ai_export_word_btn");
+
+  if (loading) loading.style.display = "block";
+  if (emptyBox) emptyBox.style.display = "none";
+  if (content) content.innerHTML = "";
+  if (copyBtn) copyBtn.style.display = "none";
+  if (regenBtn) regenBtn.style.display = "none";
+  if (wordBtn) wordBtn.style.display = "none";
+
+  const fmt = n => Math.round(n || 0).toLocaleString("vi-VN");
+  const fmtMoney = n => fmt(n) + "đ";
+
+  const blocks = selected.map((c, idx) => {
+    const adsetLines = (c.adsets || []).map(as =>
+      `  · ${as.name}: chi phí=${fmtMoney(as.spend)}, reach=${fmt(as.reach)}, kết quả=${fmt(as.result)}, CPR=${as.result > 0 ? fmtMoney(as.spend / as.result) : "N/A"}, goal=${as.optimization_goal || "N/A"}`
+    ).join("\n");
+    return `
+[Campaign ${idx + 1}] ${c.name}
+- Chi phí: ${fmtMoney(c.spend)}
+- Reach: ${fmt(c.reach)}
+- Kết quả: ${fmt(c.result)}
+- CPR TB: ${c.result > 0 ? fmtMoney(c.spend / c.result) : "N/A"}
+- Impressions: ${fmt(c.impressions)}
+- Mục tiêu: ${c.objective || "N/A"}
+- Adsets (${(c.adsets || []).length}):
+${adsetLines || "  (không có dữ liệu adset)"}`;
+  }).join("\n\n─────────────────────────\n");
+
+  const prompt = `Bạn là chuyên gia phân tích quảng cáo Facebook Ads. Hãy so sánh CHI TIẾT và TOÀN DIỆN ${selected.length} chiến dịch sau đây.
+
+DỮ LIỆU CÁC CHIẾN DỊCH CẦN SO SÁNH:
+═══════════════════════════════════════
+${blocks}
+═══════════════════════════════════════
+
+YÊU CẦU PHÂN TÍCH SO SÁNH:
+
+## 1. Bảng tổng quan so sánh
+- Tạo bảng so sánh các chỉ số chính: Chi phí, Reach, Kết quả, CPR, Impressions
+- Xếp hạng từng campaign theo từng chỉ số
+
+## 2. Phân tích điểm mạnh - điểm yếu từng campaign
+- Với mỗi campaign: nêu rõ 2-3 điểm mạnh và 2-3 điểm yếu dựa trên số liệu
+
+## 3. Campaign hiệu quả nhất
+- Kết luận campaign nào tốt nhất và tại sao (dựa trên CPR, reach, chi phí)
+
+## 4. Đề xuất tối ưu
+- Gợi ý cụ thể để cải thiện campaign kém hiệu quả hơn
+- Ngân sách nên phân bổ như thế nào giữa các campaign
+
+⚠️ QUY TẮC: Dùng bảng markdown cho phần so sánh số liệu, viết bằng tiếng Việt, có số liệu cụ thể.`;
+
+  try {
+    const resp = await fetch("https://automation.ideas.edu.vn/dom.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error || `Proxy error: ${resp.status}`);
+    const text = data?.text || "Không nhận được phản hồi.";
+
+    if (loading) loading.style.display = "none";
+    if (content) content.innerHTML = simpleMarkdown(text);
+    if (copyBtn) copyBtn.style.display = "flex";
+    if (regenBtn) regenBtn.style.display = "none";  // Regen không áp dụng cho compare
+    if (wordBtn) wordBtn.style.display = "flex";
+
+    const hLabel = `So sánh: ${selected.map(c => c.name).join(" vs ")}`;
+    saveAiHistory(content.innerHTML, hLabel);
+
+  } catch (err) {
+    if (loading) loading.style.display = "none";
+    if (content) content.innerHTML = `<div style="color:#ef4444;padding:2rem;text-align:center;">
+      <i class="fa-solid fa-circle-exclamation" style="font-size:2rem;margin-bottom:1rem;display:block;"></i>
+      ❌ Lỗi: ${err.message}
+    </div>`;
+    console.error("❌ AI Compare error:", err);
+  }
+}
+
 
 // ── localStorage history helpers ──
 
@@ -1459,7 +1708,15 @@ function renderAiHistory() {
   `).join("");
 }
 
+// Abort controller cho request AI đang chạy
+let _aiController = null;
+
 function closeAiSummaryModal() {
+  // Huỷ request đang chạy (nếu có)
+  if (_aiController) {
+    _aiController.abort();
+    _aiController = null;
+  }
   const modal = document.getElementById("ai_summary_modal");
   if (modal) modal.style.display = "none";
 }
@@ -1596,6 +1853,11 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
 - Có thể dùng markdown table (|---|) cho các phần so sánh dữ liệu hoặc phân đoạn khách hàng để báo cáo chuyên nghiệp hơn.
 - Viết bằng tiếng Việt, súc tích, có số liệu cụ thể từ dữ liệu được cung cấp.`;
 
+    // ── Huỷ request cũ nếu còn đang chạy ──
+    if (_aiController) _aiController.abort();
+    _aiController = new AbortController();
+    const signal = _aiController.signal;
+
     // ── Gọi qua PHP proxy (API key ẩn phía server) ──
     const PROXY_URL = "https://automation.ideas.edu.vn/dom.php";
 
@@ -1603,6 +1865,7 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
+      signal,
     });
 
     const data = await resp.json();
@@ -1623,10 +1886,16 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
     saveAiHistory(content.innerHTML, hLabel || "Tóm tắt chiến dịch");
 
   } catch (err) {
+    if (err.name === "AbortError") {
+      // Request bị huỷ chủ động (user đóng modal) — im lặng
+      console.log("⏹ AI request bị huỷ.");
+      return;
+    }
     console.error("❌ AI Summary error:", err);
     if (content) content.innerHTML = `<p style="color:#e05c1a">❌ Lỗi: ${err.message}</p>`;
   } finally {
     if (loading) loading.style.display = "none";
+    _aiController = null;
   }
 }
 

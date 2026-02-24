@@ -6,7 +6,7 @@
  */
 
 // ─── CẤU HÌNH ────────────────────────────────────────────────
-$GEMINI_API_KEY = "AIzaSyDvJm9wnyIR9RWQs2tpboiJlIdFKU5XvyA";   // ← Điền key thật vào đây
+$GEMINI_API_KEY = "AIzaSyDduZLbJhLXs833qWC7MyWZVDY-Lp2aKQc";   // ← Điền key thật vào đây
 $GEMINI_MODEL = "gemini-2.5-flash";
 $GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{$GEMINI_MODEL}:generateContent?key={$GEMINI_API_KEY}";
 
@@ -16,7 +16,7 @@ $ALLOWED_ORIGINS = [
     "http://127.0.0.1",
     "http://automation.ideas.edu.vn",
     "https://automation.ideas.edu.vn",
-    // Thêm domain của bạn vào đây nếu cần
+    "https://ampersand-meta-report.vercel.app"
 ];
 // ─────────────────────────────────────────────────────────────
 
@@ -75,8 +75,8 @@ $payload = json_encode([
         ]
     ],
     "generationConfig" => [
-        "temperature" => 0.7,
-        "maxOutputTokens" => 8192,
+        "temperature" => 1.5,
+        "maxOutputTokens" => 16384,
     ]
 ]);
 
