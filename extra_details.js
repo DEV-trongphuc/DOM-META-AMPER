@@ -210,7 +210,8 @@ function renderExtraGoalChart(data) {
                         borderColor: "rgba(0,0,0,0.05)"
                     },
                     ticks: { display: false },
-                    border: { display: false }
+                    border: { display: false },
+                    suggestedMax: Math.max(...values) * 1.2
                 }
             }
         }

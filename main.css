@@ -4021,7 +4021,7 @@ tbody {
 }
 
 .campaign_main>.ads_name {
-  width: 30%;
+  width: 25%;
   flex-shrink: 0;
   display: flex;
   border-right: 1px solid rgb(0, 0, 0, 0.05);
@@ -4122,7 +4122,7 @@ tbody {
 }
 
 .adset_item>.ads_name {
-  width: calc(30% - 5.5rem);
+  width: calc(25% - 5.9rem);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -4134,7 +4134,7 @@ tbody {
 }
 
 .ad_item>.ads_name {
-  width: calc(30% - 11rem);
+  width: calc(25% - 11.75rem);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -4158,11 +4158,11 @@ tbody {
 }
 
 .ad_status {
-  width: 15rem;
+  min-width: 20rem;
   height: 100%;
   display: flex;
   align-items: center;
-  padding-left: 2rem;
+  padding-left: 3rem;
   position: relative;
   border-right: 1px solid rgb(0, 0, 0, 0.05);
 }
@@ -4291,7 +4291,7 @@ tbody {
   position: absolute;
   content: "";
   top: 50%;
-  left: 0;
+  left: 1rem;
   transform: translateY(-50%);
   width: 1rem;
   height: 1rem;
@@ -4322,8 +4322,10 @@ tbody {
 .ad_cpm,
 .ad_reach,
 .ad_reaction,
-.ad_frequency {
-  width: 10rem;
+.ad_frequency,
+.ad_metric {
+  /* width: 12rem; */
+  min-width: 10.5rem;
   height: 100%;
   display: flex;
   align-items: center;
@@ -4332,15 +4334,19 @@ tbody {
   padding-left: 1rem;
   position: relative;
   border-right: 1px solid rgb(0, 0, 0, 0.05);
+  font-size: 1.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ad_cpr {
-  width: 18rem !important;
+  /* width: 18rem !important; */
   font-weight: bold;
 }
 
 .ad_result {
-  width: 13rem;
+  /* width: 13rem; */
   font-weight: bold;
 }
 
@@ -7411,5 +7417,59 @@ tbody {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
+}
 
+/* ── Premium Tooltip ── */
+.dom_premium_tooltip {
+  position: fixed;
+  background: #1e293b;
+  color: #fff;
+  padding: 0.8rem 1.4rem;
+  border-radius: 10px;
+  font-size: 1.25rem;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 11000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  max-width: 35rem;
+  line-height: 1.6;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: center;
+  transform: translate(-50%, 10px) scale(0.95);
+}
+
+.dom_premium_tooltip.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.dom_premium_tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: #1e293b;
+}
+
+.dom_premium_tooltip.is-bottom::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #1e293b;
+}
+
+/* Kiểu label lịch sử (giống ảnh mẫu) */
+.dom_premium_tooltip.history {
+  background: #252b48;
+  border-radius: 50rem;
+  font-size: 1.15rem;
+  white-space: nowrap;
+  padding: 0.6rem 1.2rem;
 }
