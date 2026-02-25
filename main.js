@@ -9319,7 +9319,31 @@ async function loadAccountActivities(reset = false) {
   } catch (err) {
     console.error("❌ Failed to load activities:", err);
     const container = document.getElementById("activity_log_list");
-    if (container) container.innerHTML = `<div style="text-align:center;padding:3rem;color:#ef4444;font-size:1.3rem;"><i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;display:block;margin-bottom:1rem;"></i>Failed to load activities. Check permissions.</div>`;
+    if (!container) return;
+
+    const isPermissionErr = err?.message?.includes("Code: 200") || err?.message?.includes("200");
+    if (isPermissionErr) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:3.5rem 2rem;background:#fffbeb;border-radius:14px;border:1.5px solid #fde68a;margin:1rem 0;">
+          <i class="fa-solid fa-lock" style="font-size:3rem;display:block;margin-bottom:1.2rem;color:#f59e0b;"></i>
+          <p style="font-size:1.4rem;font-weight:700;color:#92400e;margin:0 0 0.5rem;">Permission Required: <code>ads_management</code></p>
+          <p style="font-size:1.15rem;color:#78350f;margin:0 0 1.5rem;">The current access token only has <b>ads_read</b>.<br>
+          The <b>/activities</b> endpoint requires <b>ads_management</b> permission.</p>
+          <div style="background:#fff8e7;border-radius:10px;padding:1.2rem 1.6rem;text-align:left;max-width:500px;margin:0 auto;font-size:1.1rem;color:#78350f;line-height:1.8;">
+            <b>Cách lấy token mới:</b><br>
+            1. Vào <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:#d97706;">Graph API Explorer</a><br>
+            2. Chọn <b>User Token</b> → Add permission: <code>ads_management</code><br>
+            3. Generate Token → cập nhật vào <code>token.js</code>
+          </div>
+        </div>`;
+    } else {
+      container.innerHTML = `
+        <div style="text-align:center;padding:3rem;color:#ef4444;font-size:1.3rem;background:#fef2f2;border-radius:12px;border:1.5px dashed #fca5a5;margin:1rem 0;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size:2.5rem;display:block;margin-bottom:1rem;"></i>
+          Failed to load activities.<br>
+          <span style="font-size:1rem;color:#b91c1c;">${err?.message || "Unknown error"}</span>
+        </div>`;
+    }
   } finally {
     _activityLoading = false;
     const b = document.getElementById("activity_refresh_btn");
