@@ -4091,11 +4091,13 @@ tbody {
   z-index: 3;
 }
 
-.cmp_fan_wrap:hover .cmp_fan_img:nth-child(1) {
+.cmp_fan_wrap:hover .cmp_fan_img:nth-child(1),
+.campaign_main:hover .cmp_fan_img:nth-child(1) {
   transform: rotate(-14deg) translateX(-10px) translateY(2px);
 }
 
-.cmp_fan_wrap:hover .cmp_fan_img:nth-child(3) {
+.cmp_fan_wrap:hover .cmp_fan_img:nth-child(3),
+.campaign_main:hover .cmp_fan_img:nth-child(3) {
   transform: rotate(12deg) translateX(10px) translateY(2px);
 }
 
