@@ -99,7 +99,7 @@
             src="https://raw.githubusercontent.com/DEV-trongphuc/DOM_MISA_IDEAS_CRM/refs/heads/main/Coffee%20Talk%20AI%20LEARNING%20(9).png"
             alt="DOM Report Logo"
           /> -->
-        <img src="./logo.png" alt="DOM Report Logo" />
+        <img src="https://ampersand-reports-dom.netlify.app/DOM-img/DOM_LOGO.png" alt="DOM Report Logo" />
         <i id="mobile_menu" class="fa-solid fa-square-caret-left"></i>
       </div>
       <p class="dom_text_menu">PROJECT VIEW</p>
@@ -119,7 +119,7 @@
         <!-- Dropdown list — được JS render vào khi initAccountSelector() chạy -->
         <ul class="box_shadow"></ul>
       </div>
-      <p class="dom_text_menu">MAIN MENU</p>
+      <p class="dom_text_menu">META REPORT</p>
       <ul class="dom_menu">
         <li class="active" data-view="dashboard">
           <i class="fa-solid fa-chart-column"></i>
@@ -133,7 +133,14 @@
           <i class="fa-solid fa-money-check"></i>
           <span>Ad Account</span>
         </li>
+        <p class="dom_text_menu">GOOGLE ADS</p>
+        <li class="" data-view="google_ads">
+          <i class="fa-brands fa-google"></i>
+          <span>Google ads</span>
+        </li>
+
       </ul>
+
       <div class="dom_sidebar_bottom">
         <p class="dom_text_menu">SYSTEM</p>
         <ul class="dom_menu">
@@ -419,11 +426,18 @@
           <div class="dom_inner dom_fade_item w35 box_shadow chart full trendline dom_region_inner">
             <h2 class="">
               <span>
-                <i class="fa-solid fa-chart-simple main_clr"></i> Custom Chart
+                <i class="fa-solid fa-chart-simple main_clr"></i> Custom Bar Chart
               </span>
-              <i class="fa-solid fa-gear chart_settings_btn" id="goal_settings_btn"
-                style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity=1"
-                onmouseout="this.style.opacity=0.5"></i>
+              <div style="display:flex;align-items:center;gap:0.8rem;">
+                <span id="goal_chart_mode_toggle" class="dom_title_button" onclick="window.quickToggleGoalChartMode()"
+                  title="Switch: Brand / Keyword">
+                  <i class="fa-solid fa-repeat"></i>
+                  <span id="goal_mode_label">Keyword</span>
+                </span>
+                <i class="fa-solid fa-gear chart_settings_btn" id="goal_settings_btn"
+                  style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity=1"
+                  onmouseout="this.style.opacity=0.5"></i>
+              </div>
             </h2>
             <div>
               <canvas id="goal_chart"></canvas>
@@ -528,10 +542,12 @@
               <div class="dom_platform_abs_item dom_toplist"></div>
             </div>
           </div>
-          <div class="dom_inner dom_fade_item w35 box_shadow chart full trendline dom_region_inner">
+          <div class="dom_inner dom_fade_item w35 box_shadow chart full trendline dom_region_inner"
+            id="region_inner_card">
             <h2 class="">
-              <span><i class="fa-solid fa-chart-simple main_clr"></i> Age & Gender</span>
-              <span class="dom_title_button region"><i class="fa-solid fa-repeat"></i> Region Chart</span>
+              <span><i class="fa-solid fa-chart-simple main_clr"></i> Age &amp; Gender</span>
+              <span class="dom_title_button region" onclick="toggleRegionView()"><i class="fa-solid fa-repeat"></i>
+                Region Chart</span>
             </h2>
             <div>
               <canvas id="age_gender_total"></canvas>
@@ -540,7 +556,8 @@
               <h2 class="">
                 <span>
                   <i class="fa-solid fa-chart-simple main_clr"></i> Region Spent</span>
-                <span class="dom_title_button region"><i class="fa-solid fa-repeat"></i> Age & Gender</span>
+                <span class="dom_title_button region" onclick="toggleRegionView()"><i class="fa-solid fa-repeat"></i>
+                  Age &amp; Gender</span>
               </h2>
               <div id="region_chart_wrap">
                 <canvas id="region_chart"></canvas>
@@ -1042,6 +1059,168 @@
             </div>
           </div>
         </div>
+
+        <!-- ===== GOOGLE ADS REPORT ===== -->
+        <div id="google_ads_container">
+
+          <!-- ROW 1: Summary + Daily Chart + Bar Chart (3-up) -->
+          <div class="dom_row flex">
+            <div class="dom_inner w25 box_shadow chart">
+              <div class="dom_total_report">
+                <ul>
+                  <li class="total_spent">
+                    <span><i class="fa-brands fa-google"></i> Google Ads</span>
+                    <p id="g_spent"><span>-</span></p>
+                  </li>
+                  <li>
+                    <span><i class="fa-solid fa-eye"></i> Impression</span>
+                    <p id="g_impression"><span>-</span></p>
+                  </li>
+                  <li>
+                    <span><i class="fa-solid fa-arrow-pointer"></i> Click</span>
+                    <p id="g_click"><span>-</span></p>
+                  </li>
+                  <li>
+                    <span><i class="fa-solid fa-bullseye"></i> Conversions</span>
+                    <p id="g_conv"><span>-</span></p>
+                  </li>
+                  <li>
+                    <span><i class="fa-solid fa-store"></i> Store Visit</span>
+                    <p id="g_store"><span>-</span></p>
+                  </li>
+                </ul>
+              </div>
+              <!-- KPI mini cards – Interaction style -->
+              <div id="g_kpi_cards" class="g_kpi_cards"></div>
+            </div>
+
+            <!-- Daily Trend Chart -->
+            <div class="dom_inner w40 box_shadow chart trendline">
+              <div class="dom_table_filter">
+                <h2><i class="fa-solid fa-chart-line main_clr"></i> Daily Spent</h2>
+                <div class="dom_select daily_total" id="g_trend_select">
+                  <i class="fa-solid fa-chart-area"></i>
+                  <div class="flex">
+                    <p class="dom_selected">Spent</p>
+                  </div>
+                  <i class="fa-solid fa-angle-down"></i>
+                  <ul class="dom_select_show">
+                    <li data-view="spent" class="active"><span class="radio_box active"></span><span>Spent</span></li>
+                    <li data-view="click"><span class="radio_box"></span><span>Click</span></li>
+                    <li data-view="total_conversions"><span class="radio_box"></span><span>Conversions</span></li>
+                    <li data-view="store_visits"><span class="radio_box"></span><span>Store Visit</span></li>
+                    <li data-view="impression"><span class="radio_box"></span><span>Impression</span></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="g_chart_wrap">
+                <canvas id="g_trend_chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Bar Chart – Campaign Performance -->
+            <div class="dom_inner w35 box_shadow chart">
+              <div class="dom_table_filter">
+                <h2><i class="fa-solid fa-chart-bar main_clr"></i> Hiệu quả theo Campaign</h2>
+                <div class="dom_select daily_total" id="g_bar_select">
+                  <i class="fa-solid fa-chart-simple"></i>
+                  <div class="flex">
+                    <p class="dom_selected">Spent</p>
+                  </div>
+                  <i class="fa-solid fa-angle-down"></i>
+                  <ul class="dom_select_show">
+                    <li data-view="spent" class="active"><span class="radio_box active"></span><span>Spent</span></li>
+                    <li data-view="click"><span class="radio_box"></span><span>Click</span></li>
+                    <li data-view="total_conversions"><span class="radio_box"></span><span>Conversions</span></li>
+                    <li data-view="ctr"><span class="radio_box"></span><span>CTR (%)</span></li>
+                    <li data-view="cpc"><span class="radio_box"></span><span>CPC</span></li>
+                    <li data-view="cpa"><span class="radio_box"></span><span>CPA</span></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="g_chart_wrap">
+                <canvas id="g_bar_chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 2: Funnel + Donut + Scatter (equal thirds) -->
+          <div class="dom_row flex">
+
+            <!-- Funnel Performance (LEFT) -->
+            <div class="dom_inner g_third box_shadow chart">
+              <h2><i class="fa-solid fa-filter main_clr"></i> Funnel Performance</h2>
+              <div id="g_funnel_wrap" class="g_funnel_wrap"></div>
+              <div class="g_metric_row">
+                <div class="g_metric_item">
+                  <div class="g_metric_label">CPC</div>
+                  <div id="g_cpc" class="g_metric_val">-</div>
+                </div>
+                <div class="g_metric_item">
+                  <div class="g_metric_label">CPA</div>
+                  <div id="g_cpa" class="g_metric_val">-</div>
+                </div>
+                <div class="g_metric_item">
+                  <div class="g_metric_label">CVR</div>
+                  <div id="g_cvr" class="g_metric_val">-</div>
+                </div>
+                <div class="g_metric_item">
+                  <div class="g_metric_label">CTR</div>
+                  <div id="g_ctr" class="g_metric_val">-</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Donut Chart – Spent by Campaign (CENTER) -->
+            <div class="dom_inner g_third box_shadow chart g_donut_card">
+              <h2><i class="fa-solid fa-circle-half-stroke main_clr"></i> Spent by Campaign</h2>
+              <div class="g_donut_wrap">
+                <canvas id="g_donut_chart"></canvas>
+              </div>
+              <div id="g_donut_legend" class="g_donut_legend"></div>
+            </div>
+
+            <!-- Scatter Chart – Cost Efficiency (RIGHT) -->
+            <div class="dom_inner g_third box_shadow chart">
+              <h2><i class="fa-solid fa-circle-dot main_clr"></i> Cost Efficiency</h2>
+              <p class="g_chart_subtitle">Bubble = Clicks &nbsp;&middot;&nbsp; X: Spent &nbsp;&middot;&nbsp; Y: Conv</p>
+              <div class="g_chart_wrap">
+                <canvas id="g_scatter_chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 3: Detail Campaign Table – Meta Campaign Details style -->
+          <div class="dom_row flex">
+            <div class="dom_inner view_campaign g_campaign_wrap" style="margin-top: 3rem;">
+              <div class="dom_table_header">
+                <h2><i class="fa-solid fa-list main_clr"></i> Detail Campaigns</h2>
+                <div class="dom_active_report" style="margin-left:auto;align-items:center;gap:1.5rem;">
+                  <div class="dom_campaign_filter">
+                    <input id="g_campaign_filter" placeholder="Search campaign..." />
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                  </div>
+                </div>
+              </div>
+              <!-- Column header -->
+              <div class="view_campaign_header">
+                <div class="g_tbl_header">
+                  <div class="ads_name">Campaign Name</div>
+                  <div class="ad_metric">Spent</div>
+                  <div class="ad_metric">Impression</div>
+                  <div class="ad_metric">Click</div>
+                  <div class="ad_metric">Conv</div>
+                  <div class="ad_metric">CPC</div>
+                  <div class="ad_metric">CPA</div>
+                  <div class="ad_metric">CTR</div>
+                  <div class="ad_metric">Store Visit</div>
+                </div>
+              </div>
+              <div id="g_campaign_table"></div>
+            </div>
+          </div>
+
+        </div>
       </div>
       <div class="dom_ai_report">
         <i class="fa-solid fa-xmark dom_ai_report_close"></i>
@@ -1288,8 +1467,8 @@
 </body>
 <script src="./token.js"></script>
 <script src="./setup.js"></script>
+<script src="./google_ads.js"></script>
 <script src="./main.js"></script>
 <script src="./extra_details.js"></script>
-
 
 </html>

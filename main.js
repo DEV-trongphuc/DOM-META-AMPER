@@ -358,6 +358,13 @@ try {
 } catch (e) {
   console.warn("Lỗi load settings:", e);
 }
+// Sync quick-toggle button to reflect saved mode after DOM ready
+document.addEventListener("DOMContentLoaded", () => {
+  const modeLabel = document.getElementById("goal_mode_label");
+  const toggleBtn = document.getElementById("goal_chart_mode_toggle");
+  if (modeLabel) modeLabel.textContent = GOAL_CHART_MODE === 'brand' ? 'Keyword' : 'Brand';
+
+});
 const BATCH_SIZE = 10;
 const CONCURRENCY_LIMIT = 40;
 const API_VERSION = "v24.0";
@@ -434,7 +441,13 @@ function toggleSkeletons(scopeSelector, isLoading) {
   if (isLoading) {
     scope.classList.add("is-loading");
     // Tìm các thẻ card/chart chính
-    const cards = scope.querySelectorAll(".dom_inner");
+    let cards = scope.querySelectorAll(".dom_inner");
+
+    // 💡 Nếu đang load Dashboard tổng (Meta), đừng động vào Google Ads container cards
+    if (scopeSelector === ".dom_dashboard" || scopeSelector === ".dom_container") {
+      cards = Array.from(cards).filter(c => !c.closest("#google_ads_container"));
+    }
+
     cards.forEach((card) => {
       card.classList.add("is-loading"); // Thêm cho từng card để bắt CSS absolute
       let skeleton = card.querySelector(".skeleton-container");
@@ -475,7 +488,13 @@ function toggleSkeletons(scopeSelector, isLoading) {
     });
   } else {
     scope.classList.remove("is-loading");
-    const cards = scope.querySelectorAll(".dom_inner");
+    let cards = scope.querySelectorAll(".dom_inner");
+
+    // 💡 Nếu đang dừng load Dashboard tổng (Meta), đừng động vào Google Ads container cards
+    if (scopeSelector === ".dom_dashboard" || scopeSelector === ".dom_container") {
+      cards = Array.from(cards).filter(c => !c.closest("#google_ads_container"));
+    }
+
     cards.forEach((card) => {
       card.classList.remove("is-loading");
       const skeletons = card.querySelectorAll(".skeleton-container");
@@ -1711,6 +1730,17 @@ async function main() {
 }
 
 function openAiSummaryModal() {
+  if (startDate && endDate) {
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const diffTime = Math.abs(e - s);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diffDays > 31) {
+      return showToast(`⚠️ AI chỉ hỗ trợ phân tích tối đa 31 ngày (Hiện tại: ${diffDays} ngày). Vui lòng chọn khoảng thời gian ngắn hơn.`);
+    }
+  }
+
   const modal = document.getElementById("ai_summary_modal");
   if (modal) modal.style.display = "flex";
   updateAiHistoryBadge();
@@ -3702,14 +3732,21 @@ if (filterButton) {
 }
 
 async function applyCampaignFilter(keyword) {
-  if (!window._ALL_CAMPAIGNS || !Array.isArray(window._ALL_CAMPAIGNS)) return;
-
   CURRENT_CAMPAIGN_FILTER = keyword || ""; // 👈 Luôn lưu lại bộ lọc cuối cùng
+
+  // 🔹 Refresh Google Ads INSTANTLY (local calculation, no fetch needed)
+  if (typeof refreshGoogleAds === 'function') refreshGoogleAds();
+
+  // 🚩 Nếu đang ở tab Google Ads thì không cần xử lý dữ liệu Meta
+  const domContainer = document.querySelector(".dom_container");
+  const isGoogleAdsView = domContainer && domContainer.classList.contains("google_ads");
+
+  if (!window._ALL_CAMPAIGNS || !Array.isArray(window._ALL_CAMPAIGNS)) return;
 
   // 🚩 Nếu filter = "RESET" thì load full data
   if (keyword && keyword.toUpperCase() === "RESET") {
-    window._FILTERED_CAMPAIGNS = window._ALL_CAMPAIGNS; // 👈 lưu lại
-    renderCampaignView(window._ALL_CAMPAIGNS); // FULL_CAMPAIGN
+    window._FILTERED_CAMPAIGNS = window._ALL_CAMPAIGNS;
+    renderCampaignView(window._ALL_CAMPAIGNS);
     const allAds = window._ALL_CAMPAIGNS.flatMap((c) =>
       c.adsets.flatMap((as) =>
         (as.ads || []).map((ad) => ({
@@ -3720,7 +3757,7 @@ async function applyCampaignFilter(keyword) {
       )
     );
     renderGoalChart(allAds);
-    resetUIFilter(); // 👈 Reset cả giao diện dropdown Brand
+    resetUIFilter();
     await loadAllDashboardCharts();
     return;
   }
@@ -3729,45 +3766,42 @@ async function applyCampaignFilter(keyword) {
   const filtered = keyword
     ? window._ALL_CAMPAIGNS.filter((c) => {
       const lowerKw = keyword.toLowerCase();
-      // 1. Tên hoặc ID Campaign
       if ((c.name || "").toLowerCase().includes(lowerKw)) return true;
       if (c.id === keyword) return true;
-
-      // 2. Tên hoặc ID Adset trong campaign
       const hasAdset = (c.adsets || []).some(as =>
         (as.name || "").toLowerCase().includes(lowerKw) || as.id === keyword
       );
       if (hasAdset) return true;
-
-      // 3. Tên hoặc ID Ad trong campaign
       const hasAd = (c.adsets || []).some(as =>
         (as.ads || []).some(ad => (ad.name || "").toLowerCase().includes(lowerKw) || ad.id === keyword)
       );
       if (hasAd) return true;
-
       return false;
     })
     : window._ALL_CAMPAIGNS;
 
   // 🔹 Render lại danh sách campaign
-  window._FILTERED_CAMPAIGNS = filtered; // 👈 lưu lại cho AI Summary
+  window._FILTERED_CAMPAIGNS = filtered;
   renderCampaignView(filtered);
 
-  // 🚩 Nếu không có campaign nào khớp → show empty state dashboard ngay
+  // 🚩 Nếu không có Meta campaign nào khớp
   if (filtered.length === 0) {
     window._FILTERED_CAMPAIGNS = [];
-    document.querySelector(".dom_container")?.classList.add("is-empty");
+    // Chỉ add is-empty nếu KHÔNG đang ở tab Google Ads
+    if (!isGoogleAdsView) {
+      domContainer?.classList.add("is-empty");
+    }
     return;
   }
 
-  // Remove empty state nếu có data
-  document.querySelector(".dom_container")?.classList.remove("is-empty");
+  // Remove empty state
+  domContainer?.classList.remove("is-empty");
 
-  // 🔹 Lấy ID campaign hợp lệ để gọi API
+  // 🔹 Lấy ID campaign để gọi API Meta (chạy ngầm)
   const ids = filtered.map((c) => c.id).filter(Boolean);
-  await loadAllDashboardCharts(ids);
+  loadAllDashboardCharts(ids);
 
-  // 🔹 Render lại goal chart (dựa theo ad-level)
+  // 🔹 Render lại goal chart
   const allAds = filtered.flatMap((c) =>
     c.adsets.flatMap((as) =>
       (as.ads || []).map((ad) => ({
@@ -6544,6 +6578,11 @@ function reloadDashboard() {
     }
     if (loading) loading.classList.remove("active");
   });
+
+  // 🔹 Refresh Google Ads with FORCE fetch because dates changed
+  if (typeof fetchGoogleAdsData === 'function') {
+    fetchGoogleAdsData(true);
+  }
 }
 
 // =================== MAIN INIT ===================
@@ -6957,6 +6996,13 @@ if (quickFilterBox) {
     }
   });
 }
+
+// ── Global region/age chart toggle (called by inline onclick) ──
+window.toggleRegionView = function () {
+  const regionCard = document.getElementById("region_inner_card") || document.querySelector(".dom_region_inner");
+  if (regionCard) regionCard.classList.toggle("active");
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   // --- 📅 Initialize Date Selector ---
   const defaultRange = getDateRange("last_7days");
@@ -6977,6 +7023,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+  if (typeof fetchGoogleAdsData === 'function') fetchGoogleAdsData(false);
+
   const menuItems = document.querySelectorAll(".dom_menu li");
   const container = document.querySelector(".dom_container");
   const mobileMenu = document.querySelector("#mobile_menu");
@@ -7001,6 +7049,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
+  // Global toggle function used by inline onclick on region buttons
+  window.toggleRegionView = function () {
+    const regionCard = document.getElementById("region_inner_card") || document.querySelector(".dom_region_inner");
+    if (regionCard) regionCard.classList.toggle("active");
+  };
+
   // Toggle Sidebar on mobile menu click
   mobileMenu.addEventListener("click", () => {
     domSidebar.classList.toggle("active");
@@ -7009,6 +7064,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle menu item click to switch views
   menuItems.forEach((li) => {
     li.addEventListener("click", () => {
+      const view = li.getAttribute("data-view");
+      if (!view) return; // 💡 Only switch views if data-view is present (ignores Settings button)
+
       // Remove active class from all items
       menuItems.forEach((item) => item.classList.remove("active"));
 
@@ -7017,14 +7075,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Remove old view classes from container
       container.classList.forEach((cls) => {
-        if (["dashboard", "ad_detail", "account"].includes(cls)) {
+        if (["dashboard", "ad_detail", "account", "google_ads"].includes(cls)) {
           container.classList.remove(cls);
         }
       });
 
       // Add new view class based on the clicked item
-      const view = li.getAttribute("data-view");
       container.classList.add(view);
+
+      // Clear any leftover inline style on the Google Ads container so CSS rule takes over
+      const gAdsEl = document.getElementById("google_ads_container");
+      if (gAdsEl) gAdsEl.style.removeProperty('display');
+
+      if (view === "google_ads") {
+        if (typeof window.fetchGoogleAdsData === 'function') window.fetchGoogleAdsData(false);
+      }
 
       // 👉 Nếu là nút account thì mới fetch
       if (view === "account") {
@@ -9226,7 +9291,46 @@ window.setGoalChartMode = function (mode) {
   }
   if (kwCont) kwCont.style.display = mode === 'brand' ? 'none' : '';
   if (brNote) brNote.style.display = mode === 'keyword' ? 'none' : '';
+
+  // Sync quick-toggle button label + active state
+  // Label shows TARGET mode (where you'll switch TO), not current mode
+  const toggleBtn = document.getElementById("goal_chart_mode_toggle");
+  const modeLabel = document.getElementById("goal_mode_label");
+  if (modeLabel) modeLabel.textContent = mode === 'brand' ? 'Keyword' : 'Brand';
+  if (toggleBtn) {
+    if (mode === 'brand') {
+      toggleBtn.classList.add('dom_title_button_active');
+    } else {
+      toggleBtn.classList.remove('dom_title_button_active');
+    }
+  }
 };
+
+// Quick toggle without opening modal — flips mode & re-renders instantly
+window.quickToggleGoalChartMode = function () {
+  const newMode = GOAL_CHART_MODE === 'brand' ? 'keyword' : 'brand';
+  window.setGoalChartMode(newMode);
+  localStorage.setItem("goal_chart_mode", newMode);
+
+  // Re-render chart immediately
+  if (window._ALL_CAMPAIGNS) {
+    const campaigns = window._FILTERED_CAMPAIGNS || window._ALL_CAMPAIGNS;
+    const allAds = campaigns.flatMap((c) =>
+      c.adsets.flatMap((as) =>
+        (as.ads || []).map((ad) => ({
+          campaign_name: c.name,
+          optimization_goal: as.optimization_goal,
+          insights: { spend: ad.spend || 0 },
+        }))
+      )
+    );
+    renderGoalChart(allAds);
+  }
+  showToast(`📊 Switched to ${newMode === 'brand' ? 'Brand Groups' : 'Keyword Goal'} chart`);
+};
+
+
+
 
 function closeFilterSettings() {
   const modal = document.getElementById("filter_settings_modal");
