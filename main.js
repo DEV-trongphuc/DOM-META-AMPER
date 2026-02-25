@@ -2142,10 +2142,16 @@ YÊU CẦU PHÂN TÍCH (đầy đủ, chi tiết, có số liệu cụ thể)
  * Chuyển markdown sang HTML — với table support
  */
 function simpleMarkdown(text) {
+  // Pre-convert <br> variants to a safe placeholder BEFORE HTML escaping
+  // so they survive the escape step and are rendered as real line breaks
+  text = text.replace(/<br\s*\/?>/gi, "__BR__");
+
   let html = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    // Restore <br> placeholders as actual HTML line breaks
+    .replace(/__BR__/g, "<br>")
     .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
