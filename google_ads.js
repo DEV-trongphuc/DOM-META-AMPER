@@ -386,6 +386,10 @@ function _renderBarChart(data, metric) {
         if (metric === "ctr") return c.imp > 0 ? +(c.click / c.imp * 100).toFixed(2) : 0;
         if (metric === "cpc") return c.click > 0 ? +(c.spent / c.click).toFixed(0) : 0;
         if (metric === "cpa") return c.conv > 0 ? +(c.spent / c.conv).toFixed(0) : 0;
+        if (metric === "total_conversions") return +(c.conv || 0);   // fix: grouped key is "conv"
+        if (metric === "store_visits") return +(c.store || 0);   // fix: grouped key is "store"
+        if (metric === "spent") return +(c.spent || 0);
+        if (metric === "click") return +(c.click || 0);
         return +(c[metric] || 0);
     });
 
