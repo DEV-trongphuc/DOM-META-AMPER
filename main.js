@@ -59,10 +59,12 @@ function loadColumnConfig() {
 }
 
 function saveColumnConfig() {
-  localStorage.setItem("dom_column_config", JSON.stringify({
-    activeColumns: ACTIVE_COLUMNS,
-    customMetrics: CUSTOM_METRICS
-  }));
+  const config = { activeColumns: ACTIVE_COLUMNS, customMetrics: CUSTOM_METRICS };
+  localStorage.setItem("dom_column_config", JSON.stringify(config));
+  // Sync to Google Sheets (runs in background, non-blocking)
+  if (typeof saveColumnConfigSync === "function") {
+    saveColumnConfigSync(config).catch(() => { });
+  }
 }
 
 function getMetricValue(item, metricId) {
@@ -269,10 +271,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveBtn = document.getElementById("save_column_config_btn");
   if (saveBtn) {
     saveBtn.onclick = () => {
-      saveColumnConfig();
+      saveColumnConfig(); // lưu local + ngầm sync sheet
       modal.style.display = "none";
       if (window._ALL_CAMPAIGNS) renderCampaignView(window._ALL_CAMPAIGNS);
-      showToast("Đã cập nhật bảng báo cáo");
+      showToast("Đã đồng bộ cấu hình thiết lập");
     };
   }
 
@@ -1681,10 +1683,16 @@ async function main() {
   initDashboard();
   await initAccountSelector(); // 👈 Khởi tạo chọn tài khoản động
 
+  // ☁️ Tải settings từ Google Sheets (Brand, Columns, Goal Keywords)
+  if (typeof initSettingsSync === "function") {
+    await initSettingsSync();
+  }
+
   // 🏷️ Khởi tạo bộ lọc thương hiệu
   updateBrandDropdownUI();
 
   await loadDashboardData();
+
 
   // 🖱️ Lắng nghe sự kiện Reset All Filters từ Empty Card
   document.addEventListener("click", (e) => {
@@ -9443,7 +9451,7 @@ function removeBrandSetting(index) {
   if (items[index]) items[index].remove();
 }
 
-function saveBrandSettings() {
+async function saveBrandSettings() {
   const items = document.querySelectorAll("#brand_settings_list .brand_setting_item");
   const brands = Array.from(items).map(item => ({
     name: item.querySelector(".brand_name").value,
@@ -9451,9 +9459,19 @@ function saveBrandSettings() {
     filter: item.querySelector(".brand_filter").value
   }));
 
+  // 1. Cập nhật UI + đóng modal ngay lập tức
   localStorage.setItem(BRAND_SETTINGS_KEY, JSON.stringify(brands));
   updateBrandDropdownUI();
   closeFilterSettings();
+  showToast("Đã đồng bộ cấu hình thiết lập");
+
+  // 2. Lưu lên sheet ngầm (non-blocking)
+  if (typeof saveBrandSettingsSync === "function") {
+    saveBrandSettingsSync(brands).catch(err => {
+      console.warn("Settings sync failed:", err);
+      showToast("⚠️ Không thể đồng bộ cấu hình, vui lòng thử lại");
+    });
+  }
 }
 
 // Expose functions to global scope for onclick attributes
@@ -10240,7 +10258,7 @@ window.closeGoalSettings = function () {
   if (modal) modal.style.display = "none";
 };
 
-window.saveGoalSettings = function () {
+window.saveGoalSettings = async function () {
   const inputs = document.querySelectorAll(".goal_keyword_input");
   const newKeywords = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
 
@@ -10250,13 +10268,13 @@ window.saveGoalSettings = function () {
   }
 
   GOAL_KEYWORDS = newKeywords;
+
+  // 1. Lưu local + đóng modal + re-render ngay
   localStorage.setItem("goal_keywords", JSON.stringify(GOAL_KEYWORDS));
   localStorage.setItem("goal_chart_mode", GOAL_CHART_MODE);
-
   closeGoalSettings();
-  showToast("Đã lưu cấu hình Dashboard");
+  showToast("Đã đồng bộ cấu hình thiết lập");
 
-  // Re-render chart
   if (window._ALL_CAMPAIGNS) {
     const campaigns = window._FILTERED_CAMPAIGNS || window._ALL_CAMPAIGNS;
     const allAds = campaigns.flatMap((c) =>
@@ -10268,6 +10286,14 @@ window.saveGoalSettings = function () {
       )
     );
     renderGoalChart(allAds);
+  }
+
+  // 2. Lưu lên sheet ngầm (non-blocking)
+  if (typeof saveGoalSettingsSync === "function") {
+    saveGoalSettingsSync(GOAL_KEYWORDS, GOAL_CHART_MODE).catch(err => {
+      console.warn("Settings sync failed:", err);
+      showToast("⚠️ Không thể đồng bộ cấu hình, vui lòng thử lại");
+    });
   }
 };
 
