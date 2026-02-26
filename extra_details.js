@@ -59,19 +59,74 @@ function renderExtraOverview(allAds) {
     if (!wrap) return;
 
     // Recalculuate totals from window._ALL_CAMPAIGNS directly for better accuracy
+    // Recalculate totals from window._ALL_CAMPAIGNS directly for better accuracy
     const campaigns = window._ALL_CAMPAIGNS || [];
     let totalSpend = 0;
     let impressions = 0;
     let linkClicks = 0;
     let results = 0;
+    let follows = 0;
+    let thruplays = 0;
+    let purchases = 0;
+    let messages = 0;
+    let leads = 0;
+    let comments = 0;
+    let saves = 0;
+    let vp25 = 0;
+    let vp50 = 0;
+    let vp75 = 0;
+    let vp95 = 0;
+    let vp100 = 0;
+
+    const sVal = window.safeGetActionValue;
+    const sumArr = (arr) => {
+        if (!arr) return 0;
+        if (Array.isArray(arr)) {
+            if (!arr.length) return 0;
+            return arr.reduce((sum, a) => sum + (+a.value || 0), 0);
+        }
+        return +arr.value || 0;
+    };
 
     campaigns.forEach(c => {
         c.adsets?.forEach(as => {
-            // Aggregate totals from adset level (calculated in main.js)
+            const actions = as.actions || [];
+
+            // 🔍 DEBUG: Xem dữ liệu thô của từng Adset
+            console.log(`🔍 [Adset Debug: ${as.name || as.id}]`, {
+                as_fields: {
+                    video_thruplay: as.video_thruplay_watched_actions,
+                    video_plays: as.video_play_actions,
+                    purchase_roas: as.purchase_roas,
+                    spend: as.spend,
+                    follow: as.follow
+                },
+                actions_array: actions
+            });
+
             results += parseFloat(as.result || 0);
             totalSpend += parseFloat(as.spend || 0);
             impressions += parseInt(as.impressions || 0);
-            linkClicks += parseInt(as.link_clicks || 0);
+            linkClicks += (sVal(actions, "link_click") || as.inline_link_clicks || 0);
+
+            // Lấy từ as.follow (đã tính ở main.js) hoặc tính lại nếu chưa có
+            follows += (as.follow || (sVal(actions, "page_like") + sVal(actions, "like") + sVal(actions, "page_follow") + sVal(actions, "instagram_profile_follow") + sVal(actions, "onsite_conversion.page_like")));
+
+            // Video & Conversions: sum specialized fields as they contain the total regardless of internal action_type
+            thruplays += (sumArr(as.video_thruplay_watched_actions) || sVal(actions, "video_thruplay_watched_actions") || sVal(actions, "thruplay") || 0);
+            purchases += (sVal(actions, "purchase") || sVal(actions, "omni_purchase") || sVal(actions, "onsite_conversion.purchase") || sVal(actions, "fb_pixel_purchase") || sVal(actions, "onsite_web_purchase") || 0);
+
+            messages += (sVal(actions, "onsite_conversion.messaging_conversation_started_7d") || sVal(actions, "messaging_conversation_started_7d") || sVal(actions, "onsite_conversion.total_messaging_connection") || 0);
+            leads += (sVal(actions, "lead") || sVal(actions, "onsite_conversion.lead_grouped") || sVal(actions, "onsite_web_lead") || 0);
+            comments += sVal(actions, "comment");
+            saves += (sVal(actions, "onsite_conversion.post_save") || sVal(actions, "post_save") || 0);
+
+            // Video percentages
+            vp25 += sumArr(as.video_p25_watched_actions);
+            vp50 += sumArr(as.video_p50_watched_actions);
+            vp75 += sumArr(as.video_p75_watched_actions);
+            vp95 += sumArr(as.video_p95_watched_actions);
+            vp100 += sumArr(as.video_p100_watched_actions);
         });
     });
 
@@ -79,7 +134,7 @@ function renderExtraOverview(allAds) {
     const ctr = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
     const cpr = results > 0 ? totalSpend / results : 0;
 
-    // Helper to create item with clean UI (no background)
+
     // Helper to create item with clean UI (no background)
     const createItem = (label, value, color) => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:1.2rem 0.5rem; border-bottom:1px solid #f2f2f2;">
@@ -91,13 +146,29 @@ function renderExtraOverview(allAds) {
         </div>
     `;
 
+    wrap.style.maxHeight = "440px";
+    wrap.style.overflowY = "auto";
+    wrap.style.paddingRight = "12px";
+
     wrap.innerHTML = `
         ${createItem("Total Spend", totalSpend.toLocaleString('vi-VN') + 'đ', '#FFA900')}
         ${createItem("Impressions", impressions.toLocaleString('vi-VN'), '#0d6efd')}
         ${createItem("Clicks", linkClicks.toLocaleString('vi-VN'), '#20c997')}
         ${createItem("Results", results.toLocaleString('vi-VN'), '#dc3545')}
-        ${createItem("CPM", cpm.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'đ', '#E1306C')}
-        ${createItem("CTR", ctr.toFixed(2) + '%', '#6610f2')}
+        ${createItem("Follows", follows.toLocaleString('vi-VN'), '#E1306C')}
+        ${createItem("Messages", messages.toLocaleString('vi-VN'), '#00BCD4')}
+        ${createItem("Leads", leads.toLocaleString('vi-VN'), '#4CAF50')}
+        ${createItem("Comments", comments.toLocaleString('vi-VN'), '#2196F3')}
+        ${createItem("Saves", saves.toLocaleString('vi-VN'), '#FF9800')}
+        ${createItem("ThruPlays", thruplays.toLocaleString('vi-VN'), '#FFC107')}
+        ${createItem("Purchases", purchases.toLocaleString('vi-VN'), '#6610f2')}
+        ${createItem("Video 25%", vp25.toLocaleString('vi-VN'), '#9c27b0')}
+        ${createItem("Video 50%", vp50.toLocaleString('vi-VN'), '#673ab7')}
+        ${createItem("Video 75%", vp75.toLocaleString('vi-VN'), '#3f51b5')}
+        ${createItem("Video 95%", vp95.toLocaleString('vi-VN'), '#2196f3')}
+        ${createItem("Video 100%", vp100.toLocaleString('vi-VN'), '#03a9f4')}
+        ${createItem("CPM", cpm.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'đ', '#9C27B0')}
+        ${createItem("CTR", ctr.toFixed(2) + '%', '#009688')}
         ${createItem("Cost per Result", cpr.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'đ', '#fd7e14')}
     `;
 

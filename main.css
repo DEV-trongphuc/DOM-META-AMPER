@@ -355,7 +355,7 @@ html {
   margin: 0 auto;
   padding: 0 1rem;
   padding-bottom: 10rem;
-  margin-left: 29rem;
+  margin-left: 27rem;
 }
 
 .dom_h {
@@ -3791,7 +3791,7 @@ tbody {
 .adset_item,
 .campaign_main,
 .ad_item {
-  width: 95%;
+  width: 100% !important;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -3802,6 +3802,16 @@ tbody {
   cursor: pointer;
   border: 1px solid rgb(0, 0, 0, 0.1);
   border-radius: 5px;
+}
+
+.adset_item {
+  width: calc(100% - 5rem) !important;
+  /* transform: translateX(5rem) !important; */
+
+}
+
+.ad_item {
+  width: calc(100% - 10rem) !important;
 }
 
 .campaign_main {
@@ -3827,7 +3837,7 @@ tbody {
   width: 1px;
   background-color: rgba(78, 78, 78, 0.1);
   bottom: 3.5rem;
-  left: 5.5%;
+  left: 5.5rem;
   /* display: block !important; */
 }
 
@@ -3838,8 +3848,7 @@ tbody {
   width: 1px;
   background-color: rgba(78, 78, 78, 0.05);
   bottom: 3.5rem;
-  left: -5%;
-  /* display: block !important; */
+  left: -4.5rem !important;
 }
 
 .ad_item {
@@ -3865,8 +3874,8 @@ tbody {
   position: absolute;
   content: "";
   top: -70%;
-  left: -5%;
-  width: 5%;
+  left: -4.5rem;
+  width: 4.5rem;
   height: 120%;
   border-bottom: 1px solid rgba(78, 78, 78, 0.1);
 }
@@ -3875,8 +3884,8 @@ tbody {
   position: absolute;
   content: "";
   top: -70%;
-  left: -5%;
-  width: 5%;
+  left: -4.5rem;
+  width: 4.5rem;
   height: 120%;
   border-bottom: 1px solid rgba(78, 78, 78, 0.1);
 }
@@ -4021,7 +4030,8 @@ tbody {
 }
 
 .campaign_main>.ads_name {
-  width: 25%;
+  width: 40rem;
+  max-width: 40rem;
   flex-shrink: 0;
   display: flex;
   border-right: 1px solid rgb(0, 0, 0, 0.05);
@@ -4122,7 +4132,8 @@ tbody {
 }
 
 .adset_item>.ads_name {
-  width: 21%;
+  width: 35rem;
+  max-width: 35rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -4134,7 +4145,8 @@ tbody {
 }
 
 .ad_item>.ads_name {
-  width: 16.6%;
+  width: 30rem;
+  max-width: 30rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -4332,7 +4344,7 @@ tbody {
 .ad_frequency,
 .ad_metric {
   /* width: 12rem; */
-  min-width: 10.5rem;
+  min-width: 12rem;
   height: 100%;
   display: flex;
   align-items: center;
@@ -4362,19 +4374,15 @@ tbody {
   color: #555;
 }
 
-.campaign_view,
-.adset_view,
-.ad_view {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  /* width: 15rem; */
-}
 
+.ad_view,
 .campaign_view,
 .adset_view {
   gap: 0.6rem;
+  min-width: 7rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Nút insight adset */
@@ -8279,4 +8287,56 @@ tbody {
 #google_ads_container .dom_inner.chart h2 i {
   font-size: 1.3rem;
   opacity: 0.9;
+}
+
+/* === 📋 Campaign Detail Table Styles === */
+.campaign_table_card {
+  margin-top: 2rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.campaign_table_scroll {
+  overflow-x: auto;
+  width: 100%;
+  scrollbar-width: thin;
+  /* Firefox */
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+/* Custom scrollbar for Chrome/Safari */
+.campaign_table_scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.campaign_table_scroll::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.campaign_table_scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 20px;
+  border: 2px solid #f8fafc;
+}
+
+.view_campaign_header,
+.view_campaign_box {
+  min-width: max-content;
+  /* padding: 1rem 1.5rem; */
+  display: flex;
+  flex-direction: column;
+}
+
+.view_campaign_header {
+  padding-top: 2rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* Ensure empty state is centered in the card viewport */
+.view_campaign_empty {
+  padding: 5rem 2rem;
+  justify-content: center;
+  align-items: center;
 }

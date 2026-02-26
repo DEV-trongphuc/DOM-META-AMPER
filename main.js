@@ -17,6 +17,16 @@ const MONTH_LABELS = [
 ];
 let startDate, endDate;
 
+/** UTILITY: Lấy giá trị từ mảng actions của Meta */
+window.safeGetActionValue = (actions, type) => {
+  if (!Array.isArray(actions) || !actions.length) return 0;
+  for (let i = 0; i < actions.length; i++) {
+    const a = actions[i];
+    if (a.action_type === type) return +a.value || 0;
+  }
+  return 0;
+};
+
 // =================== DYNAMIC COLUMN CONFIG ===================
 const METRIC_REGISTRY = {
   spend: { id: "spend", label: "Spent", type: "field", format: "money" },
@@ -35,11 +45,49 @@ const METRIC_REGISTRY = {
   message: { id: "message", label: "Messages", type: "action", action_type: "onsite_conversion.messaging_conversation_started_7d", format: "number" },
   page_engagement: { id: "page_engagement", label: "Page Engaged", type: "action", action_type: "page_engagement", format: "number" },
   post_engagement: { id: "post_engagement", label: "Post Engagement", type: "action", action_type: "post_engagement", format: "number" },
-  video_view: { id: "video_view", label: "Video View", type: "action", action_type: "video_view", format: "number" },
+  video_play: { id: "video_play", label: "Video Plays", type: "action", action_type: "video_play", field_name: "video_play_actions", format: "number" },
+  video_view: { id: "video_view", label: "Video View (3s)", type: "action", action_type: "video_view", format: "number" },
+  thruplay: { id: "thruplay", label: "ThruPlays", type: "action", action_type: "video_thruplay_watched_actions", field_name: "video_thruplay_watched_actions", format: "number" },
+  video_p25: { id: "video_p25", label: "Video 25%", type: "action", action_type: "video_p25_watched_actions", field_name: "video_p25_watched_actions", format: "number" },
+  video_p50: { id: "video_p50", label: "Video 50%", type: "action", action_type: "video_p50_watched_actions", field_name: "video_p50_watched_actions", format: "number" },
+  video_p75: { id: "video_p75", label: "Video 75%", type: "action", action_type: "video_p75_watched_actions", field_name: "video_p75_watched_actions", format: "number" },
+  video_p95: { id: "video_p95", label: "Video 95%", type: "action", action_type: "video_p95_watched_actions", field_name: "video_p95_watched_actions", format: "number" },
+  video_p100: { id: "video_p100", label: "Video 100%", type: "action", action_type: "video_p100_watched_actions", field_name: "video_p100_watched_actions", format: "number" },
   photo_view: { id: "photo_view", label: "Photo View", type: "action", action_type: "photo_view", format: "number" },
   lead: { id: "lead", label: "Leads", type: "action", action_type: "onsite_conversion.lead_grouped", format: "number" },
   follow: { id: "follow", label: "Follows", type: "action", action_type: "page_like", format: "number" },
+  like: { id: "like", label: "Likes", type: "action", action_type: "post_reaction", format: "number" },
   save: { id: "save", label: "Saves", type: "action", action_type: "onsite_conversion.post_save", format: "number" },
+  clicks_all: { id: "clicks_all", label: "Clicks (All)", type: "field", field_name: "clicks", format: "number" },
+  outbound_click: { id: "outbound_click", label: "Outbound Clicks", type: "action", action_type: "outbound_click", format: "number" },
+  inline_link_click: { id: "inline_link_click", label: "Inline Link Clicks", type: "field", field_name: "inline_link_clicks", format: "number" },
+  roas: { id: "roas", label: "Purchase ROAS", type: "action", action_type: "purchase_roas", format: "decimal" },
+  account_id: { id: "account_id", label: "Account ID", type: "field", field_name: "account_id", format: "string" },
+  account_name: { id: "account_name", label: "Account Name", type: "field", field_name: "account_name", format: "string" },
+  account_currency: { id: "account_currency", label: "Currency", type: "field", field_name: "account_currency", format: "string" },
+  buying_type: { id: "buying_type", label: "Buying Type", type: "field", field_name: "buying_type", format: "string" },
+  objective: { id: "objective", label: "Objective", type: "field", field_name: "objective", format: "string" },
+
+  // --- Dynamic Action Values (Revenue/Value) ---
+  conv_value: { id: "conv_value", label: "Conv. Value", type: "action_value", action_type: "offsite_conversion.fb_pixel_purchase", format: "money" },
+  omni_purchase_value: { id: "omni_purchase_value", label: "Omni Purchase Value", type: "action_value", action_type: "omni_purchase", format: "money" },
+
+  // --- Additional Messaging Metrics from JSON ---
+  msg_total_conn: { id: "msg_total_conn", label: "Total Msg Conn.", type: "action", action_type: "onsite_conversion.total_messaging_connection", format: "number" },
+  msg_block: { id: "msg_block", label: "Msg Blocked", type: "action", action_type: "onsite_conversion.messaging_block", format: "number" },
+  msg_welcome: { id: "msg_welcome", label: "Msg Welcome View", type: "action", action_type: "onsite_conversion.messaging_welcome_message_view", format: "number" },
+  msg_depth_2: { id: "msg_depth_2", label: "Msg Depth 2+", type: "action", action_type: "onsite_conversion.messaging_user_depth_2_message_send", format: "number" },
+  msg_depth_3: { id: "msg_depth_3", label: "Msg Depth 3+", type: "action", action_type: "onsite_conversion.messaging_user_depth_3_message_send", format: "number" },
+  msg_first_reply: { id: "msg_first_reply", label: "Msg First Reply", type: "action", action_type: "onsite_conversion.messaging_first_reply", format: "number" },
+  msg_replied: { id: "msg_replied", label: "Msg Replied", type: "action", action_type: "onsite_conversion.messaging_conversation_replied_7d", format: "number" },
+
+  // --- Additional Engagement/Lead Metrics from JSON ---
+  post_unlike: { id: "post_unlike", label: "Post Unliked", type: "action", action_type: "onsite_conversion.post_unlike", format: "number" },
+  post_net_like: { id: "post_net_like", label: "Net Likes", type: "action", action_type: "onsite_conversion.post_net_like", format: "number" },
+  post_net_save: { id: "post_net_save", label: "Net Saves", type: "action", action_type: "onsite_conversion.post_net_save", format: "number" },
+  lead_grouped: { id: "lead_grouped", label: "Leads (Grouped)", type: "action", action_type: "onsite_conversion.lead_grouped", format: "number" },
+  post_interaction_gross: { id: "post_interaction_gross", label: "Gross Interaction", type: "action", action_type: "post_interaction_gross", format: "number" },
+  onsite_web_lead: { id: "onsite_web_lead", label: "Onsite Web Lead", type: "action", action_type: "onsite_web_lead", format: "number" },
 };
 
 let ACTIVE_COLUMNS = [];
@@ -49,7 +97,7 @@ function loadColumnConfig() {
   const saved = localStorage.getItem("dom_column_config");
   if (saved) {
     const config = JSON.parse(saved);
-    ACTIVE_COLUMNS = (config.activeColumns || []).slice(0, 8);
+    ACTIVE_COLUMNS = (config.activeColumns || []).slice(0, 15);
     CUSTOM_METRICS = config.customMetrics || [];
   } else {
     // Default configuration
@@ -78,11 +126,68 @@ function getMetricValue(item, metricId) {
     return item[metricId] || 0;
   }
 
-  if (meta.type === "field") return +item[metricId] || 0;
+  if (meta.type === "field") {
+    const fieldKey = meta.field_name || metricId;
+    return +item[fieldKey] || 0;
+  }
   if (meta.type === "action") {
+    // 🔍 Debug log settings
+    const isNewVideoMetric = ["video_view", "thruplay", "video_p50", "video_p100", "video_play"].includes(metricId);
+
+    // Đặc biệt cho ROAS
+    if (metricId === "roas") {
+      const roasArr = item.purchase_roas || [];
+      const roasVal = roasArr.find(a =>
+        a.action_type === "purchase" || a.action_type === "omni_purchase" ||
+        a.action_type === "omni_purchase_roas" || a.action_type === "purchase_roas"
+      );
+      return roasVal ? +roasVal.value : 0;
+    }
+
     const actions = item.actions || [];
-    const act = actions.find(a => a.action_type === meta.action_type);
-    return act ? +act.value : (item[metricId] || 0); // fallback to item[metricId] if groupByCampaign pre-calculated it
+    const actionType = meta.action_type;
+    const fieldName = meta.field_name;
+
+    // BƯỚC 1: Tìm trong mảng actions chuẩn
+    let act = actions.find(a => a.action_type === actionType);
+
+    // BƯỚC 2: Tìm trong các trường chuyên biệt (video_play_actions, etc.)
+    if (!act && fieldName && item[fieldName]) {
+      const specialData = item[fieldName];
+      if (Array.isArray(specialData)) {
+        act = specialData.find(a => a.action_type === actionType) || specialData[0];
+      } else if (typeof specialData === "number" || typeof specialData === "string") {
+        return +specialData;
+      }
+    }
+
+    // BƯỚC 3: Thử các tên thay thế (Alias) nếu vẫn là 0
+    if (!act) {
+      // Tên thay thế cho Video View
+      if (metricId === "video_view") {
+        act = actions.find(a => a.action_type === "video_3_sec_watched_actions" || a.action_type === "video_view");
+      }
+      // Tên thay thế cho Page Like/Follows
+      if (metricId === "follow") {
+        act = actions.find(a => a.action_type === "page_like" || a.action_type === "like" || a.action_type === "onsite_conversion.page_like");
+      }
+      // Thử khớp không phân biệt hoa thường
+      if (!act) {
+        act = actions.find(a => a.action_type && a.action_type.toLowerCase() === actionType.toLowerCase());
+      }
+    }
+
+    const finalVal = act ? +act.value : (item[metricId] || 0);
+
+    if (isNewVideoMetric && Math.random() < 0.1) {
+      console.log(`[Video Debug] ${metricId}:`, finalVal, "Term:", actionType, "Found:", !!act);
+    }
+    return finalVal;
+  }
+  if (meta.type === "action_value") {
+    const actionValues = item.action_values || [];
+    const act = actionValues.find(a => a.action_type === meta.action_type);
+    return act ? +act.value : 0;
   }
   if (meta.type === "special") {
     const spend = +item.spend || 0;
@@ -137,14 +242,20 @@ function formatMetric(value, format) {
 
 loadColumnConfig();
 
-function renderColumnSettingsModal() {
+function renderColumnSettingsModal(filter = "") {
   const availList = document.getElementById("available_metrics_list");
   const activeList = document.getElementById("active_columns_list");
   if (!availList || !activeList) return;
 
+  const f = filter.toLowerCase();
+
   // Render Available
   availList.innerHTML = Object.keys(METRIC_REGISTRY)
     .filter(id => !ACTIVE_COLUMNS.includes(id))
+    .filter(id => {
+      const m = METRIC_REGISTRY[id];
+      return m.label.toLowerCase().includes(f) || id.toLowerCase().includes(f);
+    })
     .map(id => `
       <div class="metric_tag" onclick="window.addColumnToActive('${id}')" style="background:#f1f5f9; color:#475569; padding:0.8rem 1.4rem; border-radius:1.2rem; font-size:1.15rem; cursor:pointer; border:1.5px solid #e2e8f0; transition:all 0.2s; display:flex; align-items:center; gap:0.8rem;">
         <i class="fa-solid fa-plus" style="color:#94a3b8;"></i> 
@@ -187,8 +298,8 @@ function renderColumnSettingsModal() {
 
 window.addColumnToActive = (id) => {
   if (!ACTIVE_COLUMNS.includes(id)) {
-    if (ACTIVE_COLUMNS.length >= 8) {
-      return showToast("Tối đa chỉ được hiển thị 8 cột báo cáo!");
+    if (ACTIVE_COLUMNS.length >= 15) {
+      return showToast("Tối đa chỉ được hiển thị 15 cột báo cáo!");
     }
     ACTIVE_COLUMNS.push(id);
     renderColumnSettingsModal();
@@ -213,10 +324,45 @@ window.editCustomMetric = (id) => {
 window.moveColumn = (idx, dir) => {
   const target = idx + dir;
   if (target < 0 || target >= ACTIVE_COLUMNS.length) return;
-  const temp = ACTIVE_COLUMNS[idx];
-  ACTIVE_COLUMNS[idx] = ACTIVE_COLUMNS[target];
-  ACTIVE_COLUMNS[target] = temp;
+  const item = ACTIVE_COLUMNS.splice(idx, 1)[0];
+  ACTIVE_COLUMNS.splice(target, 0, item);
   renderColumnSettingsModal();
+};
+
+window.filterAvailableMetrics = (query) => {
+  renderColumnSettingsModal(query);
+};
+
+window.selectAllMetrics = () => {
+  const fInput = document.getElementById("metric_search_input");
+  const filter = fInput ? fInput.value.toLowerCase() : "";
+
+  const toAdd = Object.keys(METRIC_REGISTRY).filter(id => {
+    if (ACTIVE_COLUMNS.includes(id)) return false;
+    const m = METRIC_REGISTRY[id];
+    return m.label.toLowerCase().includes(filter) || id.toLowerCase().includes(filter);
+  });
+
+  if (toAdd.length + ACTIVE_COLUMNS.length > 25) { // Tạm nâng giới hạn khi select all nếu user muốn, nhưng Meta report thực tế tầm 20-30 cột là max.
+    showToast("Cảnh báo: Quá nhiều cột có thể làm đơ bảng báo cáo!");
+  }
+
+  // Tạm khóa ở 20 cột cho ổn định
+  const limit = 20;
+  const currentLen = ACTIVE_COLUMNS.length;
+  const space = limit - currentLen;
+
+  if (space <= 0) return showToast("Đã đạt giới hạn số cột tối đa!");
+
+  const added = toAdd.slice(0, space);
+  ACTIVE_COLUMNS = [...ACTIVE_COLUMNS, ...added];
+  renderColumnSettingsModal(filter);
+};
+
+window.deselectAllMetrics = () => {
+  ACTIVE_COLUMNS = [];
+  const fInput = document.getElementById("metric_search_input");
+  renderColumnSettingsModal(fInput ? fInput.value : "");
 };
 
 
@@ -618,8 +764,8 @@ document.addEventListener("DOMContentLoaded", () => {
         delete nameInput.dataset.editingId;
         addCustomBtn.textContent = "Tạo Metric";
       } else {
-        if (ACTIVE_COLUMNS.length >= 8) {
-          return showToast("Tối đa 8 cột! Vui lòng gỡ bớt cột trước khi tạo metric mới.");
+        if (ACTIVE_COLUMNS.length >= 15) {
+          return showToast("Tối đa 15 cột! Vui lòng gỡ bớt cột trước khi tạo metric mới.");
         }
         const id = "custom_" + Date.now();
         CUSTOM_METRICS.push({ id, name, formula, format: "number" });
@@ -763,7 +909,7 @@ const resultMapping = {
   LANDING_PAGE_VIEWS: "link_click",
   REPLIES: "onsite_conversion.messaging_conversation_started_7d",
   IMPRESSIONS: "impressions",
-  PAGE_LIKES: "follows",
+  PAGE_LIKES: "page_like",
   DEFAULT: "reach", // Fallback
 };
 
@@ -1107,7 +1253,7 @@ async function fetchSingleAccountInfo(accId) {
 
 async function fetchAdsets() {
   let allData = []; // Mảng chứa tất cả dữ liệu
-  let nextPageUrl = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=adset&fields=adset_id,adset_name,campaign_id,campaign_name,optimization_goal,spend,reach,impressions,actions,frequency,cpm,cpc,ctr&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}&limit=10000`;
+  let nextPageUrl = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=adset&fields=adset_id,adset_name,campaign_id,campaign_name,optimization_goal,spend,reach,impressions,actions,action_values,frequency,cpm,cpc,ctr,clicks,inline_link_clicks,purchase_roas,account_id,account_name,account_currency,buying_type,objective,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}&limit=10000`;
 
   // Tiến hành lặp lại việc gọi API cho đến khi không còn cursor tiếp theo
   while (nextPageUrl) {
@@ -1126,7 +1272,7 @@ async function fetchAdsets() {
 
 async function fetchCampaignInsights() {
   let allData = [];
-  let nextPageUrl = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=campaign&fields=campaign_id,campaign_name,spend,reach,impressions,actions,frequency,cpm,cpc,ctr&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}&limit=10000`;
+  let nextPageUrl = `${BASE_URL}/act_${ACCOUNT_ID}/insights?level=campaign&fields=campaign_id,campaign_name,spend,reach,impressions,actions,action_values,frequency,cpm,cpc,ctr,clicks,inline_link_clicks,purchase_roas,account_id,account_name,account_currency,buying_type,objective,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions&filtering=[{"field":"spend","operator":"GREATER_THAN","value":0}]&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}&limit=10000`;
 
   while (nextPageUrl) {
     const data = await fetchJSON(nextPageUrl);
@@ -1166,7 +1312,7 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
           `${adsetId}/ads?fields=id,name,effective_status,adset_id,` +
           `adset{end_time,start_time,daily_budget,lifetime_budget},` +
           `creative{thumbnail_url,instagram_permalink_url,effective_object_story_id},` +
-          `insights.time_range({since:'${startDate}',until:'${endDate}'}){spend,impressions,reach,actions,optimization_goal}`,
+          `insights.time_range({since:'${startDate}',until:'${endDate}'}){spend,impressions,reach,actions,action_values,optimization_goal,clicks,inline_link_clicks,purchase_roas,account_id,account_name,account_currency,buying_type,objective,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions}`,
       }));
 
       // Gọi API
@@ -1232,7 +1378,24 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
               spend: !isNaN(+insights.spend) ? +insights.spend : 0,
               impressions: +insights.impressions || 0,
               reach: +insights.reach || 0,
+              clicks: +insights.clicks || 0,
+              inline_link_clicks: +insights.inline_link_clicks || 0,
+              purchase_roas: Array.isArray(insights.purchase_roas) ? insights.purchase_roas : [],
+              account_id: insights.account_id || "",
+              account_name: insights.account_name || "",
+              account_currency: insights.account_currency || "",
+              buying_type: insights.buying_type || "",
+              objective: insights.objective || "",
               actions: Array.isArray(insights.actions) ? insights.actions : [],
+              action_values: Array.isArray(insights.action_values) ? insights.action_values : [],
+              // ⭐ Store dynamic video fields
+              video_play_actions: insights.video_play_actions || [],
+              video_thruplay_watched_actions: insights.video_thruplay_watched_actions || [],
+              video_p25_watched_actions: insights.video_p25_watched_actions || [],
+              video_p50_watched_actions: insights.video_p50_watched_actions || [],
+              video_p75_watched_actions: insights.video_p75_watched_actions || [],
+              video_p95_watched_actions: insights.video_p95_watched_actions || [],
+              video_p100_watched_actions: insights.video_p100_watched_actions || [],
               optimization_goal: insights.optimization_goal || "",
             },
           });
@@ -1241,6 +1404,11 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
 
       // Stream kết quả sớm để tránh nghẽn bộ nhớ
       if (processed.length) {
+        // 🧪 DEBUG: Log raw insights sample for first batch
+        if (batchCount === 0) {
+          console.log("🧪 Raw Meta Insights Sample:", adsResp[0]?.body ? JSON.parse(adsResp[0].body).data?.[0]?.insights?.data?.[0] : "N/A");
+          console.log("✅ Processed Data Item Sample:", processed[0]);
+        }
         onBatchProcessedCallback?.(processed);
         results.push(...processed);
       }
@@ -1277,14 +1445,7 @@ function groupByCampaign(adsets, campaignsData = []) {
   const campaigns = Object.create(null);
   const campMetricsMap = new Map((campaignsData || []).map(c => [c.campaign_id, c]));
 
-  const safeGetActionValue = (actions, type) => {
-    if (!Array.isArray(actions) || !actions.length) return 0;
-    for (let i = 0; i < actions.length; i++) {
-      const a = actions[i];
-      if (a.action_type === type) return +a.value || 0;
-    }
-    return 0;
-  };
+  // (safeGetActionValue is now global)
 
   for (let i = 0; i < adsets.length; i++) {
     const as = adsets[i];
@@ -1308,7 +1469,23 @@ function groupByCampaign(adsets, campaignsData = []) {
         reach: +cMetrics.reach || 0,
         impressions: +cMetrics.impressions || 0,
         reactions: getReaction(cMetrics) || 0,
-        actions: cMetrics.actions || [], // ⭐ KEEP ALL ACTIONS FOR DYNAMIC METRICS
+        clicks: +cMetrics.clicks || 0,
+        inline_link_clicks: +cMetrics.inline_link_clicks || 0,
+        purchase_roas: cMetrics.purchase_roas || [],
+        account_id: cMetrics.account_id || "",
+        account_name: cMetrics.account_name || "",
+        account_currency: cMetrics.account_currency || "",
+        buying_type: cMetrics.buying_type || "",
+        objective: cMetrics.objective || "",
+        actions: cMetrics.actions || [],
+        action_values: cMetrics.action_values || [], // ⭐ KEEP ALL ACTION VALUES
+        video_play_actions: cMetrics.video_play_actions || [],
+        video_thruplay_watched_actions: cMetrics.video_thruplay_watched_actions || [],
+        video_p25_watched_actions: cMetrics.video_p25_watched_actions || [],
+        video_p50_watched_actions: cMetrics.video_p50_watched_actions || [],
+        video_p75_watched_actions: cMetrics.video_p75_watched_actions || [],
+        video_p95_watched_actions: cMetrics.video_p95_watched_actions || [],
+        video_p100_watched_actions: cMetrics.video_p100_watched_actions || [],
         adsets: [],
         _adsetMap: Object.create(null),
         _goals: new Set(), // Track unique goals
@@ -1330,7 +1507,21 @@ function groupByCampaign(adsets, campaignsData = []) {
         reach: +as.reach || 0,
         impressions: +as.impressions || 0,
         reactions: getReaction(as) || 0,
+        clicks: +as.clicks || 0,
+        inline_link_clicks: +as.inline_link_clicks || 0,
+        link_clicks: window.safeGetActionValue(as.actions, "link_click") || +as.inline_link_clicks || 0,
+        follow: window.safeGetActionValue(as.actions, "page_like") + window.safeGetActionValue(as.actions, "page_follow") + window.safeGetActionValue(as.actions, "instagram_profile_follow") + window.safeGetActionValue(as.actions, "onsite_conversion.page_like"),
+        purchase_roas: as.purchase_roas || [],
+        account_id: as.account_id || "",
+        account_name: as.account_name || "",
         actions: as.actions || [], // ⭐ KEEP ALL ACTIONS
+        video_play_actions: as.video_play_actions || [],
+        video_thruplay_watched_actions: as.video_thruplay_watched_actions || [],
+        video_p25_watched_actions: as.video_p25_watched_actions || [],
+        video_p50_watched_actions: as.video_p50_watched_actions || [],
+        video_p75_watched_actions: as.video_p75_watched_actions || [],
+        video_p95_watched_actions: as.video_p95_watched_actions || [],
+        video_p100_watched_actions: as.video_p100_watched_actions || [],
         ads: [],
         end_time: (as.ads?.[0]?.adset?.end_time || as.end_time) || null,
         start_time: (as.ads?.[0]?.adset?.start_time || as.start_time) || null,
@@ -1357,6 +1548,11 @@ function groupByCampaign(adsets, campaignsData = []) {
       const impressions = +ins.impressions || 0;
       const result = getResults(ins) || 0;
       const reactions = getReaction(ins) || 0;
+      const clicks = +ins.clicks || 0;
+      const inline_link_clicks = +ins.inline_link_clicks || 0;
+      const purchase_roas = ins.purchase_roas || [];
+      const account_id = ins.account_id || "";
+      const account_name = ins.account_name || "";
 
       const actions = ins.actions;
       const messageCount = safeGetActionValue(
@@ -1382,7 +1578,23 @@ function groupByCampaign(adsets, campaignsData = []) {
         reach,
         impressions,
         reactions,
-        actions: actions || [], // ⭐ KEEP ALL ACTIONS
+        clicks,
+        inline_link_clicks,
+        purchase_roas,
+        account_id,
+        account_name,
+        account_currency: ins.account_currency || "",
+        buying_type: ins.buying_type || "",
+        objective: ins.objective || "",
+        actions: actions || [],
+        action_values: ins.action_values || [],
+        video_play_actions: ins.video_play_actions || [],
+        video_thruplay_watched_actions: ins.video_thruplay_watched_actions || [],
+        video_p25_watched_actions: ins.video_p25_watched_actions || [],
+        video_p50_watched_actions: ins.video_p50_watched_actions || [],
+        video_p75_watched_actions: ins.video_p75_watched_actions || [],
+        video_p95_watched_actions: ins.video_p95_watched_actions || [],
+        video_p100_watched_actions: ins.video_p100_watched_actions || [],
         thumbnail:
           ad.creative?.thumbnail_url ||
           ad.creative?.full_picture ||
@@ -1418,6 +1630,7 @@ function groupByCampaign(adsets, campaignsData = []) {
 }
 
 function renderCampaignView(data) {
+  console.log("📊 DEBUG: Final Data to Render:", data);
   const wrap = document.querySelector(".view_campaign_box");
   if (!wrap || !Array.isArray(data)) return;
 
@@ -2016,7 +2229,6 @@ function initDashboard() {
   endDate = end;
 }
 
-// 🧠 Hàm chỉ để load lại data (gọi khi đổi account/filter)
 async function loadDashboardData() {
   const domDate = document.querySelector(".dom_date");
   if (domDate) {
@@ -2029,7 +2241,7 @@ async function loadDashboardData() {
   const loading = document.querySelector(".loading");
   if (loading) loading.classList.add("active");
 
-  // 🦴 Skeleton start
+  // Đảm bảo bật skeleton nếu gọi từ nơi khác (ví đổi ngày)
   toggleSkeletons(".dom_dashboard", true);
 
   loadAllDashboardCharts();
@@ -2046,6 +2258,9 @@ async function loadDashboardData() {
 
 // 🚀 Hàm chính gọi khi load trang lần đầu
 async function main() {
+  // 🦴 Skeleton start - Hiện khung xương ngay lập tức khi load app
+  toggleSkeletons(".dom_dashboard", true);
+
   renderYears();
   initDashboard();
   await initAccountSelector(); // 👈 Khởi tạo chọn tài khoản động
@@ -2059,6 +2274,7 @@ async function main() {
   updateBrandDropdownUI();
 
   await loadDashboardData();
+
 
 
   // 🖱️ Lắng nghe sự kiện Reset All Filters từ Empty Card
@@ -6005,28 +6221,88 @@ function updatePlatformSummaryUI(currentData, previousData = []) {
       actionsObj[action_type] = (actionsObj[action_type] || 0) + (+value || 0);
     });
 
-    // Trích xuất các chỉ số chính
+    const getActionSum = (types) => {
+      let sum = 0;
+      types.forEach(t => {
+        sum += (actionsObj[t] || 0);
+        // Thử tìm với prefix onsite_conversion. nếu chưa có
+        if (!(t in actionsObj) && !t.startsWith("onsite_conversion.")) {
+          sum += (actionsObj["onsite_conversion." + t] || 0);
+        }
+      });
+      return sum;
+    };
+
+    const getFieldVal = (field) => {
+      const val = insights[field];
+      if (!val) return 0;
+      if (Array.isArray(val)) return +val[0]?.value || 0;
+      return +val || 0;
+    };
+
+    // DEBUG: Log để kiểm tra các actions trả về từ API
+    if (insights.actions) {
+      console.log("📊 [Platform Summary Actions]:", actionsObj);
+    }
+
     return {
       spend: +insights.spend || 0,
       reach: +insights.reach || 0,
       impressions: +insights.impressions || 0,
-      message: actionsObj["onsite_conversion.messaging_conversation_started_7d"] || 0,
-      lead: actionsObj["onsite_conversion.lead_grouped"] || 0,
-      // Các chỉ số phụ (nếu cần tính toán so sánh sau này)
-      like:
-        (actionsObj["like"] || 0) +
-        (actionsObj["page_follow"] || 0) +
-        (actionsObj["page_like"] || 0),
-      reaction: actionsObj["post_reaction"] || 0,
-      comment: actionsObj["comment"] || 0,
-      share: (actionsObj["post"] || 0) + (actionsObj["share"] || 0),
-      click: actionsObj["link_click"] || 0,
-      view: (actionsObj["video_view"] || 0) + (actionsObj["photo_view"] || 0),
+      message: getActionSum(["onsite_conversion.messaging_conversation_started_7d", "messaging_conversation_started_7d", "outbound_click"]),
+      lead: getActionSum(["onsite_conversion.lead_grouped", "lead_grouped", "lead", "onsite_web_lead"]),
+      // Các chỉ số phụ
+      video_play: getActionSum(["video_play", "play", "video_view", "video_3_sec_watched_actions"]) || getFieldVal("video_play_actions") || 0,
+      thruplay: getActionSum(["video_thruplay_watched_actions", "thruplay"]) || getFieldVal("video_thruplay_watched_actions") || 0,
+      link_click: getActionSum(["link_click", "inline_link_clicks", "outbound_click"]) || getFieldVal("clicks") || 0,
+      post_engagement: getActionSum(["post_engagement", "page_engagement", "post_interaction_gross", "post_interaction"]),
+      reaction: getActionSum(["post_reaction", "reaction", "like", "post_interaction"]),
+      follow: getActionSum(["page_like", "page_follow", "follow", "like", "instagram_profile_follow", "onsite_conversion.instagram_profile_follow", "onsite_conversion.page_like"]),
+      share: getActionSum(["post", "share"]),
     };
   };
 
-  // --- Xử lý dữ liệu cho kỳ hiện tại và kỳ trước ---
-  const currentMetrics = processData(currentData);
+  // --- Aggregate current metrics from window._ALL_CAMPAIGNS for 100% consistency ---
+  const aggregateAll = (campArray) => {
+    const res = { spend: 0, reach: 0, impressions: 0, message: 0, lead: 0, video_play: 0, thruplay: 0, link_click: 0, post_engagement: 0, reaction: 0, follow: 0, share: 0 };
+
+    const sumArr = (arr) => {
+      if (!arr) return 0;
+      if (Array.isArray(arr)) {
+        if (!arr.length) return 0;
+        return arr.reduce((sum, a) => sum + (+a.value || 0), 0);
+      }
+      return +arr.value || 0;
+    };
+
+    campArray.forEach(c => {
+      c.adsets?.forEach(as => {
+        res.spend += (as.spend || 0);
+        res.reach += (as.reach || 0);
+        res.impressions += (as.impressions || 0);
+        const acts = as.actions || [];
+
+        // Sum messages and leads
+        res.message += (window.safeGetActionValue(acts, "onsite_conversion.messaging_conversation_started_7d") || window.safeGetActionValue(acts, "messaging_conversation_started_7d") || window.safeGetActionValue(acts, "onsite_conversion.total_messaging_connection") || 0);
+        res.lead += (window.safeGetActionValue(acts, "onsite_conversion.lead_grouped") || window.safeGetActionValue(acts, "lead") || window.safeGetActionValue(acts, "onsite_web_lead") || 0);
+
+        // Video metrics: sum specialized fields as they often contain the total regardless of internal action_type
+        res.video_play += (sumArr(as.video_play_actions) || window.safeGetActionValue(acts, "video_play") || window.safeGetActionValue(acts, "video_view") || 0);
+        res.thruplay += (sumArr(as.video_thruplay_watched_actions) || window.safeGetActionValue(acts, "video_thruplay_watched_actions") || window.safeGetActionValue(acts, "thruplay") || 0);
+
+        res.link_click += (window.safeGetActionValue(acts, "link_click") || as.inline_link_clicks || 0);
+        res.post_engagement += (window.safeGetActionValue(acts, "post_engagement") || window.safeGetActionValue(acts, "page_engagement") || 0);
+        res.reaction += (window.safeGetActionValue(acts, "post_reaction") || window.safeGetActionValue(acts, "reaction") || 0);
+        res.follow += (as.follow || window.safeGetActionValue(acts, "page_like") + window.safeGetActionValue(acts, "like") + window.safeGetActionValue(acts, "page_follow") + window.safeGetActionValue(acts, "instagram_profile_follow") + window.safeGetActionValue(acts, "onsite_conversion.page_like"));
+        res.share += (window.safeGetActionValue(acts, "post") || window.safeGetActionValue(acts, "share") || 0);
+      });
+    });
+    return res;
+  };
+
+  const currentMetrics = (window._ALL_CAMPAIGNS && window._ALL_CAMPAIGNS.length > 0)
+    ? aggregateAll(window._FILTERED_CAMPAIGNS || window._ALL_CAMPAIGNS)
+    : processData(currentData);
   const previousMetrics = processData(previousData);
   console.log(previousMetrics);
 
@@ -6116,23 +6392,17 @@ function updatePlatformSummaryUI(currentData, previousData = []) {
   renderMetric("message", currentMetrics.message, previousMetrics.message);
 
   // --- Render các chỉ số phụ (không cần so sánh theo UI mới) ---
-  document.querySelector(".dom_interaction_reaction").textContent =
-    formatNumber(currentMetrics.reaction);
-  document.querySelector(".dom_interaction_like").textContent = formatNumber(
-    currentMetrics.like
-  ); // Đã gộp like+follow trong processData
-  document.querySelector(".dom_interaction_comment").textContent = formatNumber(
-    currentMetrics.comment
-  );
-  document.querySelector(".dom_interaction_share").textContent = formatNumber(
-    currentMetrics.share
-  );
-  document.querySelector(".dom_interaction_click").textContent = formatNumber(
-    currentMetrics.click
-  );
-  document.querySelector(".dom_interaction_view").textContent = formatNumber(
-    currentMetrics.view
-  );
+  const updateText = (cls, val) => {
+    const el = document.querySelector(cls);
+    if (el) el.textContent = formatNumber(val);
+  };
+
+  updateText(".dom_interaction_video_play", currentMetrics.video_play);
+  updateText(".dom_interaction_thruplay", currentMetrics.thruplay);
+  updateText(".dom_interaction_link_click", currentMetrics.link_click);
+  updateText(".dom_interaction_post_engagement", currentMetrics.post_engagement);
+  updateText(".dom_interaction_reaction", currentMetrics.reaction);
+  updateText(".dom_interaction_follow", currentMetrics.follow);
 }
 
 // --- Các hàm format cũ (giữ nguyên hoặc đảm bảo chúng tồn tại) ---
@@ -6147,7 +6417,7 @@ async function fetchPlatformStats(campaignIds = []) {
         ])
       )}`
       : "";
-    const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
+    const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions&time_range={"since":"${startDate}","until":"${endDate}"}${filtering}&access_token=${META_TOKEN}`;
 
     const data = await fetchJSON(url);
 
@@ -6298,7 +6568,7 @@ async function fetchDashboardInsightsBatch(campaignIds = []) {
     {
       method: "GET",
       name: "platformStats",
-      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions${currentTimeRange}${filtering}`,
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${currentTimeRange}${filtering}`,
     },
     {
       method: "GET",
@@ -6325,7 +6595,7 @@ async function fetchDashboardInsightsBatch(campaignIds = []) {
     {
       method: "GET",
       name: "platformStats_previous",
-      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions${previousTimeRange}${filtering}`,
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${previousTimeRange}${filtering}`,
     }, // <<< CHỈ THÊM CÁI NÀY
   ];
   // --- KẾT THÚC BƯỚC 2 ---

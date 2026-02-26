@@ -75,7 +75,29 @@
         <!-- Left: Metrics Selection -->
         <div style="display: flex; flex-direction: column; gap: 2rem;">
           <div>
-            <h3 style="font-size: 1.6rem; margin-bottom: 1.5rem; color: #333; font-weight: 700;">Metrics khả dụng</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+              <h3 style="font-size: 1.6rem; color: #333; font-weight: 700; margin:0;">Metrics khả dụng</h3>
+              <div style="display:flex; gap:1.2rem;">
+                <button onclick="window.selectAllMetrics()"
+                  style="background:transparent; border:none; color:var(--mainClr); font-weight:600; cursor:pointer; font-size:1.3rem;">Chọn
+                  hết</button>
+                <button onclick="window.deselectAllMetrics()"
+                  style="background:transparent; border:none; color:#666; font-weight:500; cursor:pointer; font-size:1.3rem;">Bỏ
+                  hết</button>
+              </div>
+            </div>
+
+            <!-- 🔍 SEARCH BAR -->
+            <div style="position: relative; margin-bottom: 1.5rem;">
+              <i class="fa-solid fa-magnifying-glass"
+                style="position: absolute; left: 1.2rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 1.3rem;"></i>
+              <input type="text" id="metric_search_input" placeholder="Tìm kiếm metric..."
+                style="width: 100%; padding: 1.1rem 1.2rem 1.1rem 3.4rem; border: 1.8px solid #e2e8f0; border-radius: 1.1rem; font-size: 1.35rem; transition:all .2s; outline:none;"
+                onfocus="this.style.borderColor='var(--mainClr)'; this.style.boxShadow='0 0 0 3px rgba(255,169,0,0.1)';"
+                onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';"
+                oninput="window.filterAvailableMetrics(this.value)">
+            </div>
+
             <div id="available_metrics_list"
               style="display: flex; flex-wrap: wrap; gap: 0.8rem; max-height: 30rem; overflow-y: auto; padding-right: 1rem;">
               <!-- JS populated -->
@@ -103,7 +125,7 @@
         <div
           style="background: #fcfcfc; border: 1px solid #f0f0f0; border-radius: 1.5rem; padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem;">
           <h3 style="font-size: 1.6rem; color: #333; font-weight: 700; display: flex; justify-content: space-between;">
-            Cột đang chọn (Tối đa 8 cột)
+            Cột đang chọn (Tối đa 15 cột)
             <small style="font-weight: 400; color: #999; font-size: 1.2rem;">Kéo thả để sắp xếp (sắp tới)</small>
           </h3>
           <div id="active_columns_list" style="display: flex; flex-direction: column; gap: 0.8rem;">
@@ -511,28 +533,28 @@
               <h2>Interaction</h2>
               <div class="dom_interaction_item">
                 <div class="dom_interaction_note">
+                  <span>Video Plays</span>
+                  <span class="dom_interaction_video_play"> - </span>
+                </div>
+                <div class="dom_interaction_note">
+                  <span>ThruPlays</span>
+                  <span class="dom_interaction_thruplay"> - </span>
+                </div>
+                <div class="dom_interaction_note">
+                  <span>Link Click</span>
+                  <span class="dom_interaction_link_click"> - </span>
+                </div>
+                <div class="dom_interaction_note">
+                  <span>Post Engagement</span>
+                  <span class="dom_interaction_post_engagement"> - </span>
+                </div>
+                <div class="dom_interaction_note">
                   <span>Reactions</span>
                   <span class="dom_interaction_reaction"> - </span>
                 </div>
                 <div class="dom_interaction_note">
                   <span>Follows</span>
-                  <span class="dom_interaction_like"> - </span>
-                </div>
-                <div class="dom_interaction_note">
-                  <span>Comment</span>
-                  <span class="dom_interaction_comment"> - </span>
-                </div>
-                <div class="dom_interaction_note">
-                  <span>Share</span>
-                  <span class="dom_interaction_share"> - </span>
-                </div>
-                <div class="dom_interaction_note">
-                  <span>Link Clicks</span>
-                  <span class="dom_interaction_click"> - </span>
-                </div>
-                <div class="dom_interaction_note">
-                  <span>Video view</span>
-                  <span class="dom_interaction_view"> - </span>
+                  <span class="dom_interaction_follow"> - </span>
                 </div>
               </div>
             </div>
@@ -709,34 +731,43 @@
 
             </div>
 
-            <div class="view_campaign_header">
-              <div class="campaign_main">
-                <div class="ads_name">
-                  <p class="ad_name">Ad Name</p>
+            <!-- 📋 Campaign Table Card Wrapper -->
+            <div class="campaign_table_card">
+              <div class="campaign_table_scroll">
+                <div class="view_campaign_header">
+                  <div class="campaign_main">
+                    <div class="ads_name">
+                      <p class="ad_name">Ad Name</p>
+                    </div>
+                    <div class="ad_status">Status</div>
+                    <div class="ad_spent">Spent</div>
+                    <div class="ad_result">Result</div>
+                    <div class="ad_cpr"
+                      title="The CPR of the REACH and IMPRESSION campaigns will be Cost per 1000 results">
+                      Cost per result <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div class="ad_cpm" title="Cost per mile - (1000 reach)">
+                      CPM <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div class="ad_reach">Reach</div>
+                    <div class="ad_frequency">Frequency</div>
+                    <div class="ad_reaction">Reaction</div>
+                    <div class="campaign_view">Insignht</div>
+                  </div>
                 </div>
-                <div class="ad_status">Status</div>
-                <div class="ad_spent">Spent</div>
-                <div class="ad_result">Result</div>
-                <div class="ad_cpr" title="The CPR of the REACH and IMPRESSION campaigns will be Cost per 1000 results">
-                  Cost per result <i class="fa-solid fa-circle-info"></i>
-                </div>
-                <div class="ad_cpm" title="Cost per mile - (1000 reach)">
-                  CPM <i class="fa-solid fa-circle-info"></i>
-                </div>
-                <div class="ad_reach">Reach</div>
-                <div class="ad_frequency">Frequency</div>
-                <div class="ad_reaction">Reaction</div>
-                <div class="campaign_view">Insignht</div>
+                <div class="view_campaign_box"></div>
               </div>
-            </div>
-            <div class="view_campaign_box"></div>
-            <div class="view_campaign_empty" style="display:none">
-              <div class="empty_card">
-                <i class="fa-solid fa-filter-circle-xmark"></i>
-                <h3>Không tìm thấy kết quả</h3>
-                <p>Không có campaign nào khớp với bộ lọc đã chọn.<br />Thử đổi ngày, bộ lọc nhãn hiệu hoặc reset bộ lọc.
-                </p>
-                <button class="btn_reset_all">Reset tất cả bộ lọc</button>
+
+              <!-- Empty state remains inside the card but might need centering if scrolled -->
+              <div class="view_campaign_empty" style="display:none">
+                <div class="empty_card">
+                  <i class="fa-solid fa-filter-circle-xmark"></i>
+                  <h3>Không tìm thấy kết quả</h3>
+                  <p>Không có campaign nào khớp với bộ lọc đã chọn.<br />Thử đổi ngày, bộ lọc nhãn hiệu hoặc reset bộ
+                    lọc.
+                  </p>
+                  <button class="btn_reset_all">Reset tất cả bộ lọc</button>
+                </div>
               </div>
             </div>
           </div>
