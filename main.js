@@ -2215,8 +2215,16 @@ function exportAiToWord() {
 
 
 
+// ── AI sheet sync helper (fire-and-forget) ─────────────────────────
+function _aiSheetPost(body) {
+  const url = typeof window.SETTINGS_SHEET_URL === "string" && window.SETTINGS_SHEET_URL
+    ? window.SETTINGS_SHEET_URL : null;
+  if (!url) return;
+  fetch(url, { method: "POST", body: JSON.stringify(body) }).catch(() => { });
+}
+
 const AI_HISTORY_KEY = "dom_ai_summary_history";
-const AI_HISTORY_MAX = 10;
+const AI_HISTORY_MAX = 20;  // tăng lên 20 vì có Sheet backup
 
 function loadAiHistory() {
   try { return JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || "[]"); }
@@ -2233,16 +2241,33 @@ function saveAiHistory(html, label) {
     id: Date.now(),
     timestamp: new Date().toLocaleString("vi-VN"),
     label: label || "Tóm tắt chiến dịch",
-    brand: brand,
+    brand,
     dateRange: (dateFrom && dateTo) ? `${dateFrom} — ${dateTo}` : "",
     html,
     preview: document.getElementById("ai_summary_content")?.innerText?.slice(0, 120) || ""
   };
+
   history.unshift(entry);
   if (history.length > AI_HISTORY_MAX) history.splice(AI_HISTORY_MAX);
   try { localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history)); } catch { }
   updateAiHistoryBadge();
+
+  // Sync to Google Sheets ngầm (non-blocking)
+  _aiSheetPost({
+    sheet: "ai_reports",
+    action: "save",
+    report: {
+      id: entry.id,
+      timestamp: entry.timestamp,
+      label: entry.label,
+      brand: entry.brand,
+      dateRange: entry.dateRange,
+      preview: entry.preview,
+      html: entry.html,
+    }
+  });
 }
+
 
 function confirmDeleteAiHistory(id) {
   const overlay = document.createElement("div");
@@ -2280,11 +2305,16 @@ function confirmDeleteAiHistory(id) {
 }
 
 function _doDeleteAiHistory(id) {
+  // 1. Xóa trong localStorage ngay
   const history = loadAiHistory().filter(e => e.id !== id);
   try { localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history)); } catch { }
   updateAiHistoryBadge();
   renderAiHistory();
+
+  // 2. Xóa trên Sheet ngầm
+  _aiSheetPost({ sheet: "ai_reports", action: "delete", id });
 }
+
 
 function loadAiHistoryItem(id) {
   const entry = loadAiHistory().find(e => e.id === id);
