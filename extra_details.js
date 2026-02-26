@@ -132,7 +132,19 @@ function renderExtraOverview(allAds) {
 
     const cpm = impressions > 0 ? (totalSpend / impressions) * 1000 : 0;
     const ctr = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
-    const cpr = results > 0 ? totalSpend / results : 0;
+
+    // 🚀 TỐI ƯU CPR CHO REACH/IMPRESSIONS
+    let cpr = results > 0 ? totalSpend / results : 0;
+    let cprLabel = "Cost per Result";
+
+    // Kiểm tra goal của campaign đầu tiên làm đại diện hoặc check dominant goal
+    if (campaigns.length > 0) {
+        const firstGoal = campaigns[0].optimization_goal;
+        if (firstGoal === "REACH" || firstGoal === "IMPRESSIONS") {
+            cpr *= 1000;
+            cprLabel = firstGoal === "REACH" ? "Cost per 1,000 Reach" : "Cost per 1,000 Impress";
+        }
+    }
 
 
     // Helper to create item with clean UI (no background)
@@ -169,7 +181,7 @@ function renderExtraOverview(allAds) {
         ${createItem("Video 100%", vp100.toLocaleString('vi-VN'), '#03a9f4')}
         ${createItem("CPM", cpm.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'đ', '#9C27B0')}
         ${createItem("CTR", ctr.toFixed(2) + '%', '#009688')}
-        ${createItem("Cost per Result", cpr.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'đ', '#fd7e14')}
+        ${createItem(cprLabel, cpr.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'đ', '#fd7e14')}
     `;
 
     // Remove last border and padding bottom

@@ -202,7 +202,8 @@ function getMetricValue(item, metricId) {
     if (metricId === "result") return result;
     if (metricId === "cpr") {
       if (result === 0) return 0;
-      return item.optimization_goal === "REACH" ? (spend / result) * 1000 : spend / result;
+      const isThousandMetric = (item.optimization_goal === "REACH" || item.optimization_goal === "IMPRESSIONS");
+      return isThousandMetric ? (spend / result) * 1000 : spend / result;
     }
     if (metricId === "cpm") {
       if (reach === 0) return 0;
@@ -3056,7 +3057,11 @@ async function runAiSummary() {
     // ====== Xây dựng dữ liệu chi tiết từng campaign + adset ======
     const fmt = (n) => Math.round(n || 0).toLocaleString("vi-VN");
     const fmtMoney = (n) => fmt(n) + "đ";
-    const fmtCpr = (spend, result) => result > 0 ? fmtMoney(spend / result) : "N/A";
+    const fmtCpr = (spend, result, goal) => {
+      if (result <= 0) return "N/A";
+      const factor = (goal === "REACH" || goal === "IMPRESSIONS") ? 1000 : 1;
+      return fmtMoney((spend / result) * factor);
+    };
 
     // ====== Xây dựng danh sách Campaign riêng ======
     const campaignLines = campaigns.map((c) => {
@@ -3074,7 +3079,7 @@ async function runAiSummary() {
       const budget = as.daily_budget > 0
         ? `daily ${fmtMoney(as.daily_budget)}`
         : as.lifetime_budget > 0 ? `lifetime ${fmtMoney(as.lifetime_budget)}` : "N/A";
-      return `• Adset: "${as.name}" (thuộc Campaign: "${c.name}") | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Results: ${as.result} | CPR: ${cpr} | Budget: ${budget}`;
+      return `• Adset: "${as.name}" (thuộc Campaign: "${c.name}") | Goal: ${as.optimization_goal} | Spent: ${fmtMoney(as.spend)} | Reach: ${fmt(as.reach)} | Results: ${as.result} | CPR: ${fmtCpr(as.spend, as.result, as.optimization_goal)} | Budget: ${budget}`;
     })).join("\n");
 
     const dateRange = document.querySelector(".dom_date")?.textContent?.trim() || "N/A";
@@ -3326,7 +3331,10 @@ const getReaction = (insights) => getAction(insights?.actions, "post_reaction");
 const calcCpr = (insights) => {
   const spend = +insights?.spend || 0;
   const result = getResults(insights); // Dùng hàm getResults thống nhất
-  return result ? spend / result : 0;
+  if (!result) return 0;
+  const goal = insights.optimization_goal || VIEW_GOAL || "";
+  const factor = (goal === "REACH" || goal === "IMPRESSIONS") ? 1000 : 1;
+  return (spend / result) * factor;
 };
 
 /**
@@ -3444,7 +3452,7 @@ async function handleAdsetInsightClick(btn) {
   const reach = adsetObj ? adsetObj.reach : parseFloat(btn.dataset.reach || 0);
   const impressions = adsetObj ? adsetObj.impressions : parseFloat(btn.dataset.impressions || 0);
   const result = adsetObj ? adsetObj.result : parseFloat(btn.dataset.result || 0);
-  const cpr = adsetObj ? (result > 0 ? spend / result : 0) : parseFloat(btn.dataset.cpr || 0);
+  const cpr = adsetObj ? getMetricValue(adsetObj, "cpr") : parseFloat(btn.dataset.cpr || 0);
 
   // Hiển thị ngay Actions Detail từ bộ nhớ (trước khi gọi API breakdown)
   if (adsetObj) {
@@ -3473,7 +3481,7 @@ async function handleAdsetInsightClick(btn) {
 
   // Tính CPR nếu dataset trả về 0 nhưng có result
   let finalCpr = cpr;
-  if (result > 0 && finalCpr === 0) {
+  if (result > 0 && (finalCpr === 0 || isNaN(finalCpr))) {
     finalCpr = (goal === "REACH" || goal === "IMPRESSIONS") ? (spend / result) * 1000 : spend / result;
   }
   if (cprEl) cprEl.textContent = result > 0 ? formatMoney(finalCpr) : "-";
@@ -3791,7 +3799,7 @@ async function handleViewClick(e, type = "ad") {
   const goal = itemObj ? itemObj.optimization_goal : (adViewEl.dataset.goal || "");
   const name = itemObj ? (itemObj.name || itemObj.ad_name) : (adViewEl.dataset.name || "");
   const result = itemObj ? itemObj.result : parseFloat(adViewEl.dataset.result || 0);
-  const cpr = itemObj ? (result > 0 ? spend / result : 0) : parseFloat(adViewEl.dataset.cpr || 0);
+  const cpr = itemObj ? getMetricValue(itemObj, "cpr") : parseFloat(adViewEl.dataset.cpr || 0);
 
   // Hiển thị ngay Actions Detail từ bộ nhớ
   if (itemObj) {
@@ -3824,7 +3832,7 @@ async function handleViewClick(e, type = "ad") {
 
   // Tính CPR nếu dataset trả về 0 nhưng có result
   let finalCpr = cpr;
-  if (result > 0 && finalCpr === 0) {
+  if (result > 0 && (finalCpr === 0 || isNaN(finalCpr))) {
     finalCpr = (goal === "REACH" || goal === "IMPRESSIONS") ? (spend / result) * 1000 : spend / result;
   }
   if (cprEl) cprEl.textContent = result > 0 ? formatMoney(finalCpr) : "-";
@@ -6216,7 +6224,8 @@ function renderChartByPlatform(allData) {
 
       let cpr = 0;
       if (result && spend) {
-        cpr = goal === "REACH" ? (spend / result) * 1000 : spend / result;
+        const isThousandMetric = (goal === "REACH" || goal === "IMPRESSIONS");
+        cpr = isThousandMetric ? (spend / result) * 1000 : spend / result;
       }
 
       if (spend > 0) items.push({ key, spend, result: result || 0, cpr, goal });
@@ -6296,8 +6305,9 @@ function renderDeepCPR(allData) {
       const spend = +val.spend || 0;
       const result = getResults(val);
       if (!spend || !result) continue;
-      const goal = VIEW_GOAL;
-      const cpr = goal === "REACH" ? (spend / result) * 1000 : spend / result;
+      const goal = (val.optimization_goal || VIEW_GOAL || "").toUpperCase();
+      const isThousandMetric = (goal === "REACH" || goal === "IMPRESSIONS");
+      const cpr = isThousandMetric ? (spend / result) * 1000 : spend / result;
       groupItems.push({ key, spend, result, cpr, goal });
     }
 
@@ -6324,7 +6334,7 @@ function renderDeepCPR(allData) {
       li.innerHTML = `
         <p><b>${formatDeepName(p.key)}</b></p>
         <p class="toplist_percent" style="color:${color};background:${bg}">
-          ${formatMoney(p.cpr)} ${p.goal === "REACH" ? "" : ""}
+          ${formatMoney(p.cpr)} ${(p.goal === "REACH" || p.goal === "IMPRESSIONS") ? " / 1000" : ""}
         </p>
       `;
       fragment.appendChild(li);
@@ -9157,7 +9167,8 @@ async function generateDeepReportDetailed({
     spend = safeNumber(spend);
     result = safeNumber(result);
     if (spend <= 0 || result <= 0) return 0;
-    if ((VIEW_GOAL || goal).toUpperCase() === "REACH")
+    const currentGoal = (VIEW_GOAL || goal || "").toUpperCase();
+    if (currentGoal === "REACH" || currentGoal === "IMPRESSIONS")
       return (spend / result) * 1000;
     return spend / result;
   };
@@ -9165,8 +9176,9 @@ async function generateDeepReportDetailed({
   const formatCPR = (cprValue, VIEW_GOAL = "") => {
     if (!cprValue || cprValue === 0) return "N/A";
     const formatted = formatMoney(Math.round(cprValue));
-    return (VIEW_GOAL || goal).toUpperCase() === "REACH"
-      ? `${formatted} / 1000 reach`
+    const currentGoal = (VIEW_GOAL || goal || "").toUpperCase();
+    return (currentGoal === "REACH" || currentGoal === "IMPRESSIONS")
+      ? `${formatted} / 1000 ${currentGoal.toLowerCase()}`
       : formatted;
   };
 
