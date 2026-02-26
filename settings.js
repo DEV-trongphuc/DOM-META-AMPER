@@ -11,7 +11,7 @@ const SETTINGS_SYNC_URL =
 
 const SYNC_KEYS = [
     "dom_brand_filters",
-    "dom_column_config",
+    "dom_view_presets",
     "goal_keywords",
     "goal_chart_mode",
 ];
@@ -53,6 +53,9 @@ function _applyToGlobal(key, value) {
     switch (key) {
         case "dom_brand_filters":
             // loadBrandSettings() reads from localStorage — already written before this call
+            break;
+        case "dom_view_presets":
+            // loadViewPresets() reads from localStorage — already written by caller
             break;
         case "dom_column_config":
             if (value && typeof value === "object") {
