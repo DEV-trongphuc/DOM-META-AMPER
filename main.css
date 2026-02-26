@@ -8303,10 +8303,6 @@ tbody {
   overflow-y: auto;
   max-height: 75vh;
   width: 100%;
-  scrollbar-width: none;
-  /* Hide for Firefox */
-  -ms-overflow-style: none;
-  /* Hide for IE/Edge */
 }
 
 .view_campaign_header {
@@ -8326,8 +8322,9 @@ tbody {
 /* Custom scrollbar for Chrome/Safari */
 .campaign_table_scroll::-webkit-scrollbar {
   height: 8px;
-  width: 0;
-  /* Hide vertical */
+  /* Hiện scroll ngang */
+  width: 0px;
+  /* Ẩn scroll dọc */
 }
 
 .campaign_table_scroll::-webkit-scrollbar-track {
