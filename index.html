@@ -1048,6 +1048,32 @@
             </div>
           </div>
         </div>
+        <div class="dom_row flex um"
+          style="margin-top: 1rem; width: 100% !important; max-width: 100% !important; flex: 0 0 100%;">
+          <div class="dom_inner dom_fade_item wfull box_shadow show"
+            style="width: 100% !important; flex: 0 0 100%; height: auto !important;">
+            <div
+              style="display: flex; align-items: center; justify-content: space-between; padding: 2.5rem 2.5rem 0.5rem 2.5rem; margin: 0;">
+              <h2 style="margin: 0;">
+                <i class="fa-solid fa-list-check main_clr" style="margin-right: 0.8rem;"></i>
+                Full Actions Detail
+              </h2>
+              <div class="detail_search_wrap" style="position: relative;">
+                <input type="text" id="detail_full_actions_search" placeholder="Lọc chỉ số..."
+                  oninput="window.filterFullActions(this.value)"
+                  style="padding: 0.8rem 1.2rem 0.8rem 3.5rem; border-radius: 8px; border: 1.5px solid #edf2f7; background: #f8fafc; font-size: 1.2rem; width: 220px; outline: none; transition: all 0.2s;">
+                <i class="fa-solid fa-magnifying-glass"
+                  style="position: absolute; left: 1.2rem; top: 50%; transform: translateY(-50%); color: #a0aec0; font-size: 1.2rem;"></i>
+              </div>
+            </div>
+            <div class="dom_toplist_wrap" style="padding: 2.5rem;">
+              <div id="detail_full_actions_list"
+                style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; align-items: start;">
+                <!-- JS populate -->
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="dom_account" id="dom_account">
         <div class="dom_row dom_account_title">

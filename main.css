@@ -3382,10 +3382,12 @@ tbody {
 .dom_platform>div:first-child {
   width: 35%;
   height: 100%;
+  margin-left: 2px;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   justify-content: center;
+  transform: translateY(-1px);
 }
 
 .dom_platform>div:last-child {

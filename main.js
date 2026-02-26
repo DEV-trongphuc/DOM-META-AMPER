@@ -171,6 +171,10 @@ function getMetricValue(item, metricId) {
       if (metricId === "follow") {
         act = actions.find(a => a.action_type === "page_like" || a.action_type === "like" || a.action_type === "onsite_conversion.page_like");
       }
+      // Tên thay thế cho ThruPlay
+      if (metricId === "thruplay") {
+        act = actions.find(a => a.action_type === "video_thruplay_watched_actions" || a.action_type === "thruplay" || a.action_type === "video_thruplay");
+      }
       // Thử khớp không phân biệt hoa thường
       if (!act) {
         act = actions.find(a => a.action_type && a.action_type.toLowerCase() === actionType.toLowerCase());
@@ -880,8 +884,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (modeLabel) modeLabel.textContent = GOAL_CHART_MODE === 'brand' ? 'Keyword' : 'Brand';
 
 });
-const BATCH_SIZE = 10;
-const CONCURRENCY_LIMIT = 40;
+const BATCH_SIZE = 20; // Meta max is 50
+const CONCURRENCY_LIMIT = 10; // 10 parallel batches * 50 = 500 requests at once
 const API_VERSION = "v24.0";
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
 const goalMapping = {
@@ -902,7 +906,7 @@ const resultMapping = {
   REACH: "reach",
   LEAD_GENERATION: "onsite_conversion.lead_grouped",
   QUALITY_LEAD: "onsite_conversion.lead_grouped",
-  THRUPLAY: "video_view",
+  THRUPLAY: "video_thruplay_watched_actions",
   POST_ENGAGEMENT: "post_engagement",
   PROFILE_VISIT: "link_click",
   LINK_CLICKS: "link_click",
@@ -1091,6 +1095,14 @@ function getResults(item, goal) {
   if (!resultType) resultType = resultMapping.DEFAULT;
 
   if (Array.isArray(actions)) {
+    // Ưu tiên tìm trong các trường đặc biệt nếu khớp (VD: video_thruplay_watched_actions)
+    if (insights[resultType]) {
+      const sp = insights[resultType];
+      if (Array.isArray(sp)) return sp.reduce((s, a) => s + (+a.value || 0), 0);
+      if (typeof sp === 'number' || typeof sp === 'string') return +sp;
+      if (sp.value) return +sp.value;
+    }
+
     for (let i = 0; i < actions.length; i++) {
       if (actions[i].action_type === resultType) return +actions[i].value || 0;
     }
@@ -1099,6 +1111,13 @@ function getResults(item, goal) {
       for (const g of goalMapping[goalKey]) {
         const altType = resultMapping[g];
         if (!altType) continue;
+
+        // Thử tìm trong trường đặc biệt cho altType
+        if (insights[altType]) {
+          const asp = insights[altType];
+          if (Array.isArray(asp)) return asp.reduce((s, a) => s + (+a.value || 0), 0);
+        }
+
         for (let i = 0; i < actions.length; i++) {
           if (actions[i].action_type === altType) return +actions[i].value || 0;
         }
@@ -1321,7 +1340,11 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
         adsResp = await fetchJSON(BASE_URL, {
           method: "POST",
           headers,
-          body: JSON.stringify({ access_token: META_TOKEN, batch: fbBatch }),
+          body: JSON.stringify({
+            access_token: META_TOKEN,
+            batch: fbBatch,
+            include_headers: false // 🚀 Optimize: Reduce response size by omitting headers for each sub-request
+          }),
         });
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -1415,9 +1438,8 @@ async function fetchAdsAndInsights(adsetIds, onBatchProcessedCallback) {
 
       // Perf log
       batchCount++;
-      const elapsed = (performance.now() - startTime).toFixed(0);
     }),
-    CONCURRENCY_LIMIT // Giới hạn số lượng batch song song
+    CONCURRENCY_LIMIT
   );
 
   console.timeEnd("⏱️ Total fetchAdsAndInsights");
@@ -1922,6 +1944,7 @@ function renderCampaignView(data) {
               data-reach="${ad.reach}"
               data-impressions="${ad.impressions}"
               data-result="${ad.result}"
+              data-cpr="${getMetricValue(ad, 'cpr')}"
               data-thumb="${ad.thumbnail || ""}"
               data-post="${ad.post_url || ""}">
               <i class="fa-solid fa-magnifying-glass-chart"></i>
@@ -1931,7 +1954,7 @@ function renderCampaignView(data) {
 
       campaignHtml.push(`
         <div class="adset_item ${adsetStatusClass}">
-          <div class="ads_name">
+          <div class="ads_name" style="cursor: pointer;" onclick="const b = this.closest('.adset_item').querySelector('.adset_insight_btn'); if(b) handleAdsetInsightClick(b);">
             <a>
               <div class="adset_goal_thumb ${hasActiveAd ? '' : 'inactive'}">
                 <i class="${getCampaignIcon(as.optimization_goal)}"></i>
@@ -1950,6 +1973,7 @@ function renderCampaignView(data) {
               data-reach="${as.reach}"
               data-impressions="${as.impressions}"
               data-result="${as.result}"
+              data-cpr="${getMetricValue(as, 'cpr')}"
               data-thumbs="${encodeURIComponent(JSON.stringify((as.ads || []).slice(0, 3).map(a => a.thumbnail || '').filter(Boolean)))}"
               title="Xem insight adset">
               <i class="fa-solid fa-magnifying-glass-chart"></i>
@@ -2168,8 +2192,11 @@ function renderGoalChart(data) {
 
 async function loadCampaignList() {
   try {
-    const campaignsInsights = await fetchCampaignInsights();
-    const adsets = await fetchAdsets();
+    // 🚀 Parallelize campaign and adset fetching
+    const [campaignsInsights, adsets] = await Promise.all([
+      fetchCampaignInsights(),
+      fetchAdsets()
+    ]);
     if (!adsets || !adsets.length) throw new Error("No adsets found.");
 
     const adsetIds = adsets.map((as) => as.adset_id).filter(Boolean);
@@ -2263,17 +2290,17 @@ async function main() {
 
   renderYears();
   initDashboard();
-  await initAccountSelector(); // 👈 Khởi tạo chọn tài khoản động
-
-  // ☁️ Tải settings từ Google Sheets (Brand, Columns, Goal Keywords)
-  if (typeof initSettingsSync === "function") {
-    await initSettingsSync();
-  }
-
-  // 🏷️ Khởi tạo bộ lọc thương hiệu
-  updateBrandDropdownUI();
-
-  await loadDashboardData();
+  // 🚀 TỐI ƯU: Chạy song song các tiến trình khởi tạo và tải dữ liệu
+  await Promise.all([
+    initAccountSelector(), // 👤 Khởi tạo chọn tài khoản động
+    (async () => {
+      if (typeof initSettingsSync === "function") {
+        await initSettingsSync(); // ☁️ Tải settings
+      }
+      updateBrandDropdownUI(); // 🏷️ Khởi tạo bộ lọc sau khi có settings
+    })(),
+    loadDashboardData() // 📊 Tải dữ liệu chính
+  ]);
 
 
 
@@ -3403,11 +3430,26 @@ async function handleAdsetInsightClick(btn) {
 
   const name = btn.dataset.name || "Adset";
   const goal = btn.dataset.goal || "";
-  const spend = parseFloat(btn.dataset.spend || 0);
-  const reach = parseFloat(btn.dataset.reach || 0);
-  const impressions = parseFloat(btn.dataset.impressions || 0);
-  const result = parseFloat(btn.dataset.result || 0);
-  const cpr = parseFloat(btn.dataset.cpr || 0);
+
+  // ⭐ Lấy data từ bộ nhớ để hiển thị tức thì
+  let adsetObj = null;
+  if (window._ALL_CAMPAIGNS) {
+    for (const c of window._ALL_CAMPAIGNS) {
+      adsetObj = (c.adsets || []).find(a => a.id === adsetId);
+      if (adsetObj) break;
+    }
+  }
+
+  const spend = adsetObj ? adsetObj.spend : parseFloat(btn.dataset.spend || 0);
+  const reach = adsetObj ? adsetObj.reach : parseFloat(btn.dataset.reach || 0);
+  const impressions = adsetObj ? adsetObj.impressions : parseFloat(btn.dataset.impressions || 0);
+  const result = adsetObj ? adsetObj.result : parseFloat(btn.dataset.result || 0);
+  const cpr = adsetObj ? (result > 0 ? spend / result : 0) : parseFloat(btn.dataset.cpr || 0);
+
+  // Hiển thị ngay Actions Detail từ bộ nhớ (trước khi gọi API breakdown)
+  if (adsetObj) {
+    renderFullActionsDetail(adsetObj);
+  }
 
   // Cập nhật quick stats
   const goalEl = document.querySelector("#detail_goal span");
@@ -3417,7 +3459,24 @@ async function handleAdsetInsightClick(btn) {
   if (goalEl) goalEl.textContent = goal;
   if (spendEl) spendEl.textContent = formatMoney(spend);
   if (resultEl) resultEl.textContent = formatNumber(result);
-  if (cprEl) cprEl.textContent = result ? formatMoney(cpr) : "-";
+
+  // CẬP NHẬT NHÃN CPR LINH HOẠT (Phải bao gồm icon để không bị mất)
+  const cprLi = document.querySelector("#detail_cpr").closest("li");
+  const cprLabelWrapper = cprLi ? cprLi.querySelector("span") : null;
+
+  if (cprLabelWrapper) {
+    let rawLabel = "Cost per Result";
+    if (goal === "REACH") rawLabel = "Cosper 1,000 Reach";
+    else if (goal === "IMPRESSIONS") rawLabel = "Cosper 1,000 Impress";
+    cprLabelWrapper.innerHTML = `<i class="fa-solid fa-bullseye"></i> ${rawLabel}`;
+  }
+
+  // Tính CPR nếu dataset trả về 0 nhưng có result
+  let finalCpr = cpr;
+  if (result > 0 && finalCpr === 0) {
+    finalCpr = (goal === "REACH" || goal === "IMPRESSIONS") ? (spend / result) * 1000 : spend / result;
+  }
+  if (cprEl) cprEl.textContent = result > 0 ? formatMoney(finalCpr) : "-";
 
   VIEW_GOAL = goal;
 
@@ -3453,7 +3512,8 @@ async function handleAdsetInsightClick(btn) {
       try { thumbs = JSON.parse(decodeURIComponent(btn.dataset.thumbs || "[]")) || []; } catch (e) { thumbs = []; }
       if (thumbs.length > 1) {
         // Render fan cards
-        headerThumbWrap.querySelector("img") && (headerThumbWrap.querySelector("img").style.display = "none");
+        const mainImg = headerThumbWrap.querySelector("img:not(.cmp_fan_img)");
+        if (mainImg) mainImg.style.display = "none";
         let fanEl = headerThumbWrap.querySelector(".detail_fan_wrap");
         if (!fanEl) {
           fanEl = document.createElement("div");
@@ -3469,7 +3529,7 @@ async function handleAdsetInsightClick(btn) {
         // Single image or none
         const existFan = headerThumbWrap.querySelector(".detail_fan_wrap");
         if (existFan) existFan.style.display = "none";
-        const imgEl = headerThumbWrap.querySelector("img");
+        const imgEl = headerThumbWrap.querySelector("img:not(.cmp_fan_img)");
         if (imgEl) {
           imgEl.style.display = "";
           imgEl.src = thumbs[0] || "https://dev-trongphuc.github.io/DOM_MISA_IDEAS_CRM/logotarget.png";
@@ -3516,17 +3576,18 @@ async function showAdsetDetail(adset_id) {
   try {
     // ✅ Fix: bỏ khoảng trắng thừa — trước đây "&  time_range[since]= " gây lỗi API
     const timeRangeParam = `&time_range[since]=${startDate}&time_range[until]=${endDate}`;
+    const videoFieldsParam = "video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions";
+
     const batchRequests = [
-      // ✅ Fix: bỏ khoảng trắng trong "fields = targeting"
       { method: "GET", name: "targeting", relative_url: `${adset_id}?fields=targeting` },
       {
-        method: "GET", name: "byHour", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=hourly_stats_aggregated_by_advertiser_time_zone${timeRangeParam}`
+        method: "GET", name: "byHour", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=hourly_stats_aggregated_by_advertiser_time_zone${timeRangeParam}`
       },
-      { method: "GET", name: "byAgeGender", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=age,gender${timeRangeParam}` },
-      { method: "GET", name: "byRegion", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=region${timeRangeParam}` },
-      { method: "GET", name: "byPlatform", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=publisher_platform,platform_position${timeRangeParam}` },
-      { method: "GET", name: "byDevice", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&breakdowns=impression_device${timeRangeParam}` },
-      { method: "GET", name: "byDate", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions&time_increment=1${timeRangeParam}` },
+      { method: "GET", name: "byAgeGender", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=age,gender${timeRangeParam}` },
+      { method: "GET", name: "byRegion", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=region${timeRangeParam}` },
+      { method: "GET", name: "byPlatform", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=publisher_platform,platform_position${timeRangeParam}` },
+      { method: "GET", name: "byDevice", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=impression_device${timeRangeParam}` },
+      { method: "GET", name: "byDate", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&time_increment=1${timeRangeParam}` },
     ];
 
     const batchResponse = await fetchJSON(BASE_URL, {
@@ -3573,6 +3634,21 @@ async function showAdsetDetail(adset_id) {
         out[key].spend += parseFloat(item.spend || 0);
         out[key].impressions += parseInt(item.impressions || 0);
         out[key].reach += parseInt(item.reach || 0);
+
+        // Core Video metrics check
+        const videoFields = [
+          "video_thruplay_watched_actions", "video_play_actions",
+          "video_p25_watched_actions", "video_p50_watched_actions",
+          "video_p75_watched_actions", "video_p95_watched_actions",
+          "video_p100_watched_actions"
+        ];
+        videoFields.forEach(vf => {
+          if (item[vf]) {
+            const val = Array.isArray(item[vf]) ? (item[vf][0]?.value || 0) : (item[vf]?.value || item[vf]);
+            out[key].actions[vf] = (out[key].actions[vf] || 0) + parseInt(val || 0);
+          }
+        });
+
         (item.actions || []).forEach((a) => {
           out[key].actions[a.action_type] = (out[key].actions[a.action_type] || 0) + parseInt(a.value || 0);
         });
@@ -3589,6 +3665,14 @@ async function showAdsetDetail(adset_id) {
           reach: parseInt(item.reach || 0),
           actions: item.actions ? Object.fromEntries(item.actions.map((a) => [a.action_type, parseInt(a.value || 0)])) : {},
         };
+        // Also capture video metrics for daily chart compatibility
+        const videoFields = ["video_thruplay_watched_actions", "video_play_actions", "video_p25_watched_actions", "video_p50_watched_actions", "video_p75_watched_actions", "video_p95_watched_actions", "video_p100_watched_actions"];
+        videoFields.forEach(vf => {
+          if (item[vf]) {
+            const val = Array.isArray(item[vf]) ? (item[vf][0]?.value || 0) : (item[vf]?.value || item[vf]);
+            processedByDate[item.date_start].actions[vf] = parseInt(val || 0);
+          }
+        });
       }
     });
 
@@ -3682,21 +3766,39 @@ async function handleViewClick(e, type = "ad") {
   }
 
   // Lấy ID từ dataset của .ad_view
-  const id =
-    type === "adset" ? adViewEl.dataset.adsetId : adViewEl.dataset.adId;
+  const id = type === "adset" ? adViewEl.dataset.adsetId : adViewEl.dataset.adId;
   if (!id) return;
 
-  // --- Lấy dữ liệu từ dataset của .ad_view ---
-  const spend = parseFloat(adViewEl.dataset.spend || 0);
-  const reach = parseFloat(adViewEl.dataset.reach || 0);
-  const impressions = parseFloat(adViewEl.dataset.impressions || 0);
-  const goal = adViewEl.dataset.goal || "";
-  const name = adViewEl.dataset.name || "";
-  const result = parseFloat(adViewEl.dataset.result || 0);
-  const cpr = parseFloat(adViewEl.dataset.cpr || 0);
-  const thumb =
-    adViewEl.dataset.thumb ||
-    "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
+  // ⭐ Lấy data từ bộ nhớ để hiển thị tức thì
+  let itemObj = null;
+  if (window._ALL_CAMPAIGNS) {
+    for (const c of window._ALL_CAMPAIGNS) {
+      if (type === "adset") {
+        itemObj = (c.adsets || []).find(as => as.id === id);
+      } else {
+        for (const as of (c.adsets || [])) {
+          itemObj = (as.ads || []).find(ad => ad.id === id);
+          if (itemObj) break;
+        }
+      }
+      if (itemObj) break;
+    }
+  }
+
+  const spend = itemObj ? itemObj.spend : parseFloat(adViewEl.dataset.spend || 0);
+  const reach = itemObj ? itemObj.reach : parseFloat(adViewEl.dataset.reach || 0);
+  const impressions = itemObj ? itemObj.impressions : parseFloat(adViewEl.dataset.impressions || 0);
+  const goal = itemObj ? itemObj.optimization_goal : (adViewEl.dataset.goal || "");
+  const name = itemObj ? (itemObj.name || itemObj.ad_name) : (adViewEl.dataset.name || "");
+  const result = itemObj ? itemObj.result : parseFloat(adViewEl.dataset.result || 0);
+  const cpr = itemObj ? (result > 0 ? spend / result : 0) : parseFloat(adViewEl.dataset.cpr || 0);
+
+  // Hiển thị ngay Actions Detail từ bộ nhớ
+  if (itemObj) {
+    renderFullActionsDetail(itemObj);
+  }
+
+  const thumb = adViewEl.dataset.thumb || "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
   const postUrl = adViewEl.dataset.post || "#";
 
   // --- Cập nhật quick stats ---
@@ -3708,7 +3810,24 @@ async function handleViewClick(e, type = "ad") {
   if (goalEl) goalEl.textContent = goal;
   if (spendEl) spendEl.textContent = formatMoney(spend);
   if (resultEl) resultEl.textContent = formatNumber(result);
-  if (cprEl) cprEl.textContent = result ? formatMoney(cpr) : "-";
+
+  // CẬP NHẬT NHÃN CPR LINH HOẠT (Phải bao gồm icon để không bị mất)
+  const cprLi = document.querySelector("#detail_cpr").closest("li");
+  const cprLabelWrapper = cprLi ? cprLi.querySelector("span") : null;
+
+  if (cprLabelWrapper) {
+    let rawLabel = "Cost per Result";
+    if (goal === "REACH") rawLabel = "Cosper 1,000 Reach";
+    else if (goal === "IMPRESSIONS") rawLabel = "Cosper 1,000 Impress";
+    cprLabelWrapper.innerHTML = `<i class="fa-solid fa-bullseye"></i> ${rawLabel}`;
+  }
+
+  // Tính CPR nếu dataset trả về 0 nhưng có result
+  let finalCpr = cpr;
+  if (result > 0 && finalCpr === 0) {
+    finalCpr = (goal === "REACH" || goal === "IMPRESSIONS") ? (spend / result) * 1000 : spend / result;
+  }
+  if (cprEl) cprEl.textContent = result > 0 ? formatMoney(finalCpr) : "-";
 
   // --- Gán VIEW_GOAL toàn cục ---
   VIEW_GOAL = goal;
@@ -3737,9 +3856,22 @@ async function handleViewClick(e, type = "ad") {
     if (previewBox) previewBox.style.display = "";
     if (previewBtn) previewBtn.style.display = "";
 
-    const img = domDetail.querySelector(".dom_detail_header img");
     const idEl = domDetail.querySelector(".dom_detail_id");
-    if (img) img.src = thumb;
+    const headerThumbWrap = domDetail.querySelector(".dom_detail_header_first > div");
+
+    // Đảm bảo không hiện fan cards của Adset cũ
+    if (headerThumbWrap) {
+      const existFan = headerThumbWrap.querySelector(".detail_fan_wrap");
+      if (existFan) {
+        existFan.innerHTML = "";
+        existFan.style.display = "none";
+      }
+      const imgEl = headerThumbWrap.querySelector("img:not(.cmp_fan_img)");
+      if (imgEl) {
+        imgEl.style.display = "";
+        imgEl.src = thumb;
+      }
+    }
     if (idEl) idEl.innerHTML = `<span>${name}</span> <span> ID: ${id}</span>`;
   }
 
@@ -4079,6 +4211,21 @@ async function showAdDetail(ad_id) {
         result[key].spend += parseFloat(item.spend || 0);
         result[key].impressions += parseInt(item.impressions || 0);
         result[key].reach += parseInt(item.reach || 0);
+
+        // Core Video metrics check
+        const videoFields = [
+          "video_thruplay_watched_actions",
+          "video_play_actions", "video_p25_watched_actions",
+          "video_p50_watched_actions", "video_p75_watched_actions",
+          "video_p95_watched_actions", "video_p100_watched_actions"
+        ];
+        videoFields.forEach(vf => {
+          if (item[vf]) {
+            const val = Array.isArray(item[vf]) ? (item[vf][0]?.value || 0) : (item[vf]?.value || item[vf]);
+            result[key].actions[vf] = (result[key].actions[vf] || 0) + parseInt(val || 0);
+          }
+        });
+
         if (item.actions) {
           item.actions.forEach((a) => {
             result[key].actions[a.action_type] =
@@ -4850,6 +4997,242 @@ function renderInteraction(byDate) {
   `;
 
   wrap.innerHTML = html;
+
+  wrap.innerHTML = html;
+}
+
+/**
+ * Render all available actions in a scrollable list from the item's existing data
+ */
+let lastFullActionsData = null; // Store data for filtering
+
+function renderFullActionsDetail(manualTotals, filterQuery = "") {
+  if (!manualTotals && !lastFullActionsData) return;
+  if (manualTotals) lastFullActionsData = manualTotals;
+  else manualTotals = lastFullActionsData;
+
+  const listWrap = document.getElementById("detail_full_actions_list");
+  if (!listWrap) return;
+
+  const query = filterQuery.toLowerCase().trim();
+
+  // 1. Grouping rules (Deduplication)
+  const aliasGroupMap = {
+    // Engagement
+    "page_engagement": "Engagement",
+    "post_engagement": "Engagement",
+    "post_interaction_gross": "Engagement",
+    // Messages
+    "onsite_conversion.messaging_conversation_started_7d": "Messenger Conversations",
+    "messaging_conversation_started_7d": "Messenger Conversations",
+    "onsite_conversion.total_messaging_connection": "Messenger Conversations",
+    "total_messaging_connection": "Messenger Conversations",
+    // Leads (Normalizing multiple Meta/Pixel aliases)
+    "onsite_conversion.lead_grouped": "Leads",
+    "lead_grouped": "Leads",
+    "lead": "Leads",
+    "Leads": "Leads",
+    "onsite_web_lead": "Leads",
+    "offsite_conversion.fb_pixel_lead": "Leads",
+    "offsite_conversion.fb_pixel_complete_registration": "Leads",
+    "offsite_conversion.fb_pixel_search": "Leads",
+    "offsite_conversion.fb_pixel_view_content": "Leads",
+    "complete_registration": "Leads",
+    // Saves
+    "onsite_conversion.post_save": "Saves",
+    "post_save": "Saves",
+    "onsite_conversion.post_net_save": "Saves",
+    // Follows
+    "page_like": "Follows",
+    "onsite_conversion.page_like": "Follows",
+    "instagram_profile_follow": "Follows",
+    "post_reaction": "Reactions/Likes",
+    "post_net_like": "Reactions/Likes",
+    // Video Metrics
+    "video_view": "Video View (3s)",
+    "video_play": "Video Plays",
+    "video_play_actions": "Video Plays",
+    "video_thruplay_watched_actions": "ThruPlays",
+    "video_p25_watched_actions": "Video 25%",
+    "video_p50_watched_actions": "Video 50%",
+    "video_p75_watched_actions": "Video 75%",
+    "video_p95_watched_actions": "Video 95%",
+    "video_p100_watched_actions": "Video 100%"
+  };
+
+  const aggregated = {};
+  let totalSpend = manualTotals.spend || 0;
+  let totalReach = manualTotals.reach || 0;
+  let totalImp = manualTotals.impressions || 0;
+  let totalClicks = 0;
+
+  // 1. Aggregating from an item's data (campaign/adset/ad)
+  const actionsSource = manualTotals.actions || [];
+  if (Array.isArray(actionsSource)) {
+    actionsSource.forEach(a => {
+      const type = a.action_type;
+      const val = parseInt(a.value || 0);
+      if (type === 'link_click') totalClicks += val;
+
+      let label = aliasGroupMap[type] || null;
+
+      // Fallback to Registry
+      if (!label) {
+        for (const key in METRIC_REGISTRY) {
+          if (METRIC_REGISTRY[key].action_type === type) {
+            label = METRIC_REGISTRY[key].label;
+            break;
+          }
+        }
+      }
+
+      // Final Prettify fallback
+      if (!label) {
+        label = type.replace("onsite_conversion.", "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      }
+
+      // Use Max for engagement/plays to avoid duplicate counting
+      if (label === "Engagement" || label === "Video Plays" || label === "Video View (3s)") {
+        aggregated[label] = Math.max(aggregated[label] || 0, val);
+      } else {
+        aggregated[label] = (aggregated[label] || 0) + val;
+      }
+    });
+  }
+
+  // Direct video performance fields as fallback
+  const vfs = {
+    "video_play_actions": "Video Plays",
+    "video_thruplay_watched_actions": "ThruPlays",
+    "video_p25_watched_actions": "Video 25%",
+    "video_p50_watched_actions": "Video 50%",
+    "video_p75_watched_actions": "Video 75%",
+    "video_p95_watched_actions": "Video 95%",
+    "video_p100_watched_actions": "Video 100%"
+  };
+
+  Object.entries(vfs).forEach(([vf, label]) => {
+    if (!aggregated[label]) {
+      const data = manualTotals[vf];
+      if (data) {
+        const val = parseInt(Array.isArray(data) ? (data[0]?.value || 0) : (data?.value || data) || 0);
+        aggregated[label] = val;
+      }
+    }
+  });
+
+  // --- ⭐ Include Custom Metrics from Registry/Memory ---
+  if (window.CUSTOM_METRICS) {
+    window.CUSTOM_METRICS.forEach(cm => {
+      const val = window.evaluateFormula ? window.evaluateFormula(manualTotals, cm.formula) : 0;
+      if (val > 0) {
+        aggregated[cm.label] = (aggregated[cm.label] || 0) + val;
+      }
+    });
+  }
+
+  // 2. Common logic for both branches
+  const coreMetrics = [
+    { label: "Cost Per Click (CPC)", val: totalClicks ? (totalSpend / totalClicks) : 0, key: "cpc", icon: "fa-arrow-pointer", format: formatMoney },
+    { label: "Click-Through Rate (CTR)", val: totalImp ? (totalClicks / totalImp) * 100 : 0, key: "ctr", icon: "fa-percent", format: v => v.toFixed(2) + '%' }
+  ];
+
+  const METRIC_DESCRIPTIONS = {
+    "Cost Per Click (CPC)": "Average cost for each click on your ad.",
+    "Click-Through Rate (CTR)": "Percentage of times people saw your ad and performed a click.",
+    "Engagement": "Total number of actions people take involving your ads (views, comments, shares, etc).",
+    "Messenger Conversations": "Number of times people started a chat with your business after seeing the ad.",
+    "Leads": "Number of people who submitted a lead form or completed a registration.",
+    "Saves": "Number of times people saved your ad for later.",
+    "Follows": "Total number of Page Likes or Profile Follows generated.",
+    "Reactions/Likes": "Total number of reactions (Like, Love, Haha, Wow...) on the ad post.",
+    "Video View (3s)": "Number of times your video was played for at least 3 seconds, or for nearly its total length if it's shorter than 3 seconds.",
+    "Video Plays": "Number of times your video started playing.",
+    "ThruPlays": "Number of times your video was played for at least 15 seconds (or completion).",
+    "Video 25%": "Video watched to 25% of its total duration.",
+    "Video 50%": "Video watched to 50% of its total video duration.",
+    "Video 75%": "Video watched to 75% of its total video duration.",
+    "Video 95%": "Video watched to 95% of its total video duration.",
+    "Video 100%": "Video watched to full completion (100%)."
+  };
+
+  // Helper for filtering
+  const matchesQuery = (label) => !query || label.toLowerCase().includes(query);
+
+  const actionEntries = Object.entries(aggregated)
+    .filter(([label, v]) => v > 0 && matchesQuery(label))
+    .sort((a, b) => b[1] - a[1]);
+
+  const filteredCore = coreMetrics.filter(m => matchesQuery(m.label));
+
+  if (!actionEntries.length && !filteredCore.length) {
+    listWrap.innerHTML = `<div style='grid-column: 1/-1; padding: 4rem 2rem; text-align: center; opacity: 0.5; color: #718096; font-size: 1.3rem;'>
+      <i class="fa-solid fa-magnifying-glass" style="display: block; font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.2;"></i>
+      Không tìm thấy chỉ số nào khớp với "${query}"
+    </div>`;
+    return;
+  }
+
+  // Combine Core + Sorted Actions
+  let html = filteredCore.map(m => {
+    const desc = METRIC_DESCRIPTIONS[m.label] || "Key performance indicator for this campaign.";
+    return `
+      <div class="action_detail_card core" title="${desc}" style="background: #fffdf5; border: 1px solid #ffeeba; border-radius: 12px; padding: 1.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 0.8rem; min-width: 0;  justify-content: space-between; cursor: help;">
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 169, 0, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i class="fa-solid ${m.icon}" style="font-size: 1.3rem; color: var(--mainClr);"></i>
+          </div>
+          <span style="font-size: 1.3rem; font-weight: 800; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.label}</span>
+        </div>
+        <div style="font-size: 2.2rem; font-weight: 900; color: #111; margin: 0.5rem 0;">${m.format(m.val)}</div>
+        <div style="font-size: 1rem; color: #777; border-top: 2px dashed #f5f5f5; padding-top: 1rem; font-family: var(--fontMain);">
+           <span style="opacity: 0.5; font-weight: 500;">Metrics:</span> <code style="font-weight: 700; color: #c27800;">${m.key}</code>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  html += actionEntries.map(([label, val]) => {
+    let icon = "fa-chart-simple";
+    if (label.includes("Lead")) icon = "fa-bullseye";
+    if (label.includes("Message")) icon = "fa-comment-dots";
+    if (label.includes("Save")) icon = "fa-bookmark";
+    if (label.includes("Engagement")) icon = "fa-fingerprint";
+    if (label.includes("View")) icon = "fa-play-circle";
+    if (label.includes("ThruPlay")) icon = "fa-bolt";
+    if (label.includes("Click")) icon = "fa-mouse-pointer";
+    if (label.includes("Reaction") || label.includes("Like")) icon = "fa-heart";
+
+    let technicalKey = "";
+    for (const [key, grpLabel] of Object.entries(aliasGroupMap)) {
+      if (grpLabel === label) { technicalKey = key; break; }
+    }
+    if (!technicalKey) {
+      for (const k in METRIC_REGISTRY) {
+        if (METRIC_REGISTRY[k].label === label) { technicalKey = METRIC_REGISTRY[k].action_type || k; break; }
+      }
+    }
+    if (!technicalKey) technicalKey = label.toLowerCase().replace(/\s+/g, "_");
+
+    const desc = METRIC_DESCRIPTIONS[label] || `Total value for ${label} action type.`;
+
+    return `
+      <div class="action_detail_card" title="${desc}" style="background: #fff; border: 1px solid #ececec; border-radius: 12px; padding: 1.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; justify-content: space-between; cursor: help;">
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <div style="width: 42px; height: 42px; border-radius: 12px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i class="fa-solid ${icon}" style="font-size: 1.2rem; color: #555;"></i>
+          </div>
+          <span style="font-size: 1.3rem; font-weight: 800; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${label}</span>
+        </div>
+        <div style="font-size: 2.2rem; font-weight: 900; color: #111; margin: 0.5rem 0;">${formatNumber(val)}</div>
+        <div style="font-size: 1rem; color: #999; border-top: 1px solid #f2f2f2; padding-top: 1rem; font-family: var(--fontMain);">
+           <span style="opacity: 0.6; font-weight: 500;">Metrics:</span> <code style="font-weight: 600; color: #666;">${technicalKey}</code>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  listWrap.innerHTML = html;
 }
 
 function formatMoneyShort(v) {
@@ -6587,6 +6970,11 @@ async function fetchDashboardInsightsBatch(campaignIds = []) {
     },
     {
       method: "GET",
+      name: "spendByDevice",
+      relative_url: `${commonEndpoint}?fields=spend,impressions&breakdowns=impression_device${currentTimeRange}${filtering}`,
+    },
+    {
+      method: "GET",
       name: "dailySpend",
       relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,campaign_name,campaign_id&time_increment=1${currentTimeRange}${filtering}`,
     },
@@ -6656,6 +7044,7 @@ async function fetchDashboardInsightsBatch(campaignIds = []) {
       spendByPlatform: [],
       spendByAgeGender: [],
       spendByRegion: [],
+      spendByDevice: [],
       dailySpend: [],
       platformStats_previous: [], // << Thêm key rỗng cho trường hợp lỗi
     };
@@ -6707,9 +7096,10 @@ async function loadAllDashboardCharts(campaignIds = []) {
     renderRegionChart(results.spendByRegion);
 
     // 3.5. Daily Spend
-    // Lưu ý: hàm fetchDailySpendByAccount của bạn giờ cũng được thay thế
-    // bằng results.dailySpend (khi campaignIds rỗng)
-    renderDetailDailyChart2(results.dailySpend, "spend"); // "spend" là default
+    renderDetailDailyChart2(results.dailySpend, "spend");
+
+    // 3.6. Store for extra_details usage to avoid re-fetch
+    window._DASHBOARD_BATCH_RESULTS = results;
   } catch (err) {
     console.error("❌ Lỗi khi tải dữ liệu charts dashboard:", err);
   } finally {
@@ -10977,4 +11367,11 @@ function showToast(msg, duration = 2500) {
   clearTimeout(toast._timer);
   toast._timer = setTimeout(() => toast.classList.remove("show"), duration);
 }
+
+// ── Search handler for Full Actions Detail ──────────────────────
+window.filterFullActions = (query) => {
+  if (typeof renderFullActionsDetail === "function") {
+    renderFullActionsDetail(null, query);
+  }
+};
 

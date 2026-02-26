@@ -291,6 +291,13 @@ function renderExtraGoalChart(data) {
 
 async function loadExtraPlatformPositions() {
     try {
+        // 🚀 TỐI ƯU: Sử dụng dữ liệu đã có từ DASHBOARD BATCH RESULTS (Tránh fetch lại)
+        if (window._DASHBOARD_BATCH_RESULTS && window._DASHBOARD_BATCH_RESULTS.spendByPlatform) {
+            console.log("🚀 [Extra] Using cached spendByPlatform data");
+            renderExtraPlatformPositions(window._DASHBOARD_BATCH_RESULTS.spendByPlatform);
+            return;
+        }
+
         if (!ACCOUNT_ID) throw new Error("ACCOUNT_ID is required");
         // Fetch platform position data
         const url = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend&breakdowns=publisher_platform,platform_position&time_range={"since":"${startDate}","until":"${endDate}"}&access_token=${META_TOKEN}`;
@@ -397,8 +404,16 @@ async function fetchSpendByDevice(campaignIds = []) {
 }
 
 async function loadDeviceChart() {
-    const data = await fetchSpendByDevice();
-    if (!data.length) return;
+    // 🚀 TỐI ƯU: Sử dụng dữ liệu đã có từ DASHBOARD BATCH RESULTS (Tránh fetch lại)
+    let data = [];
+    if (window._DASHBOARD_BATCH_RESULTS && window._DASHBOARD_BATCH_RESULTS.spendByDevice) {
+        console.log("🚀 [Extra] Using cached spendByDevice data");
+        data = window._DASHBOARD_BATCH_RESULTS.spendByDevice;
+    } else {
+        data = await fetchSpendByDevice();
+    }
+
+    if (!data || !data.length) return;
 
     const deviceStats = {};
     let totalSpend = 0;
