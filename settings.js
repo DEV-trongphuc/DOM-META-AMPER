@@ -12,6 +12,7 @@ const SETTINGS_SYNC_URL =
 const SYNC_KEYS = [
     "dom_brand_filters",
     "dom_view_presets",
+    "dom_column_config",
     "goal_keywords",
     "goal_chart_mode",
 ];
@@ -60,7 +61,7 @@ function _applyToGlobal(key, value) {
         case "dom_column_config":
             if (value && typeof value === "object") {
                 if (Array.isArray(value.activeColumns))
-                    window.ACTIVE_COLUMNS = value.activeColumns.slice(0, 8);
+                    window.ACTIVE_COLUMNS = value.activeColumns.slice(0, 15);
                 if (Array.isArray(value.customMetrics))
                     window.CUSTOM_METRICS = value.customMetrics;
             }
@@ -109,6 +110,9 @@ window.initSettingsSync = async function () {
     // Sync column settings into ACTIVE_COLUMNS / CUSTOM_METRICS
     if (typeof loadColumnConfig === "function") loadColumnConfig();
 
+    // Refresh preset dropdown
+    if (typeof renderPresetDropdown === "function") renderPresetDropdown();
+
     // Sync goal chart toggle label
     const modeLabel = document.getElementById("goal_mode_label");
     if (modeLabel && typeof GOAL_CHART_MODE !== "undefined") {
@@ -136,4 +140,11 @@ window.saveColumnConfigSync = function (config) {
  */
 window.saveGoalSettingsSync = function (keywords, mode) {
     return _sheetPost({ settings: { goal_keywords: keywords, goal_chart_mode: mode } });
+};
+
+/**
+ * Save view presets to Sheet silently in background.
+ */
+window.saveViewPresetsSync = function (presets) {
+    return _sheetPost({ key: "dom_view_presets", value: presets });
 };

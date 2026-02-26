@@ -397,12 +397,10 @@ function loadViewPresets() {
 /** Ghi presets — sync lên Sheet ngầm (chỉ dom_view_presets, không cần dom_column_config) */
 function _saveViewPresets(presets) {
   try { localStorage.setItem(VIEW_PRESETS_KEY, JSON.stringify(presets)); } catch { }
-  const url = typeof window.SETTINGS_SHEET_URL === "string" && window.SETTINGS_SHEET_URL
-    ? window.SETTINGS_SHEET_URL : null;
-  if (url) fetch(url, {
-    method: "POST",
-    body: JSON.stringify({ key: VIEW_PRESETS_KEY, value: presets })
-  }).catch(() => { });
+  // Sync to Google Sheets (runs in background, non-blocking)
+  if (typeof saveViewPresetsSync === "function") {
+    saveViewPresetsSync(presets).catch(() => { });
+  }
 }
 
 /** Áp dụng preset → update cột + lưu + re-render bảng */
@@ -675,6 +673,7 @@ function _savePresetEditIfActive() {
     const name = nameInput?.value?.trim() || presets[idx].name;
     presets[idx] = { ...presets[idx], name, columns: [...ACTIVE_COLUMNS], customMetrics: [...CUSTOM_METRICS] };
     _saveViewPresets(presets);
+    saveColumnConfig(); // ☁️ Đồng bộ cả config cột hiện tại
     renderPresetDropdown();
     _renderPresetPanel();
     _exitPresetEditMode();
@@ -694,6 +693,7 @@ function _savePresetEditIfActive() {
     if (dupIdx >= 0) presets[dupIdx] = np;
     else presets.push(np);
     _saveViewPresets(presets);
+    saveColumnConfig(); // ☁️ Đồng bộ cả config cột hiện tại
     renderPresetDropdown();
     _exitPresetEditMode();
     showToast(`✅ Đã lưu preset "${trimmed}"`);
