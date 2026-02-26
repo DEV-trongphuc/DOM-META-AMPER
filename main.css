@@ -3753,7 +3753,8 @@ tbody {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  opacity: 0.8;
+  opacity: 0.95;
+  margin-bottom: 1rem;
 }
 
 .ad_cpr>i,
@@ -8299,15 +8300,34 @@ tbody {
 
 .campaign_table_scroll {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 75vh;
   width: 100%;
-  scrollbar-width: thin;
-  /* Firefox */
-  scrollbar-color: #cbd5e1 #f8fafc;
+  scrollbar-width: none;
+  /* Hide for Firefox */
+  -ms-overflow-style: none;
+  /* Hide for IE/Edge */
+}
+
+.view_campaign_header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(247, 247, 247, 1);
+  padding-top: 0rem;
+  /* padding-bottom: 1rem; */
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.g_campaign_wrap .view_campaign_header {
+  background: transparent !important;
 }
 
 /* Custom scrollbar for Chrome/Safari */
 .campaign_table_scroll::-webkit-scrollbar {
   height: 8px;
+  width: 0;
+  /* Hide vertical */
 }
 
 .campaign_table_scroll::-webkit-scrollbar-track {
@@ -8326,12 +8346,6 @@ tbody {
   /* padding: 1rem 1.5rem; */
   display: flex;
   flex-direction: column;
-}
-
-.view_campaign_header {
-  padding-top: 2rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
 }
 
 /* Ensure empty state is centered in the card viewport */
