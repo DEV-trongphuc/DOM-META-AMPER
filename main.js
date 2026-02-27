@@ -8622,19 +8622,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const imgEl = option.querySelector("img");
       const nameEl = option.querySelector("span");
-      // data-filter="" = Ampersand (all), không undefined
       const filterValue = option.dataset?.filter ?? null;
       const isReset = filterValue === null ? false : filterValue.trim() === "";
 
       if (!imgEl || !nameEl) return;
 
-      const imgSrc = imgEl.src;
-      const name = nameEl.textContent.trim();
       const filter = isReset ? "" : filterValue.trim().toLowerCase();
+
+      // Close dropdown
+      parent.classList.remove("active");
 
       // Apply brand/campaign filter
       if (typeof applyCampaignFilter === "function") {
         applyCampaignFilter(isReset ? "RESET" : filter);
+      }
+    } else {
+      // Click outside closes it
+      const selector = document.querySelector(".quick_filter_detail");
+      if (selector && !selector.contains(e.target)) {
+        selector.classList.remove("active");
       }
     }
   });
