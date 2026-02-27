@@ -3604,6 +3604,37 @@ tbody {
   transition: 0.3s;
 }
 
+.g_view_raw_btn {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0 2.5rem 0 2rem;
+  background: #ffffff;
+  border-radius: 3rem;
+  box-shadow: 0 0 2px rgb(0, 0, 0, 0.2) !important;
+  color: #374151;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 4.4rem;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+}
+
+.g_view_raw_btn:hover {
+  background: #f8fafc;
+  border-color: #0f9d58;
+  color: #0f9d58;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.g_view_raw_btn img {
+  height: 1.8rem;
+  width: auto;
+}
+
 .dom_active_report {
   display: flex;
   gap: 1rem;
@@ -3613,6 +3644,98 @@ tbody {
   width: 100%;
   display: flex;
   column-gap: 1rem;
+}
+
+.action_detail_card {
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  border-radius: 16px;
+  padding: 1.8rem 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  cursor: help;
+}
+
+.action_detail_card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-color: #e2e8f0;
+}
+
+.action_detail_card.core {
+  background: linear-gradient(135deg, #fffdfa 0%, #fff9e6 100%);
+  border: 1px solid #ffeeba;
+}
+
+.action_detail_card .icon_box {
+  width: 4.8rem;
+  height: 4.8rem;
+  border-radius: 14px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.action_detail_card.core .icon_box {
+  background: rgba(255, 169, 0, 0.12);
+}
+
+.action_detail_card:hover .icon_box {
+  transform: scale(1.1);
+}
+
+.action_detail_card .label_text {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.action_detail_card .value_text {
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0.2rem 0;
+  letter-spacing: -0.02em;
+}
+
+.action_detail_card .footer_meta {
+  font-size: 1rem;
+  color: #94a3b8;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1.2rem;
+  font-family: var(--fontMain);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action_detail_card.core .footer_meta {
+  border-top: 1.5px dashed rgba(255, 169, 0, 0.15);
+}
+
+.action_detail_card .technical_key {
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+}
+
+.action_detail_card.core .technical_key {
+  color: #c27800;
+  background: rgba(255, 169, 0, 0.08);
 }
 
 .dom_active_cp {
@@ -4276,6 +4399,7 @@ tbody {
   /* padding-left: 3rem; */
   padding-right: 1rem;
   gap: 1.2rem;
+  padding-left: 1rem;
 }
 
 .ad_item>.ads_name {
@@ -4553,7 +4677,7 @@ tbody {
 .ad_view i::after {
   content: "";
   position: absolute;
-  width: 100%;
+  width: calc(100% - 30rem);
   height: 100%;
   top: 0;
   right: 0;
@@ -8840,4 +8964,26 @@ tbody {
 .g_switcher button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.ad_copy_id {
+  opacity: 0.3;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.ad_copy_id:hover {
+  opacity: 1;
+  color: var(--mainClr);
+  transform: scale(1.2);
+}
+
+.ad_copy_id.copied {
+  opacity: 1;
+  color: #10b981;
+  transform: scale(1.2);
 }

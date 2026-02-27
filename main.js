@@ -2063,7 +2063,14 @@ function renderCampaignView(data) {
             <div class="ads_name">
               <a>
                 <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${ad.thumbnail}" data-ad-id-img="${ad.id}" />
-                <p class="ad_name">ID: ${ad.id}</p>
+                <p class="ad_name" style="display:flex;align-items:center;gap:0.5rem;">
+                  <span>ID: ${ad.id}</span>
+                  <i class="fa-regular fa-copy ad_copy_id" 
+                     data-id="${ad.id}"
+                     title="Copy ID"
+                     onclick="event.stopPropagation();navigator.clipboard.writeText('${ad.id}').then(()=>{this.className='fa-solid fa-circle-check ad_copy_id copied';setTimeout(()=>this.className='fa-regular fa-copy ad_copy_id',1500)});"
+                     style="cursor:pointer;font-size:1.1rem;opacity:0.4;transition:all 0.2s;flex-shrink:0;"></i>
+                </p>
               </a>
             </div>
             <div class="ad_status ${isActive ? "active" : "inactive"}">${ad.status
@@ -5377,16 +5384,16 @@ function renderFullActionsDetail(manualTotals, filterQuery = "") {
   let html = filteredCore.map(m => {
     const desc = METRIC_DESCRIPTIONS[m.label] || "Key performance indicator for this campaign.";
     return `
-      <div class="action_detail_card core" title="${desc}" style="background: #fffdf5; border: 1px solid #ffeeba; border-radius: 12px; padding: 1.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 0.8rem; min-width: 0;  justify-content: space-between; cursor: help;">
-        <div style="display: flex; align-items: center; gap: 0.8rem;">
-          <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 169, 0, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <i class="fa-solid ${m.icon}" style="font-size: 1.3rem; color: var(--mainClr);"></i>
+      <div class="action_detail_card core" title="${desc}">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div class="icon_box">
+            <i class="fa-solid ${m.icon}" style="font-size: 1.5rem; color: var(--mainClr);"></i>
           </div>
-          <span style="font-size: 1.3rem; font-weight: 800; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.label}</span>
+          <span class="label_text">${m.label}</span>
         </div>
-        <div style="font-size: 2.2rem; font-weight: 900; color: #111; margin: 0.5rem 0;">${m.format(m.val)}</div>
-        <div style="font-size: 1rem; color: #777; border-top: 2px dashed #f5f5f5; padding-top: 1rem; font-family: var(--fontMain);">
-           <span style="opacity: 0.5; font-weight: 500;">Metrics:</span> <code style="font-weight: 700; color: #c27800;">${m.key}</code>
+        <div class="value_text">${m.format(m.val)}</div>
+        <div class="footer_meta">
+           <span style="opacity: 0.7;">Metrics:</span> <code class="technical_key">${m.key}</code>
         </div>
       </div>
     `;
@@ -5417,16 +5424,16 @@ function renderFullActionsDetail(manualTotals, filterQuery = "") {
     const desc = METRIC_DESCRIPTIONS[label] || `Total value for ${label} action type.`;
 
     return `
-      <div class="action_detail_card" title="${desc}" style="background: #fff; border: 1px solid #ececec; border-radius: 12px; padding: 1.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; justify-content: space-between; cursor: help;">
-        <div style="display: flex; align-items: center; gap: 0.8rem;">
-          <div style="width: 42px; height: 42px; border-radius: 12px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <i class="fa-solid ${icon}" style="font-size: 1.2rem; color: #555;"></i>
+      <div class="action_detail_card" title="${desc}">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div class="icon_box">
+            <i class="fa-solid ${icon}" style="font-size: 1.4rem; color: #475569;"></i>
           </div>
-          <span style="font-size: 1.3rem; font-weight: 800; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${label}</span>
+          <span class="label_text">${label}</span>
         </div>
-        <div style="font-size: 2.2rem; font-weight: 900; color: #111; margin: 0.5rem 0;">${formatNumber(val)}</div>
-        <div style="font-size: 1rem; color: #999; border-top: 1px solid #f2f2f2; padding-top: 1rem; font-family: var(--fontMain);">
-           <span style="opacity: 0.6; font-weight: 500;">Metrics:</span> <code style="font-weight: 600; color: #666;">${technicalKey}</code>
+        <div class="value_text">${formatNumber(val)}</div>
+        <div class="footer_meta">
+           <span style="opacity: 0.7;">Metrics:</span> <code class="technical_key">${technicalKey}</code>
         </div>
       </div>
     `;

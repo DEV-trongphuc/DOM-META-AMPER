@@ -30,21 +30,9 @@ window.fetchGoogleAdsData = async function (force = false) {
     // DO NOT set inline style here — it persists when switching away from google_ads tab
 
     const currentRange = `${startDate}_${endDate}`;
-
-    // Optimization: Don't fetch if currently fetching or already have data for this range
-    if (isGAdsFetching) {
-        console.warn("⚠️ Already fetching Google Ads data...");
-        return;
-    }
-
-    if (!force && googleAdsRawData.length > 0 && lastGAdsRange === currentRange) {
-        console.log("ℹ️ Using cached Google Ads data for range:", currentRange);
-        renderGoogleAdsView();
-        return;
-    }
-
-    isGAdsFetching = true;
+    if (isGAdsFetching) return;
     lastGAdsRange = currentRange;
+    isGAdsFetching = true;
 
     _showGoogleSkeletons();
 
@@ -55,41 +43,29 @@ window.fetchGoogleAdsData = async function (force = false) {
         const pEnd = new Date(s.getTime() - 86400000);
         const pStart = new Date(pEnd.getTime() - diff);
         const ps = pStart.toISOString().split('T')[0];
-        const pe = pEnd.toISOString().split('T')[0];
 
+        // MEGA FETCH: Fetch everything from prev-start to current-end in ONE request
+        // This avoids 2 cold starts of Apps Script, saving ~2-4 seconds.
         const url = new URL(GOOGLE_SHEET_API_URL);
-        url.searchParams.append("time_range", JSON.stringify({ since: startDate, until: endDate }));
+        url.searchParams.append("time_range", JSON.stringify({ since: ps, until: endDate }));
 
-        const prevUrl = new URL(GOOGLE_SHEET_API_URL);
-        prevUrl.searchParams.append("time_range", JSON.stringify({ since: ps, until: pe }));
+        console.log("🔵 Google Ads API: Mega Fetching all data in one go...");
+        const response = await fetch(url.toString());
+        const compactData = response.ok ? await response.json() : { h: [], d: [] };
 
-        const fetchTasks = [
-            fetch(url.toString()).then(r => r.ok ? r.json() : []),
-            fetch(prevUrl.toString()).then(r => r.ok ? r.json() : [])
-        ];
+        // Transform COMPACT JSON back to array of objects
+        const allData = _fromCompact(compactData);
 
-        let needsMonthly = !googleAdsMonthlyData || googleAdsMonthlyData.length === 0;
-        if (needsMonthly && !isMonthlyFetching) {
-            isMonthlyFetching = true;
-            const now = new Date();
-            const startOfYear = now.getUTCFullYear() + "-01-01";
-            const todayStr = now.toISOString().split('T')[0];
-            const mUrl = new URL(GOOGLE_SHEET_API_URL);
-            mUrl.searchParams.append("time_range", JSON.stringify({ since: startOfYear, until: todayStr }));
-            fetchTasks.push(fetch(mUrl.toString()).then(r => r.ok ? r.json() : []));
+        // Split data into Current and Previous arrays
+        googleAdsRawData = allData.filter(item => item.date >= startDate && item.date <= endDate);
+        googleAdsPrevData = allData.filter(item => item.date >= ps && item.date <= pEnd.toISOString().split('T')[0]);
+
+        // Background fetch monthly data if needed
+        if ((!googleAdsMonthlyData || googleAdsMonthlyData.length === 0) && !isMonthlyFetching) {
+            fetchGoogleAdsMonthlyData();
         }
 
-        console.log("🔵 Google Ads API: Fetching required data in parallel...");
-        const results = await Promise.all(fetchTasks);
-
-        googleAdsRawData = results[0];
-        googleAdsPrevData = results[1];
-        if (needsMonthly) {
-            googleAdsMonthlyData = results[2] || [];
-            isMonthlyFetching = false;
-        }
-
-        console.log("✅ Google Ads: Data pipeline complete.", googleAdsRawData.length, "rows");
+        console.log("✅ Google Ads: Mega Pipeline complete.", googleAdsRawData.length, "current /", googleAdsPrevData.length, "prev rows");
         renderGoogleAdsView();
 
     } catch (error) {
@@ -100,6 +76,19 @@ window.fetchGoogleAdsData = async function (force = false) {
         isGAdsFetching = false;
         _hideGoogleSkeletons();
     }
+}
+
+/** Utility: Convert compact JSON {h:[], d:[[]]} to [{...}] */
+function _fromCompact(json) {
+    if (!json || !json.h || !json.d) return [];
+    const headers = json.h;
+    return json.d.map(row => {
+        let obj = {};
+        for (let i = 0; i < headers.length; i++) {
+            obj[headers[i]] = row[i];
+        }
+        return obj;
+    });
 }
 
 function _showGoogleSkeletons() {
@@ -812,7 +801,8 @@ async function fetchGoogleAdsMonthlyData() {
         console.log("🔵 Google Ads: Fetching Monthly Data in background...");
         const response = await fetch(url.toString());
         if (response.ok) {
-            googleAdsMonthlyData = await response.json();
+            const compactData = await response.json();
+            googleAdsMonthlyData = _fromCompact(compactData);
             console.log("✅ Google Ads: Monthly Data cached.", googleAdsMonthlyData.length, "rows");
 
             // Only re-render if user is currently looking at the monthly chart
@@ -842,9 +832,10 @@ function _renderMonthlyChart(data, metric) {
 
     // Filter monthly data by brand if active
     const brandLabel = (typeof CURRENT_CAMPAIGN_FILTER !== 'undefined') ? CURRENT_CAMPAIGN_FILTER : "";
+    const sourceData = Array.isArray(data) ? data : [];
     const filtered = (brandLabel && brandLabel.toUpperCase() !== "RESET" && brandLabel !== "Ampersand Group")
-        ? data.filter(item => item.campaign && item.campaign.toLowerCase().includes(brandLabel.toLowerCase()))
-        : data;
+        ? sourceData.filter(item => item.campaign && item.campaign.toLowerCase().includes(brandLabel.toLowerCase()))
+        : sourceData;
 
     filtered.forEach(item => {
         const d = new Date(item.date);
