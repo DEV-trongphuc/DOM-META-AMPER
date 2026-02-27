@@ -2404,12 +2404,17 @@ async function loadDashboardData() {
   // Đảm bảo bật skeleton nếu gọi từ nơi khác (ví đổi ngày)
   toggleSkeletons(".dom_dashboard", true);
 
-  loadAllDashboardCharts();
-  initializeYearData();
-
   resetYearDropdownToCurrentYear();
   resetFilterDropdownTo("spend");
-  loadCampaignList().finally(() => {
+
+  // 🚀 TỐI ƯU: Khởi chạy song song các phần của Meta (Charts + Monthly + List)
+  const metaTasks = [
+    loadAllDashboardCharts(),
+    initializeYearData(),
+    loadCampaignList()
+  ];
+
+  await Promise.all(metaTasks).finally(() => {
     if (loading) loading.classList.remove("active");
     // 🦴 Skeleton end
     toggleSkeletons(".dom_dashboard", false);
@@ -2431,18 +2436,27 @@ async function main() {
 
   renderYears();
   initDashboard();
-  // 🚀 TỐI ƯU: Tải settings xong mới tải dữ liệu để tránh lệch metrics
-  await (async () => {
+  // 🚀 TỐI ƯU CỰC ĐẠI: Khởi chạy TẤT CẢ các tác vụ fetch dữ liệu song song (Meta, Google, Settings, History)
+  // Không đợi settings xong mới gọi API mà gọi cùng lúc để tận dụng băng thông
+  window._SETTINGS_PROMISE = (async () => {
     if (typeof initSettingsSync === "function") {
-      await initSettingsSync(); // ☁️ Tải settings
+      await initSettingsSync();
       if (typeof updateSummaryCardHTML === "function") updateSummaryCardHTML();
     }
   })();
 
+  const googleAdsTask = (async () => {
+    if (typeof fetchGoogleAdsData === 'function') {
+      await fetchGoogleAdsData(false);
+    }
+  })();
+
   await Promise.all([
-    initAccountSelector(), // 👤 Khởi tạo chọn tài khoản động
-    updateBrandDropdownUI(), // 🏷️ Khởi tạo bộ lọc sau khi có settings
-    loadDashboardData() // 📊 Tải dữ liệu chính
+    window._SETTINGS_PROMISE,
+    googleAdsTask,
+    initAccountSelector(),
+    loadDashboardData(),
+    syncAiHistoryFromSheet()
   ]);
 
 
@@ -2509,6 +2523,7 @@ function openAiSummaryModal() {
   }
   updateAiHistoryBadge();
   switchAiTab("home");
+  syncAiHistoryFromSheet(); // Đồng bộ ngầm khi mở modal
 }
 
 function switchAiTab(tab) {
@@ -2971,12 +2986,35 @@ function exportAiToWord() {
 
 
 
-// ── AI sheet sync helper (fire-and-forget) ─────────────────────────
+// ── AI sheet sync helper ─────────────────────────
 function _aiSheetPost(body) {
   const url = typeof window.SETTINGS_SHEET_URL === "string" && window.SETTINGS_SHEET_URL
     ? window.SETTINGS_SHEET_URL : null;
   if (!url) return;
   fetch(url, { method: "POST", body: JSON.stringify(body) }).catch(() => { });
+}
+
+async function syncAiHistoryFromSheet() {
+  const url = typeof window.SETTINGS_SHEET_URL === "string" && window.SETTINGS_SHEET_URL
+    ? window.SETTINGS_SHEET_URL : null;
+  if (!url) return;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({ sheet: "ai_reports", action: "list" })
+    });
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json.ok && Array.isArray(json.data)) {
+      localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(json.data));
+      updateAiHistoryBadge();
+      // Nếu đang mở tab lịch sử thì render lại ngay
+      const panel = document.getElementById("ai_panel_history");
+      if (panel && panel.style.display !== "none") renderAiHistory();
+    }
+  } catch (err) {
+    console.warn("AI History Sync failed:", err);
+  }
 }
 
 const AI_HISTORY_KEY = "dom_ai_summary_history";
@@ -4660,6 +4698,10 @@ if (filterButton) {
 async function applyCampaignFilter(keyword) {
   CURRENT_CAMPAIGN_FILTER = keyword || ""; // 👈 Luôn lưu lại bộ lọc cuối cùng
 
+  // 🔹 Sync all brand dropdown UIs
+  if (typeof updateBrandDropdownUI === 'function') updateBrandDropdownUI();
+  if (typeof updatePerfBrandDropdownUI === 'function') updatePerfBrandDropdownUI();
+
   // 🔹 Refresh Google Ads INSTANTLY (local calculation, no fetch needed)
   if (typeof refreshGoogleAds === 'function') refreshGoogleAds();
 
@@ -4725,7 +4767,7 @@ async function applyCampaignFilter(keyword) {
 
   // 🔹 Lấy ID campaign để gọi API Meta (chạy ngầm)
   const ids = filtered.map((c) => c.id).filter(Boolean);
-  loadAllDashboardCharts(ids);
+  await loadAllDashboardCharts(ids);
 
   // 🔹 Render lại goal chart
   const allAds = filtered.flatMap((c) =>
@@ -6750,7 +6792,7 @@ function setupDetailDailyFilter() {
 /**
  * Cập nhật UI tóm tắt tổng quan, bao gồm so sánh với kỳ trước.
  */
-function updatePlatformSummaryUI(currentData, previousData = []) {
+function updatePlatformSummaryUI(currentData, previousData = [], customDates = null) {
   // Thêm previousData và giá trị mặc định
   // --- Helper function để xử lý một object/array data ---
 
@@ -6916,7 +6958,17 @@ function updatePlatformSummaryUI(currentData, previousData = []) {
     const e = new Date(endDate + "T00:00:00");
     const durationDays = Math.round((e - s) / 86400000) + 1;
 
-    let titleText = `Kỳ trước: ${isCurrency ? formatMoney(previousValue) : previousValue.toLocaleString("vi-VN")} (${fmtDate(previousData?.[0]?.date_start)} - ${fmtDate(previousData?.[0]?.date_stop)}) • ${durationDays} ngày trước đó`;
+    let dFrom = customDates ? customDates.start : previousData?.[0]?.date_start;
+    let dTo = customDates ? customDates.end : previousData?.[0]?.date_stop;
+
+    let compDuration = durationDays;
+    if (dFrom && dTo) {
+      const cs = new Date(dFrom + "T00:00:00");
+      const ce = new Date(dTo + "T00:00:00");
+      compDuration = Math.round((ce - cs) / 86400000) + 1;
+    }
+
+    let titleText = `${customDates ? 'Kỳ so sánh' : 'Kỳ trước'}: ${isCurrency ? formatMoney(previousValue) : previousValue.toLocaleString("vi-VN")} (${fmtDate(dFrom)} - ${fmtDate(dTo)}) • ${compDuration} ngày`;
     const valueEl = document.querySelector(`#${id} span:first-child`);
     const changeEl = document.querySelector(`#${id} span:last-child`);
 
@@ -7270,6 +7322,9 @@ async function loadAllDashboardCharts(campaignIds = []) {
 
     // 3. Phân phối data đến các hàm RENDER/UPDATE UI (không fetch nữa)
     // 3.1. Platform Stats (Summary)
+    // 🚩 QUAN TRỌNG: Phải đợi settingsTask xong để đảm bảo updateSummaryCardHTML không xóa đè dữ liệu
+    if (window._SETTINGS_PROMISE) await window._SETTINGS_PROMISE;
+
     updatePlatformSummaryUI(
       results.platformStats,
       results.platformStats_previous
@@ -8427,7 +8482,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-  if (typeof fetchGoogleAdsData === 'function') fetchGoogleAdsData(false);
+  // if (typeof fetchGoogleAdsData === 'function') fetchGoogleAdsData(false); // Đã chuyển vào main() khởi tạo song song
 
   const menuItems = document.querySelectorAll(".dom_menu li");
   const container = document.querySelector(".dom_container");
@@ -8577,19 +8632,60 @@ document.addEventListener("DOMContentLoaded", () => {
       const name = nameEl.textContent.trim();
       const filter = isReset ? "" : filterValue.trim().toLowerCase();
 
-      // Update UI
-      const parentImg = parent.querySelector("img");
-      const parentText = parent.querySelector(".dom_selected");
-      if (parentImg) parentImg.src = imgSrc;
-      if (parentText) parentText.textContent = name;
-
-      parent.classList.remove("active");
-      parent.querySelectorAll("li").forEach((li) => li.classList.remove("active"));
-      option.classList.add("active");
-
       // Apply brand/campaign filter
       if (typeof applyCampaignFilter === "function") {
         applyCampaignFilter(isReset ? "RESET" : filter);
+      }
+    }
+  });
+
+  // Handle BRAND selector in performance modal
+  document.addEventListener("click", async (e) => {
+    const select = e.target.closest("#perf_brand_selector");
+    const option = e.target.closest("#perf_brand_list li");
+
+    if (select && !option) {
+      select.classList.toggle("active");
+      const ul = select.querySelector("ul");
+      if (ul) ul.classList.toggle("show");
+      return;
+    }
+
+    if (option) {
+      const parent = option.closest("#perf_brand_selector");
+      if (!parent) return;
+
+      const nameEl = option.querySelector("span");
+      const filterValue = option.dataset?.filter ?? null;
+      const isReset = filterValue === null ? false : filterValue.trim() === "";
+
+      if (!nameEl) return;
+
+      const name = nameEl.textContent.trim();
+      const filter = isReset ? "RESET" : filterValue.trim().toLowerCase();
+
+      parent.classList.remove("active");
+      const ul = parent.querySelector("ul");
+      if (ul) ul.classList.remove("show");
+
+      // Apply filter
+      if (typeof applyCampaignFilter === "function") {
+        await applyCampaignFilter(filter);
+
+        // Refresh the performance table
+        if (typeof refreshPerformanceComparison === "function") {
+          refreshPerformanceComparison();
+        }
+      }
+    } else {
+      // Click outside closes it
+      const selector = document.getElementById("perf_brand_selector");
+      if (selector && !selector.contains(e.target)) {
+        if (selector) {
+          selector.classList.remove("active");
+          const ul = selector.querySelector("ul");
+          if (ul) ul.classList.remove("show");
+        }
       }
     }
   });
@@ -10652,15 +10748,20 @@ function updateBrandDropdownUI() {
   const dropdownUl = document.querySelector(".quick_filter_detail .dom_select_show");
   if (!dropdownUl) return;
 
-  dropdownUl.innerHTML = brands.map(b => `
-    <li data-filter="${b.filter}" class="">
+  const current = (CURRENT_CAMPAIGN_FILTER || "").toUpperCase() === "RESET" ? "" : (CURRENT_CAMPAIGN_FILTER || "").toLowerCase();
+
+  dropdownUl.innerHTML = brands.map(b => {
+    const bFilter = (b.filter || "").toLowerCase();
+    const isActive = bFilter === current;
+    return `
+    <li data-filter="${b.filter}" class="${isActive ? 'active' : ''}">
       <img src="${b.img}" />
       <span>${b.name}</span>
     </li>
-  `).join('');
+  `}).join('');
 
   // Update currently selected if it exists
-  const selectedBrand = brands.find(b => b.filter === CURRENT_CAMPAIGN_FILTER) || brands[brands.length - 1];
+  const selectedBrand = brands.find(b => (b.filter || "").toLowerCase() === current) || brands[brands.length - 1];
   if (selectedBrand) {
     const parent = dropdownUl.closest(".quick_filter_detail");
     if (parent) {
@@ -10671,6 +10772,41 @@ function updateBrandDropdownUI() {
     }
   }
 }
+
+function updatePerfBrandDropdownUI() {
+  const brands = loadBrandSettings();
+  const dropdownUl = document.getElementById("perf_brand_list");
+  if (!dropdownUl) return;
+
+  const current = (CURRENT_CAMPAIGN_FILTER || "").toUpperCase() === "RESET" ? "" : (CURRENT_CAMPAIGN_FILTER || "").toLowerCase();
+
+  dropdownUl.innerHTML = brands.map(b => {
+    const bFilter = (b.filter || "").toLowerCase();
+    const isActive = bFilter === current;
+    return `
+    <li data-filter="${b.filter}" class="${isActive ? 'active' : ''}">
+      <img src="${b.img}" />
+      <span>${b.name}</span>
+    </li>
+  `}).join('');
+
+  // Update currently selected if it exists
+  const selectedBrand = brands.find(b => (b.filter || "").toLowerCase() === current) || brands[brands.length - 1];
+  if (selectedBrand) {
+    const parentText = document.getElementById("perf_selected_brand");
+    const parentImg = document.getElementById("perf_selected_brand_img");
+    if (parentText) parentText.textContent = selectedBrand.name;
+    if (parentImg) {
+      if (selectedBrand.img && !selectedBrand.img.includes("ampersand_img.jpg")) {
+        parentImg.src = selectedBrand.img;
+        parentImg.style.display = "block";
+      } else {
+        parentImg.style.display = "none";
+      }
+    }
+  }
+}
+
 
 function openFilterSettings() {
   const modal = document.getElementById("filter_settings_modal");
@@ -11730,6 +11866,7 @@ let perfCalendarYear = new Date().getFullYear();
 let perfCompareMode = 'auto'; // 'auto', 'last_year', 'custom'
 let perfSelectedStartDate = null;
 let perfSelectedEndDate = null;
+let perfCustomCompareDates = null; // Lưu trữ kỳ so sánh đã chọn để dùng cho tooltip Dashboard
 
 const fmtPerfDate = (d) => {
   if (!d) return "??/??";
@@ -11746,16 +11883,41 @@ window.openPerformanceDetail = function () {
   setTimeout(() => modal.classList.add("active"), 10);
   document.body.style.overflow = "hidden";
 
-  // Reset state picker
-  perfCompareMode = 'auto';
-  perfSelectedStartDate = null;
-  perfSelectedEndDate = null;
+  // Chỉ reset state nếu chưa có kỳ so sánh nào được chọn (hoặc muốn reset mới hoàn toàn)
+  // 🚩 Giữ lại kỳ so sánh đang active để user không phải chọn lại
+  if (!perfSelectedStartDate && perfCompareMode === 'auto') {
+    perfCompareMode = 'auto';
+    perfSelectedStartDate = null;
+    perfSelectedEndDate = null;
+  }
+
   const pnlReset = document.getElementById("perf_date_picker_panel");
   if (pnlReset) pnlReset.style.display = "none";
 
   const labelCurrent = document.getElementById("perf_current_date_range");
   if (labelCurrent) labelCurrent.textContent = `${fmtPerfDate(startDate)} - ${fmtPerfDate(endDate)}`;
 
+  // Cập nhật text label cho kỳ so sánh hiện tại
+  const compareLabel = document.getElementById("perf_compare_label");
+  if (compareLabel) {
+    if (perfCompareMode === 'auto') compareLabel.textContent = "Tự động (Kỳ trước)";
+    else if (perfCompareMode === 'last_year') compareLabel.textContent = "Cùng kỳ năm ngoái";
+    else if (perfCompareMode === 'custom') {
+      const start = fmtPerfDate(perfSelectedStartDate);
+      const end = perfSelectedEndDate ? fmtPerfDate(perfSelectedEndDate) : "...";
+      compareLabel.textContent = `Tùy chỉnh (${start} - ${end})`;
+    }
+  }
+
+  // Active đúng nút trong list
+  const modeList = document.querySelector(".perf_compare_modes");
+  if (modeList) {
+    const lis = modeList.querySelectorAll("li");
+    lis.forEach(li => {
+      li.classList.toggle("active", li.getAttribute("onclick")?.includes(`'${perfCompareMode}'`));
+    });
+  }
+  updatePerfBrandDropdownUI();
   renderPerformanceTable();
 };
 
@@ -11911,7 +12073,18 @@ window.refreshPerformanceComparison = async function () {
     const endpoint = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions,inline_link_clicks,purchase_roas,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${filtering}&time_range={"since":"${compareStart}","until":"${compareEnd}"}&access_token=${META_TOKEN}`;
 
     const resp = await fetchJSON(endpoint);
-    renderPerformanceTable(resp.data?.[0] || {});
+    const manualData = resp.data?.[0] || {};
+    renderPerformanceTable(manualData);
+
+    // 🚩 Lưu lại kỳ so sánh custom để dashboard dùng
+    perfCustomCompareDates = { start: compareStart, end: compareEnd, data: manualData };
+
+    // Cập nhật thẻ tóm tắt ở ngoài Dashboard
+    updatePlatformSummaryUI(
+      window._DASHBOARD_BATCH_RESULTS?.platformStats,
+      [manualData],
+      perfCustomCompareDates
+    );
   } catch (err) {
     console.error("❌ Lỗi load so sánh:", err);
   } finally {
@@ -11996,7 +12169,18 @@ function renderPerformanceTable(manualCompareData = null) {
   };
 
   const cur = process(results.platformStats);
-  const prev = manualCompareData ? process(manualCompareData) : process(results.platformStats_previous);
+  let prev = manualCompareData ? process(manualCompareData) : process(results.platformStats_previous);
+
+  // 🚩 Nếu dashboard gọi render mà đang có kỳ custom được chọn, dùng kỳ đó luôn
+  if (!manualCompareData && perfCustomCompareDates && perfCompareMode !== 'auto') {
+    prev = process(perfCustomCompareDates.data);
+    // Cập nhật lại Card ở Dashboard với kỳ custom đang có
+    updatePlatformSummaryUI(results.platformStats, [perfCustomCompareDates.data], perfCustomCompareDates);
+  } else if (!manualCompareData) {
+    // Reset về Auto
+    perfCustomCompareDates = null;
+    updatePlatformSummaryUI(results.platformStats, results.platformStats_previous);
+  }
 
   const rows = [
     { section: "Tổng quan tài chính" },
