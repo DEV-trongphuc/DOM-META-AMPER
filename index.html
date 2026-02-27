@@ -26,10 +26,8 @@
 
 <body>
   <!-- ⚙️ Column Settings Modal -->
-  <div id="column_settings_modal" class="dom_modal"
-    style="display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); position: fixed; inset: 0; z-index: 9999;">
-    <div
-      style="background: #fff; width: 85rem; max-height: 90vh; border-radius: 2rem; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2rem 5rem rgba(0,0,0,0.2);">
+  <div id="column_settings_modal" class="ai_modal_overlay" style="display: none;">
+    <div class="ai_modal_box" style="width: 85rem;">
       <div
         style="padding: 2rem 3rem; background: #f8f9fa; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
         <!-- Title area: thường thì icon+h2, khi edit preset thì ẩn h2 và hiện name input tại đây -->
@@ -197,8 +195,8 @@
           <i class="fa-solid fa-money-check"></i>
           <span>Ad Account</span>
         </li>
-        <p class="dom_text_menu">GOOGLE ADS</p>
-        <li class="" data-view="google_ads">
+        <p class="dom_text_menu" id="gads_menu_title">GOOGLE ADS</p>
+        <li class="" data-view="google_ads" id="gads_menu_item">
           <i class="fa-brands fa-google"></i>
           <span>Google ads</span>
         </li>
@@ -416,7 +414,10 @@
             </div>
           </div> -->
         <div class="dom_row flex">
-          <div class="dom_inner dom_fade_item w20 box_shadow chart">
+          <div class="dom_inner dom_fade_item w20 box_shadow chart" style="position: relative;">
+            <div class="summary_expand_btn" onclick="openPerformanceDetail()" title="Detailed Performance">
+              <i class="fa-solid fa-chevron-right"></i>
+            </div>
             <div class="dom_total_report">
               <ul>
                 <li class="total_spent">
@@ -500,7 +501,7 @@
                 </span>
                 <i class="fa-solid fa-gear chart_settings_btn" id="goal_settings_btn"
                   style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity=1"
-                  onmouseout="this.style.opacity=0.5"></i>
+                  onmouseout="this.style.opacity=0.5" onclick="openGoalSettings()"></i>
               </div>
             </h2>
             <div>
@@ -652,6 +653,10 @@
                       CAMPAIGNS</span>
                   </li>
                   <li class="">
+                    <span data-view="spent_ads" class="view_quick"></span>
+                    <span><i class="fa-solid fa-coins" style="color:#f59e0b;"></i> Campaign has Spend</span>
+                  </li>
+                  <li class="">
                     <span data-view="lead_ads_goal" class="view_quick"></span>
                     <span><i class="fa-solid fa-bullseye"></i> Lead
                       Campaign</span>
@@ -662,6 +667,22 @@
                       Campaign</span>
                   </li>
                   <li class="">
+                    <span data-view="traffic_ads_goal" class="view_quick"></span>
+                    <span><i class="fa-solid fa-link"></i> Traffic Campaign</span>
+                  </li>
+                  <li class="">
+                    <span data-view="sales_ads_goal" class="view_quick"></span>
+                    <span><i class="fa-solid fa-cart-shopping"></i> Sales Campaign</span>
+                  </li>
+                  <li class="">
+                    <span data-view="video_ads_goal" class="view_quick"></span>
+                    <span><i class="fa-solid fa-circle-play"></i> Video Campaign</span>
+                  </li>
+                  <li class="">
+                    <span data-view="app_ads_goal" class="view_quick"></span>
+                    <span><i class="fa-solid fa-mobile-screen-button"></i> App Promotion</span>
+                  </li>
+                  <li class="">
                     <span data-view="ba_ads_goal" class="view_quick"></span>
                     <span><i class="fa-solid fa-eye"></i> Brand Awareness</span>
                   </li>
@@ -669,6 +690,17 @@
                     <span data-view="engage_ads_goal" class="view_quick"></span>
                     <span><i class="fa-solid fa-thumbs-up"></i> Engagement
                       Page</span>
+                  </li>
+                  <li
+                    style="padding: 0.5rem 1.5rem; font-size: 1.1rem; color: #94a3b8; font-weight: 700; border-top: 1px solid #f1f5f9; margin-top: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                    Performance</li>
+                  <li class="">
+                    <span data-view="high_ctr" class="view_quick"></span>
+                    <span><i class="fa-solid fa-chart-line" style="color:#6366f1;"></i> High CTR (>1%)</span>
+                  </li>
+                  <li class="">
+                    <span data-view="high_roas" class="view_quick"></span>
+                    <span><i class="fa-solid fa-sack-dollar" style="color:#10b981;"></i> High ROAS (>2)</span>
                   </li>
                   <li class="">
                     <span data-view="reset" class="view_quick"></span>
@@ -680,6 +712,35 @@
                     <li  class="">
                       <span class="radio_box"></span> <span>Today</span>
                     </li> -->
+                </ul>
+              </div>
+              <!-- ⏳ Status/Ending Filter -->
+              <div class="dom_select status_filter">
+                <div class="flex">
+                  <p class="dom_selected">Sắp kết thúc</p>
+                </div>
+                <i class="fa-solid fa-angle-down"></i>
+                <ul class="dom_select_show">
+                  <li>
+                    <span data-view="ending_1d" class="view_status"></span>
+                    <span><i class="fa-solid fa-hourglass-end status_filter_icon" style="color:#ef4444;"></i><span>Còn 1
+                        ngày</span></span>
+                  </li>
+                  <li>
+                    <span data-view="ending_3d" class="view_status"></span>
+                    <span><i class="fa-solid fa-hourglass-half status_filter_icon" style="color:#f59e0b;"></i><span>Còn
+                        3
+                        ngày</span></span>
+                  </li>
+                  <li>
+                    <span data-view="ended_ads" class="view_status"></span>
+                    <span><i class="fa-solid fa-circle-stop status_filter_icon" style="color:#64748b;"></i><span>Đã kết
+                        thúc</span></span>
+                  </li>
+                  <li class="divider">
+                    <span data-view="reset_status" class="view_status"></span>
+                    <span><i class="fa-solid fa-xmark status_filter_icon"></i><span>Reset bộ lọc</span></span>
+                  </li>
                 </ul>
               </div>
               <!-- ⚡ Preset switcher — custom dropdown -->
@@ -1208,23 +1269,38 @@
                 <ul>
                   <li class="total_spent">
                     <span><i class="fa-brands fa-google"></i> Google Ads</span>
-                    <p id="g_spent"><span>-</span></p>
+                    <p id="g_spent">
+                      <span>-</span>
+                      <span>-%</span>
+                    </p>
                   </li>
                   <li>
                     <span><i class="fa-solid fa-eye"></i> Impression</span>
-                    <p id="g_impression"><span>-</span></p>
+                    <p id="g_impression">
+                      <span>-</span>
+                      <span>-%</span>
+                    </p>
                   </li>
                   <li>
                     <span><i class="fa-solid fa-arrow-pointer"></i> Click</span>
-                    <p id="g_click"><span>-</span></p>
+                    <p id="g_click">
+                      <span>-</span>
+                      <span>-%</span>
+                    </p>
                   </li>
                   <li>
                     <span><i class="fa-solid fa-bullseye"></i> Conversions</span>
-                    <p id="g_conv"><span>-</span></p>
+                    <p id="g_conv">
+                      <span>-</span>
+                      <span>-%</span>
+                    </p>
                   </li>
                   <li>
                     <span><i class="fa-solid fa-store"></i> Store Visit</span>
-                    <p id="g_store"><span>-</span></p>
+                    <p id="g_store">
+                      <span>-</span>
+                      <span>-%</span>
+                    </p>
                   </li>
                 </ul>
               </div>
@@ -1234,8 +1310,15 @@
 
             <!-- Daily Trend Chart -->
             <div class="dom_inner w40 box_shadow chart trendline">
-              <div class="dom_table_filter">
-                <h2><i class="fa-solid fa-chart-line main_clr"></i> Daily Spent</h2>
+              <div class="dom_table_filter" style="justify-content: space-between;">
+                <div style="display:flex; align-items:center; gap:1.2rem;">
+                  <h2 style="margin:0;"><i class="fa-solid fa-chart-line main_clr"></i> <span id="g_trend_title">Daily
+                      Spent</span></h2>
+                  <div class="g_switcher">
+                    <button id="g_daily_btn" class="active" onclick="setGoogleTrendMode('daily')">Daily</button>
+                    <button id="g_monthly_btn" onclick="setGoogleTrendMode('monthly')">Monthly</button>
+                  </div>
+                </div>
                 <div class="dom_select daily_total" id="g_trend_select">
                   <i class="fa-solid fa-chart-area"></i>
                   <div class="flex">
@@ -1273,6 +1356,7 @@
                     <li data-view="ctr"><span class="radio_box"></span><span>CTR (%)</span></li>
                     <li data-view="cpc"><span class="radio_box"></span><span>CPC</span></li>
                     <li data-view="cpa"><span class="radio_box"></span><span>CPA</span></li>
+                    <li data-view="cpv"><span class="radio_box"></span><span>CPV</span></li>
                   </ul>
                 </div>
               </div>
@@ -1318,12 +1402,12 @@
               <div id="g_donut_legend" class="g_donut_legend"></div>
             </div>
 
-            <!-- Scatter Chart – Cost Efficiency (RIGHT) -->
+            <!-- CPVisit Chart – Store Visit Efficiency (RIGHT) -->
             <div class="dom_inner g_third box_shadow chart">
-              <h2><i class="fa-solid fa-circle-dot main_clr"></i> Cost Efficiency</h2>
-              <p class="g_chart_subtitle">Bubble = Clicks &nbsp;&middot;&nbsp; X: Spent &nbsp;&middot;&nbsp; Y: Conv</p>
-              <div class="g_chart_wrap">
-                <canvas id="g_scatter_chart"></canvas>
+              <h2><i class="fa-solid fa-store main_clr"></i> CPVisit Efficiency</h2>
+              <div id="g_cpvisit_wrap" class="g_funnel_wrap"
+                style="overflow-y:auto; max-height: 32rem; padding-right: 0.5rem; margin-top: 1rem;">
+                <!-- JS populated bars -->
               </div>
             </div>
           </div>
@@ -1599,6 +1683,145 @@
           <i class="fa-solid fa-floppy-disk"></i> Lưu cấu hình
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 📊 Detailed Performance Modal -->
+  <div id="performance_modal" class="ai_modal_overlay" style="display:none; z-index: 2000;">
+    <div class="ai_modal_content"
+      style="width: 90vw; max-width: 1300px; height: 85vh; display:flex; flex-direction:column;">
+      <div class="ai_modal_header">
+        <div style="display:flex; align-items:center; gap:1.2rem;">
+          <i class="fa-solid fa-chart-column" style="color: var(--mainClr); font-size: 2.2rem;"></i>
+          <span style="font-size: 2rem; font-weight:800; color: #1e293b;">BÁO CÁO HIỆU SUẤT CHI TIẾT</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:1.5rem;">
+          <div
+            style="cursor: pointer; color: #64748b; background: #f1f5f9; width: 3.2rem; height: 3.2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
+            onclick="openSummarySettings()"
+            onmouseover="this.style.background='var(--mainClr)'; this.style.color='#fff'"
+            onmouseout="this.style.background='#f1f5f9'; this.style.color='#64748b'" title="Cấu hình 3 chỉ số">
+            <i class="fa-solid fa-gear" style="font-size: 1.5rem;"></i>
+          </div>
+          <button class="ai_close_btn" onclick="closePerformanceDetail()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="performance_compare_toolbar"
+        style="padding: 1.2rem 2.4rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display:flex; align-items:center; justify-content: space-between; gap:2rem; position: relative; z-index: 500;">
+        <div style="display:flex; align-items:center; gap:1.5rem;">
+          <div class="perf_date_selector" style="cursor: default; border-color: #cbd5e1; background: #f1f5f9;">
+            <i class="fa-solid fa-calendar-day" style="color:#94a3b8;"></i>
+            <span style="font-weight:600; color:#64748b;">Kỳ hiện tại:</span>
+            <span id="perf_current_date_range" style="font-weight:700; color:#1e293b; margin-left: 0.5rem;">-</span>
+          </div>
+          <i class="fa-solid fa-arrow-right-arrow-left" style="color:#cbd5e1;"></i>
+          <div class="perf_date_selector_wrap" style="position: relative;">
+            <div class="perf_date_selector" onclick="togglePerfDatePicker()">
+              <i class="fa-solid fa-calendar-check" style="color:var(--mainClr);"></i>
+              <span style="font-weight:600; color:#64748b;">So sánh với:</span>
+              <span id="perf_compare_label" style="font-weight:700; color:#1e293b; margin-left: 0.5rem;">Tự động (Kỳ
+                trước)</span>
+              <i class="fa-solid fa-chevron-down" style="font-size:1.1rem; color:#94a3b8; margin-left: 0.5rem;"></i>
+            </div>
+
+            <!-- Custom Date Picker Dropdown for Performance -->
+            <div id="perf_date_picker_panel" class="perf_date_picker_panel" style="display: none;">
+              <div class="time_picker_sidebar">
+                <ul>
+                  <li onclick="setPerfCompareType('auto', this)" class="active">
+                    <span class="radio_box"></span> <span>Tự động (Kỳ trước)</span>
+                  </li>
+
+                  <li onclick="setPerfCompareType('custom', this)">
+                    <span class="radio_box"></span> <span>Tùy chọn khoảng ngày</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="time_picker_content">
+                <div class="calendar_container">
+                  <div class="calendar_card" id="perf_calendar">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+                <div class="time_picker_footer">
+                  <div class="picker_inputs" style="display:flex; align-items:center; gap:0.6rem;">
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                      <span style="font-size:1rem; color:#94a3b8; font-weight:700;">Từ ngày:</span>
+                      <input type="date" id="perf_start_date_input" />
+                    </div>
+                    <span style="margin-top:1.5rem; color:#cbd5e1;">-</span>
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                      <span style="font-size:1rem; color:#94a3b8; font-weight:700;">Đến ngày:</span>
+                      <input type="date" id="perf_end_date_input" />
+                    </div>
+                  </div>
+                  <div class="picker_actions">
+                    <button class="btn_cancel" onclick="togglePerfDatePicker()">Hủy</button>
+                    <button class="btn_update" onclick="applyPerfCompareDate()">Áp dụng</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="ai_modal_body"
+        style="padding: 0; overflow-y: auto; flex: 1; background: #fff; position: relative; z-index: 1; border-radius: 0 0 12px 12px;">
+        <div id="performance_detail_content" style="padding: 2.4rem;">
+          <!-- Table will be rendered here -->
+        </div>
+        <div class="perf_loading" style="display:none; text-align:center; padding: 5rem;">
+          <div class="ai_loader_dots"><span></span><span></span><span></span></div>
+          <p style="margin-top:1.5rem; color:#64748b; font-weight:600;">Đang chuẩn bị dữ liệu so sánh...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="summary_settings_modal" class="ai_modal_overlay" style="display: none;">
+    <div class="ai_modal_box" style="width: 650px;">
+      <div
+        style="padding: 1.8rem 2.4rem; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between;">
+        <h3
+          style="font-size: 1.8rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 1rem; margin: 0;">
+          <i class="fa-solid fa-gear" style="color: var(--mainClr);"></i> Cài đặt chỉ số tóm tắt
+        </h3>
+        <i class="fa-solid fa-xmark" style="cursor: pointer; font-size: 2rem; color: #94a3b8;"
+          onclick="closeSummarySettings()"></i>
+      </div>
+      <div style="padding: 2rem; overflow-y: auto;">
+        <p style="font-size: 1.35rem; color: #64748b; margin-bottom: 2rem; line-height: 1.6;">Chọn đúng <b>3 chỉ số</b>
+          quan trọng nhất (ngoài Spent) để hiển thị và nhận định nhanh.</p>
+        <div id="summary_available_list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <!-- Options rendered by JS -->
+        </div>
+      </div>
+      <div
+        style="padding: 1.5rem 2.4rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 1.2rem; background: #f8fafc;">
+        <button onclick="closeSummarySettings()"
+          style="padding: 0.8rem 1.6rem; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; font-weight: 600; cursor: pointer; color: #64748b;">Hủy</button>
+        <button onclick="saveSummarySettings()"
+          style="padding: 0.8rem 2.4rem; border-radius: 8px; background: var(--mainClr); color: #fff; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(255, 169, 0, 0.3);">Lưu
+          cấu hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚠️ Custom Alert Modal -->
+  <div id="dom_alert_modal" class="ai_modal_overlay" style="display: none; z-index: 200000;">
+    <div class="ai_modal_box" style="width: 400px; padding: 2.4rem;" id="dom_alert_content">
+      <div
+        style="width: 5rem; height: 5rem; background: #fff7ed; color: #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2.4rem;">
+        <i class="fa-solid fa-circle-exclamation"></i>
+      </div>
+      <h3 style="font-size: 1.8rem; font-weight: 800; color: #1e293b; margin-bottom: 1rem;">Thông báo</h3>
+      <p id="dom_alert_message" style="font-size: 1.4rem; color: #64748b; margin-bottom: 2rem; line-height: 1.5;"></p>
+      <button onclick="closeDomAlert()"
+        style="width: 100%; padding: 1.2rem; border-radius: 10px; background: var(--mainClr); color: #fff; border: none; font-weight: 700; cursor: pointer; font-size: 1.4rem;">Đã
+        hiểu</button>
     </div>
   </div>
 

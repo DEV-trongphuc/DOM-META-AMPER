@@ -29,66 +29,181 @@ window.safeGetActionValue = (actions, type) => {
 
 // =================== DYNAMIC COLUMN CONFIG ===================
 const METRIC_REGISTRY = {
-  spend: { id: "spend", label: "Spent", type: "field", format: "money" },
-  reach: { id: "reach", label: "Reach", type: "field", format: "number" },
-  impressions: { id: "impressions", label: "Impressions", type: "field", format: "number" },
-  frequency: { id: "frequency", label: "Frequency", type: "special", format: "decimal" },
-  cpm: { id: "cpm", label: "CPM", type: "special", format: "money" },
-  cpc: { id: "cpc", label: "CPC", type: "field", format: "money" },
-  ctr: { id: "ctr", label: "CTR", type: "field", format: "percent" },
-  result: { id: "result", label: "Result", type: "special", format: "number" },
-  cpr: { id: "cpr", label: "CPR", type: "special", format: "money" },
-  reaction: { id: "reaction", label: "Reactions", type: "action", action_type: "post_reaction", format: "number" },
-  comment: { id: "comment", label: "Comments", type: "action", action_type: "comment", format: "number" },
-  share: { id: "share", label: "Shares", type: "action", action_type: "post", format: "number" },
-  link_click: { id: "link_click", label: "Link Clicks", type: "action", action_type: "link_click", format: "number" },
-  message: { id: "message", label: "Messages", type: "action", action_type: "onsite_conversion.messaging_conversation_started_7d", format: "number" },
-  page_engagement: { id: "page_engagement", label: "Page Engaged", type: "action", action_type: "page_engagement", format: "number" },
-  post_engagement: { id: "post_engagement", label: "Post Engagement", type: "action", action_type: "post_engagement", format: "number" },
-  video_play: { id: "video_play", label: "Video Plays", type: "action", action_type: "video_play", field_name: "video_play_actions", format: "number" },
-  video_view: { id: "video_view", label: "Video View (3s)", type: "action", action_type: "video_view", format: "number" },
-  thruplay: { id: "thruplay", label: "ThruPlays", type: "action", action_type: "video_thruplay_watched_actions", field_name: "video_thruplay_watched_actions", format: "number" },
-  video_p25: { id: "video_p25", label: "Video 25%", type: "action", action_type: "video_p25_watched_actions", field_name: "video_p25_watched_actions", format: "number" },
-  video_p50: { id: "video_p50", label: "Video 50%", type: "action", action_type: "video_p50_watched_actions", field_name: "video_p50_watched_actions", format: "number" },
-  video_p75: { id: "video_p75", label: "Video 75%", type: "action", action_type: "video_p75_watched_actions", field_name: "video_p75_watched_actions", format: "number" },
-  video_p95: { id: "video_p95", label: "Video 95%", type: "action", action_type: "video_p95_watched_actions", field_name: "video_p95_watched_actions", format: "number" },
-  video_p100: { id: "video_p100", label: "Video 100%", type: "action", action_type: "video_p100_watched_actions", field_name: "video_p100_watched_actions", format: "number" },
-  photo_view: { id: "photo_view", label: "Photo View", type: "action", action_type: "photo_view", format: "number" },
-  lead: { id: "lead", label: "Leads", type: "action", action_type: "onsite_conversion.lead_grouped", format: "number" },
-  follow: { id: "follow", label: "Follows", type: "action", action_type: "page_like", format: "number" },
-  like: { id: "like", label: "Likes", type: "action", action_type: "post_reaction", format: "number" },
-  save: { id: "save", label: "Saves", type: "action", action_type: "onsite_conversion.post_save", format: "number" },
-  clicks_all: { id: "clicks_all", label: "Clicks (All)", type: "field", field_name: "clicks", format: "number" },
-  outbound_click: { id: "outbound_click", label: "Outbound Clicks", type: "action", action_type: "outbound_click", format: "number" },
-  inline_link_click: { id: "inline_link_click", label: "Inline Link Clicks", type: "field", field_name: "inline_link_clicks", format: "number" },
-  roas: { id: "roas", label: "Purchase ROAS", type: "action", action_type: "purchase_roas", format: "decimal" },
-  account_id: { id: "account_id", label: "Account ID", type: "field", field_name: "account_id", format: "string" },
-  account_name: { id: "account_name", label: "Account Name", type: "field", field_name: "account_name", format: "string" },
-  account_currency: { id: "account_currency", label: "Currency", type: "field", field_name: "account_currency", format: "string" },
-  buying_type: { id: "buying_type", label: "Buying Type", type: "field", field_name: "buying_type", format: "string" },
-  objective: { id: "objective", label: "Objective", type: "field", field_name: "objective", format: "string" },
-
-  // --- Dynamic Action Values (Revenue/Value) ---
-  conv_value: { id: "conv_value", label: "Conv. Value", type: "action_value", action_type: "offsite_conversion.fb_pixel_purchase", format: "money" },
-  omni_purchase_value: { id: "omni_purchase_value", label: "Omni Purchase Value", type: "action_value", action_type: "omni_purchase", format: "money" },
-
-  // --- Additional Messaging Metrics from JSON ---
-  msg_total_conn: { id: "msg_total_conn", label: "Total Msg Conn.", type: "action", action_type: "onsite_conversion.total_messaging_connection", format: "number" },
-  msg_block: { id: "msg_block", label: "Msg Blocked", type: "action", action_type: "onsite_conversion.messaging_block", format: "number" },
-  msg_welcome: { id: "msg_welcome", label: "Msg Welcome View", type: "action", action_type: "onsite_conversion.messaging_welcome_message_view", format: "number" },
-  msg_depth_2: { id: "msg_depth_2", label: "Msg Depth 2+", type: "action", action_type: "onsite_conversion.messaging_user_depth_2_message_send", format: "number" },
-  msg_depth_3: { id: "msg_depth_3", label: "Msg Depth 3+", type: "action", action_type: "onsite_conversion.messaging_user_depth_3_message_send", format: "number" },
-  msg_first_reply: { id: "msg_first_reply", label: "Msg First Reply", type: "action", action_type: "onsite_conversion.messaging_first_reply", format: "number" },
-  msg_replied: { id: "msg_replied", label: "Msg Replied", type: "action", action_type: "onsite_conversion.messaging_conversation_replied_7d", format: "number" },
-
-  // --- Additional Engagement/Lead Metrics from JSON ---
-  post_unlike: { id: "post_unlike", label: "Post Unliked", type: "action", action_type: "onsite_conversion.post_unlike", format: "number" },
-  post_net_like: { id: "post_net_like", label: "Net Likes", type: "action", action_type: "onsite_conversion.post_net_like", format: "number" },
-  post_net_save: { id: "post_net_save", label: "Net Saves", type: "action", action_type: "onsite_conversion.post_net_save", format: "number" },
-  lead_grouped: { id: "lead_grouped", label: "Leads (Grouped)", type: "action", action_type: "onsite_conversion.lead_grouped", format: "number" },
-  post_interaction_gross: { id: "post_interaction_gross", label: "Gross Interaction", type: "action", action_type: "post_interaction_gross", format: "number" },
-  onsite_web_lead: { id: "onsite_web_lead", label: "Onsite Web Lead", type: "action", action_type: "onsite_web_lead", format: "number" },
+  spend: { id: "spend", label: "Spent", icon: "fa-solid fa-circle-dollar-to-slot", type: "field", format: "money" },
+  reach: { id: "reach", label: "Reach", icon: "fa-solid fa-street-view", type: "field", format: "number" },
+  impressions: { id: "impressions", label: "Impressions", icon: "fa-solid fa-eye", type: "field", format: "number" },
+  frequency: { id: "frequency", label: "Frequency", icon: "fa-solid fa-wave-square", type: "special", format: "decimal" },
+  cpm: { id: "cpm", label: "CPM", icon: "fa-solid fa-receipt", type: "special", format: "money" },
+  cpc: { id: "cpc", label: "CPC", icon: "fa-solid fa-mouse-pointer", type: "field", format: "money" },
+  ctr: { id: "ctr", label: "CTR", icon: "fa-solid fa-percent", type: "field", format: "percent" },
+  result: { id: "result", label: "Result", icon: "fa-solid fa-square-poll-vertical", type: "special", format: "number" },
+  cpr: { id: "cpr", label: "CPR", icon: "fa-solid fa-tags", type: "special", format: "money" },
+  reaction: { id: "reaction", label: "Reactions", icon: "fa-solid fa-thumbs-up", type: "action", action_type: "post_reaction", format: "number" },
+  comment: { id: "comment", label: "Comments", icon: "fa-solid fa-comment", type: "action", action_type: "comment", format: "number" },
+  share: { id: "share", label: "Shares", icon: "fa-solid fa-share-nodes", type: "action", action_type: "post", format: "number" },
+  link_click: { id: "link_click", label: "Link Clicks", icon: "fa-solid fa-link", type: "action", action_type: "link_click", format: "number" },
+  message_started: { id: "message_started", label: "Mess. Started", icon: "fa-brands fa-facebook-messenger", type: "action", action_type: "onsite_conversion.messaging_conversation_started_7d", format: "number" },
+  message_connection: { id: "message_connection", label: "Mess. Connection", icon: "fa-solid fa-comments", type: "action", action_type: "onsite_conversion.total_messaging_connection", format: "number" },
+  purchase: { id: "purchase", label: "Purchases", icon: "fa-solid fa-cart-shopping", type: "action", action_type: "purchase", format: "number" },
+  roas: { id: "roas", label: "ROAS (Purchase)", icon: "fa-solid fa-money-bill-trend-up", type: "action", action_type: "purchase_roas", format: "decimal" },
+  page_engagement: { id: "page_engagement", label: "Page Engaged", icon: "fa-solid fa-hand-pointer", type: "action", action_type: "page_engagement", format: "number" },
+  post_engagement: { id: "post_engagement", label: "Post Engagement", icon: "fa-solid fa-plus-square", type: "action", action_type: "post_engagement", format: "number" },
+  video_play: { id: "video_play", label: "Video Plays", icon: "fa-solid fa-play", type: "action", action_type: "video_play", field_name: "video_play_actions", format: "number" },
+  video_view: { id: "video_view", label: "Video View (3s)", icon: "fa-solid fa-video", type: "action", action_type: "video_view", format: "number" },
+  thruplay: { id: "thruplay", label: "ThruPlays", icon: "fa-solid fa-forward", type: "action", action_type: "video_thruplay_watched_actions", field_name: "video_thruplay_watched_actions", format: "number" },
+  video_p25: { id: "video_p25", label: "Video 25%", icon: "fa-solid fa-hourglass-start", type: "action", action_type: "video_p25_watched_actions", field_name: "video_p25_watched_actions", format: "number" },
+  video_p50: { id: "video_p50", label: "Video 50%", icon: "fa-solid fa-hourglass-half", type: "action", action_type: "video_p50_watched_actions", field_name: "video_p50_watched_actions", format: "number" },
+  video_p75: { id: "video_p75", label: "Video 75%", icon: "fa-solid fa-hourglass-end", type: "action", action_type: "video_p75_watched_actions", field_name: "video_p75_watched_actions", format: "number" },
+  video_p95: { id: "video_p95", label: "Video 95%", icon: "fa-solid fa-clock", type: "action", action_type: "video_p95_watched_actions", field_name: "video_p95_watched_actions", format: "number" },
+  video_p100: { id: "video_p100", label: "Video 100%", icon: "fa-solid fa-circle-check", type: "action", action_type: "video_p100_watched_actions", field_name: "video_p100_watched_actions", format: "number" },
+  photo_view: { id: "photo_view", label: "Photo View", icon: "fa-solid fa-image", type: "action", action_type: "photo_view", format: "number" },
+  lead: { id: "lead", label: "Leads", icon: "fa-solid fa-bullseye", type: "action", action_type: "onsite_conversion.lead_grouped", format: "number" },
+  follow: { id: "follow", label: "Follows", icon: "fa-solid fa-user-plus", type: "action", action_type: "page_like", format: "number" },
+  like: { id: "like", label: "Likes", icon: "fa-solid fa-heart", type: "action", action_type: "post_reaction", format: "number" },
+  save: { id: "save", label: "Saves", icon: "fa-solid fa-bookmark", type: "action", action_type: "onsite_conversion.post_save", format: "number" },
 };
+let SUMMARY_METRICS = JSON.parse(localStorage.getItem("dom_summary_metrics")) || ["impressions", "reach", "message"];
+// --- Summary Metrics UI Logic ---
+window.openSummarySettings = function () {
+  const modal = document.getElementById("summary_settings_modal");
+  if (!modal) return;
+  modal.style.display = "flex";
+  setTimeout(() => modal.classList.add("active"), 10);
+
+  const list = document.getElementById("summary_available_list");
+  list.innerHTML = Object.keys(METRIC_REGISTRY)
+    .filter(id => id !== "spend")
+    .map(id => {
+      const active = SUMMARY_METRICS.includes(id);
+      return `
+        <div class="summary_option ${active ? 'active' : ''}" onclick="toggleSummaryMetric('${id}')" data-id="${id}" 
+             style="display: flex; align-items:center; gap: 1.2rem; padding: 1.2rem; border: 1.5px solid ${active ? 'var(--mainClr)' : '#e2e8f0'}; border-radius: 12px; cursor:pointer; background:${active ? '#fffbeb' : '#fff'}; transition:all 0.2s; position:relative;">
+          <div style="width: 3.2rem; height: 3.2rem; border-radius: 8px; background: ${active ? 'var(--mainClr)' : '#f1f5f9'}; display: flex; align-items: center; justify-content: center;">
+            <i class="${METRIC_REGISTRY[id].icon || 'fa-solid fa-chart-simple'}" style="color: ${active ? '#fff' : '#64748b'}; font-size: 1.4rem;"></i>
+          </div>
+          <span style="font-size:1.35rem; font-weight:600; color: ${active ? 'var(--mainClrText)' : '#1e293b'};">${METRIC_REGISTRY[id].label}</span>
+          <i class="fa-solid fa-circle-check check-icon" style="margin-left:auto; color:var(--mainClr); font-size: 1.6rem; display:${active ? 'block' : 'none'}"></i>
+        </div>
+      `;
+    }).join("");
+};
+window.domAlert = function (msg) {
+  const modal = document.getElementById("dom_alert_modal");
+  const msgEl = document.getElementById("dom_alert_message");
+  if (!modal || !msgEl) return;
+  msgEl.innerText = msg;
+  modal.style.display = "flex";
+  setTimeout(() => {
+    modal.classList.add("active");
+    document.getElementById("dom_alert_content").style.transform = "scale(1)";
+  }, 10);
+};
+
+window.closeDomAlert = function () {
+  const modal = document.getElementById("dom_alert_modal");
+  const content = document.getElementById("dom_alert_content");
+  if (content) content.style.transform = "scale(0.9)";
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => {
+      modal.style.display = "none";
+    }, 200);
+  }
+};
+
+window.toggleSummaryMetric = function (id) {
+  const idx = SUMMARY_METRICS.indexOf(id);
+  if (idx > -1) {
+    SUMMARY_METRICS.splice(idx, 1);
+  } else {
+    if (SUMMARY_METRICS.length >= 3) {
+      domAlert("Bạn chỉ được chọn tối đa 3 chỉ số phụ.");
+      return;
+    }
+    SUMMARY_METRICS.push(id);
+  }
+
+  document.querySelectorAll(".summary_option").forEach(el => {
+    const eid = el.dataset.id;
+    const active = SUMMARY_METRICS.includes(eid);
+    el.style.borderColor = active ? "var(--mainClr)" : "#e2e8f0";
+    el.style.background = active ? "#fffbeb" : "#fff";
+    const iconContainer = el.querySelector("div");
+    iconContainer.style.background = active ? "var(--mainClr)" : "#f1f5f9";
+    iconContainer.querySelector("i").style.color = active ? "#fff" : "#64748b";
+    el.querySelector(".check-icon").style.display = active ? 'block' : 'none';
+  });
+};
+
+window.saveSummarySettings = function () {
+  if (SUMMARY_METRICS.length !== 3) {
+    domAlert("Vui lòng chọn đúng 3 chỉ số phụ.");
+    return;
+  }
+  localStorage.setItem("dom_summary_metrics", JSON.stringify(SUMMARY_METRICS));
+
+  // Đồng bộ với Google Sheets nếu có function
+  if (typeof window.saveSummaryMetricsSync === "function") {
+    window.saveSummaryMetricsSync(SUMMARY_METRICS).catch(e => console.warn("Sync summary settings failed:", e));
+  }
+
+  const modal = document.getElementById("summary_settings_modal");
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => { modal.style.display = "none"; }, 300);
+  }
+  updateSummaryCardHTML();
+  loadDashboardData();
+};
+
+window.closeSummarySettings = function () {
+  const modal = document.getElementById("summary_settings_modal");
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => {
+      modal.style.display = "none";
+    }, 300);
+  }
+  SUMMARY_METRICS = JSON.parse(localStorage.getItem("dom_summary_metrics")) || ["impressions", "reach", "message"];
+};
+
+function updateSummaryCardHTML() {
+  const container = document.querySelector(".dom_total_report ul");
+  if (!container) return;
+
+  let html = `
+    <li class="total_spent">
+      <span><i class="${METRIC_REGISTRY.spend.icon}"></i> ${METRIC_REGISTRY.spend.label}</span>
+      <p id="spent">
+        <span>-</span>
+        <span>-%</span>
+      </p>
+    </li>
+  `;
+
+  SUMMARY_METRICS.forEach(id => {
+    const meta = METRIC_REGISTRY[id];
+    if (!meta) return;
+    html += `
+      <li id="card_${id}">
+        <span><i class="${meta.icon || 'fa-solid fa-chart-simple'}"></i> ${meta.label}</span>
+        <p id="${id}">
+          <span>-</span>
+          <span>-%</span>
+        </p>
+      </li>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// Chạy update khi DOM load
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", updateSummaryCardHTML);
+} else {
+  updateSummaryCardHTML();
+}
 
 let ACTIVE_COLUMNS = [];
 let CUSTOM_METRICS = [];
@@ -547,7 +662,10 @@ window._promptRenamePreset = function (id) {
 
   // Open the modal
   const modal = document.getElementById("column_settings_modal");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("active"), 10);
+  }
 };
 
 /** Show edit-mode UI in the column settings modal */
@@ -655,7 +773,10 @@ window.saveCurrentAsPreset = function () {
   if (lbl) lbl.textContent = "Lưu Preset mới";
 
   const modal = document.getElementById("column_settings_modal");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("active"), 10);
+  }
 };
 
 // ── Core save handler (edit existing OR save new) ───────────────
@@ -742,7 +863,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (close && modal) {
     close.onclick = () => {
       _exitPresetEditMode();
-      modal.style.display = "none";
+      modal.classList.remove("active");
+      setTimeout(() => {
+        modal.style.display = "none";
+      }, 300);
     };
   }
 
@@ -794,13 +918,19 @@ document.addEventListener("DOMContentLoaded", () => {
         // Preset mode (edit or new)
         _savePresetEditIfActive();
         renderColumnSettingsModal();
-        setTimeout(() => { if (modal) modal.style.display = "none"; }, 300);
+        if (modal) {
+          modal.classList.remove("active");
+          setTimeout(() => { modal.style.display = "none"; }, 300);
+        }
         if (window._ALL_CAMPAIGNS)
           renderCampaignView(window._FILTERED_CAMPAIGNS || window._ALL_CAMPAIGNS);
       } else {
         // Normal column config mode
         saveColumnConfig();
-        if (modal) modal.style.display = "none";
+        if (modal) {
+          modal.classList.remove("active");
+          setTimeout(() => { modal.style.display = "none"; }, 300);
+        }
         if (window._ALL_CAMPAIGNS) renderCampaignView(window._ALL_CAMPAIGNS);
         showToast("Đã đồng bộ cấu hình thiết lập");
       }
@@ -1660,7 +1790,8 @@ function renderCampaignView(data) {
   const now = Date.now();
   const activeLower = "active";
 
-  let totalCampaignCount = data.length;
+  let totalCampaignCount = window._ALL_CAMPAIGNS?.length || data.length;
+  let filteredCampaignCount = data.length;
   let activeCampaignCount = 0;
   let totalAdsetCount = 0;
   let activeAdsetCount = 0;
@@ -1736,7 +1867,7 @@ function renderCampaignView(data) {
     if (campEl) {
       const hasActiveCampaign = activeCampaignCount > 0;
       campEl.classList.toggle("inactive", !hasActiveCampaign);
-      campEl.innerHTML = `<span class="live-dot"></span>${activeCampaignCount}/${totalCampaignCount}`;
+      campEl.innerHTML = `<span class="live-dot"></span>${activeCampaignCount}/${filteredCampaignCount}`;
     }
 
     // Cập nhật trạng thái adset
@@ -2286,6 +2417,14 @@ async function loadDashboardData() {
 
 // 🚀 Hàm chính gọi khi load trang lần đầu
 async function main() {
+  // 🚩 Xử lý ẩn Google Ads nếu SETUP là false
+  if (window.GOOGLE_ADS_SETUP === false) {
+    const gadsTitle = document.getElementById("gads_menu_title");
+    const gadsItem = document.getElementById("gads_menu_item");
+    if (gadsTitle) gadsTitle.style.display = "none";
+    if (gadsItem) gadsItem.style.display = "none";
+  }
+
   // 🦴 Skeleton start - Hiện khung xương ngay lập tức khi load app
   toggleSkeletons(".dom_dashboard", true);
 
@@ -2361,7 +2500,10 @@ function openAiSummaryModal() {
   }
 
   const modal = document.getElementById("ai_summary_modal");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("active"), 10);
+  }
   updateAiHistoryBadge();
   switchAiTab("home");
 }
@@ -3006,7 +3148,12 @@ function closeAiSummaryModal() {
     _aiController = null;
   }
   const modal = document.getElementById("ai_summary_modal");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => {
+      modal.style.display = "none";
+    }, 300);
+  }
 }
 
 async function runAiSummary() {
@@ -6605,97 +6752,124 @@ function updatePlatformSummaryUI(currentData, previousData = []) {
   // --- Helper function để xử lý một object/array data ---
 
   const processData = (data) => {
-    // Đảm bảo data là object, lấy phần tử đầu nếu là array
     const insights = Array.isArray(data) ? data[0] || {} : data || {};
+    const acts = {};
+    (insights.actions || []).forEach(a => acts[a.action_type] = (acts[a.action_type] || 0) + (+a.value || 0));
 
-    // Chuyển actions array thành object để dễ truy cập
-    const actionsObj = {};
-    (insights.actions || []).forEach(({ action_type, value }) => {
-      actionsObj[action_type] = (actionsObj[action_type] || 0) + (+value || 0);
-    });
+    // Bổ sung từ các trường action chuyên biệt (video, engagement, v.v.)
+    const parseSpecial = (field) => {
+      if (!insights[field]) return;
+      if (Array.isArray(insights[field])) {
+        insights[field].forEach(({ action_type, value }) => {
+          acts[action_type] = (acts[action_type] || 0) + (+value || 0);
+        });
+      } else if (typeof insights[field] === "number" || typeof insights[field] === "string") {
+        const base = field.replace("_actions", "");
+        acts[base] = (acts[base] || 0) + (+insights[field] || 0);
+      }
+    };
+    ["video_play_actions", "video_thruplay_watched_actions", "video_p25_watched_actions", "video_p50_watched_actions", "video_p75_watched_actions", "video_p95_watched_actions", "video_p100_watched_actions"].forEach(parseSpecial);
 
-    const getActionSum = (types) => {
-      let sum = 0;
+    const getAct = (types) => {
+      let s = 0;
+      const doneBase = new Set();
       types.forEach(t => {
-        sum += (actionsObj[t] || 0);
-        // Thử tìm với prefix onsite_conversion. nếu chưa có
-        if (!(t in actionsObj) && !t.startsWith("onsite_conversion.")) {
-          sum += (actionsObj["onsite_conversion." + t] || 0);
+        const base = t.startsWith("onsite_conversion.") ? t.replace("onsite_conversion.", "") : t;
+        if (doneBase.has(base)) return;
+        doneBase.add(base);
+
+        const onsite = "onsite_conversion." + base;
+        if (acts[onsite]) {
+          s += acts[onsite];
+        } else if (acts[base]) {
+          s += acts[base];
         }
       });
-      return sum;
+      return s;
     };
-
-    const getFieldVal = (field) => {
-      const val = insights[field];
-      if (!val) return 0;
-      if (Array.isArray(val)) return +val[0]?.value || 0;
-      return +val || 0;
-    };
-
-    // DEBUG: Log để kiểm tra các actions trả về từ API
-    if (insights.actions) {
-      console.log("📊 [Platform Summary Actions]:", actionsObj);
-    }
-
-    return {
-      spend: +insights.spend || 0,
-      reach: +insights.reach || 0,
-      impressions: +insights.impressions || 0,
-      message: getActionSum(["onsite_conversion.messaging_conversation_started_7d", "messaging_conversation_started_7d", "outbound_click"]),
-      lead: getActionSum(["onsite_conversion.lead_grouped", "lead_grouped", "lead", "onsite_web_lead"]),
-      // Các chỉ số phụ
-      video_play: getActionSum(["video_play", "play", "video_view", "video_3_sec_watched_actions"]) || getFieldVal("video_play_actions") || 0,
-      thruplay: getActionSum(["video_thruplay_watched_actions", "thruplay"]) || getFieldVal("video_thruplay_watched_actions") || 0,
-      link_click: getActionSum(["link_click", "inline_link_clicks", "outbound_click"]) || getFieldVal("clicks") || 0,
-      post_engagement: getActionSum(["post_engagement", "page_engagement", "post_interaction_gross", "post_interaction"]),
-      reaction: getActionSum(["post_reaction", "reaction", "like", "post_interaction"]),
-      follow: getActionSum(["page_like", "page_follow", "follow", "like", "instagram_profile_follow", "onsite_conversion.instagram_profile_follow", "onsite_conversion.page_like"]),
-      share: getActionSum(["post", "share"]),
-    };
-  };
-
-  // --- Aggregate current metrics from window._ALL_CAMPAIGNS for 100% consistency ---
-  const aggregateAll = (campArray) => {
-    const res = { spend: 0, reach: 0, impressions: 0, message: 0, lead: 0, video_play: 0, thruplay: 0, link_click: 0, post_engagement: 0, reaction: 0, follow: 0, share: 0 };
 
     const sumArr = (arr) => {
       if (!arr) return 0;
       if (Array.isArray(arr)) {
-        if (!arr.length) return 0;
-        return arr.reduce((sum, a) => sum + (+a.value || 0), 0);
+        return arr.reduce((acc, a) => acc + (+a.value || 0), 0);
       }
       return +arr.value || 0;
     };
 
+    const res = { spend: +insights.spend || 0 };
+    SUMMARY_METRICS.forEach(mid => {
+      const meta = METRIC_REGISTRY[mid];
+      if (!meta) return;
+      if (meta.type === "field") {
+        res[mid] = +insights[meta.field_name || mid] || 0;
+      } else if (meta.type === "action") {
+        res[mid] = getAct([meta.action_type]);
+      } else if (meta.type === "special") {
+        if (mid === "result") {
+          res[mid] = getAct(["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.lead_grouped"]);
+        }
+      }
+    });
+
+    res.reach = +insights.reach || 0;
+    res.impressions = +insights.impressions || 0;
+    res.video_play = sumArr(insights.video_play_actions) || getAct(["video_play", "video_view"]);
+    res.thruplay = sumArr(insights.video_thruplay_watched_actions) || getAct(["thruplay", "video_thruplay_watched_actions"]);
+    res.link_click = getAct(["link_click", "inline_link_clicks", "outbound_click"]) || +insights.clicks || 0;
+    res.post_engagement = getAct(["post_engagement", "page_engagement", "post_interaction"]);
+    res.reaction = getAct(["post_reaction", "reaction", "like"]);
+    res.follow = getAct(["page_like", "page_follow", "instagram_profile_follow", "onsite_conversion.page_like", "onsite_conversion.instagram_profile_follow", "like"]);
+
+    return res;
+  };
+
+  const aggregateAll = (campArray) => {
+    const res = { spend: 0 };
+    SUMMARY_METRICS.forEach(mid => res[mid] = 0);
+
+    // Add base metrics
+    ["reach", "impressions", "video_play", "thruplay", "link_click", "post_engagement", "reaction", "follow"].forEach(m => res[m] = 0);
+
     campArray.forEach(c => {
       c.adsets?.forEach(as => {
+        const acts = as.actions || [];
         res.spend += (as.spend || 0);
         res.reach += (as.reach || 0);
         res.impressions += (as.impressions || 0);
-        const acts = as.actions || [];
 
-        // Sum messages and leads
-        res.message += (window.safeGetActionValue(acts, "onsite_conversion.messaging_conversation_started_7d") || window.safeGetActionValue(acts, "messaging_conversation_started_7d") || window.safeGetActionValue(acts, "onsite_conversion.total_messaging_connection") || 0);
-        res.lead += (window.safeGetActionValue(acts, "onsite_conversion.lead_grouped") || window.safeGetActionValue(acts, "lead") || window.safeGetActionValue(acts, "onsite_web_lead") || 0);
+        SUMMARY_METRICS.forEach(mid => {
+          const meta = METRIC_REGISTRY[mid];
+          if (!meta) return;
+          if (meta.type === "field") {
+            res[mid] += (+as[meta.field_name || mid] || 0);
+          } else if (meta.type === "action") {
+            res[mid] += (window.safeGetActionValue(acts, meta.action_type) || window.safeGetActionValue(acts, "onsite_conversion." + meta.action_type) || 0);
+          } else if (mid === "result") {
+            res[mid] += (window.safeGetActionValue(acts, "onsite_conversion.messaging_conversation_started_7d") || window.safeGetActionValue(acts, "onsite_conversion.lead_grouped") || 0);
+          }
+        });
 
-        // Video metrics: sum specialized fields as they often contain the total regardless of internal action_type
-        res.video_play += (sumArr(as.video_play_actions) || window.safeGetActionValue(acts, "video_play") || window.safeGetActionValue(acts, "video_view") || 0);
-        res.thruplay += (sumArr(as.video_thruplay_watched_actions) || window.safeGetActionValue(acts, "video_thruplay_watched_actions") || window.safeGetActionValue(acts, "thruplay") || 0);
-
+        // Base actions
+        res.video_play += (window.safeGetActionValue(acts, "video_play") || 0);
+        res.thruplay += (window.safeGetActionValue(acts, "video_thruplay_watched_actions") || 0);
         res.link_click += (window.safeGetActionValue(acts, "link_click") || as.inline_link_clicks || 0);
         res.post_engagement += (window.safeGetActionValue(acts, "post_engagement") || window.safeGetActionValue(acts, "page_engagement") || 0);
         res.reaction += (window.safeGetActionValue(acts, "post_reaction") || window.safeGetActionValue(acts, "reaction") || 0);
-        res.follow += (as.follow || window.safeGetActionValue(acts, "page_like") + window.safeGetActionValue(acts, "like") + window.safeGetActionValue(acts, "page_follow") + window.safeGetActionValue(acts, "instagram_profile_follow") + window.safeGetActionValue(acts, "onsite_conversion.page_like"));
-        res.share += (window.safeGetActionValue(acts, "post") || window.safeGetActionValue(acts, "share") || 0);
+        res.follow += (as.follow || window.safeGetActionValue(acts, "page_like") || window.safeGetActionValue(acts, "onsite_conversion.page_like") || 0);
       });
     });
     return res;
   };
 
-  const currentMetrics = (window._ALL_CAMPAIGNS && window._ALL_CAMPAIGNS.length > 0)
-    ? aggregateAll(window._FILTERED_CAMPAIGNS || window._ALL_CAMPAIGNS)
-    : processData(currentData);
+  // Ưu tiên dùng currentData từ API (Results của fetchDashboardInsightsBatch)
+  // Chỉ fallback aggregateAll nếu currentData rỗng/lỗi
+  const currentMetrics = (currentData && (Array.isArray(currentData) ? currentData.length > 0 : !!currentData.spend))
+    ? processData(currentData)
+    : (window._ALL_CAMPAIGNS && window._ALL_CAMPAIGNS.length > 0
+      ? aggregateAll(window._FILTERED_CAMPAIGNS || window._ALL_CAMPAIGNS)
+      : processData(currentData)
+    );
+
   const previousMetrics = processData(previousData);
   console.log(previousMetrics);
 
@@ -6780,9 +6954,12 @@ function updatePlatformSummaryUI(currentData, previousData = []) {
 
   // --- Render các chỉ số chính với so sánh ---
   renderMetric("spent", currentMetrics.spend, previousMetrics.spend, true);
-  renderMetric("impression", currentMetrics.impressions, previousMetrics.impressions);
-  renderMetric("reach", currentMetrics.reach, previousMetrics.reach);
-  renderMetric("message", currentMetrics.message, previousMetrics.message);
+
+  SUMMARY_METRICS.forEach(mid => {
+    const valCur = currentMetrics[mid] || currentMetrics.actionsObj?.[mid] || 0;
+    const valPrev = previousMetrics[mid] || previousMetrics.actionsObj?.[mid] || 0;
+    renderMetric(mid, valCur, valPrev, METRIC_REGISTRY[mid]?.format === "money");
+  });
 
   // --- Render các chỉ số phụ (không cần so sánh theo UI mới) ---
   const updateText = (cls, val) => {
@@ -6961,7 +7138,7 @@ async function fetchDashboardInsightsBatch(campaignIds = []) {
     {
       method: "GET",
       name: "platformStats",
-      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${currentTimeRange}${filtering}`,
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,inline_link_clicks,purchase_roas,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${currentTimeRange}${filtering}`,
     },
     {
       method: "GET",
@@ -6993,7 +7170,7 @@ async function fetchDashboardInsightsBatch(campaignIds = []) {
     {
       method: "GET",
       name: "platformStats_previous",
-      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${previousTimeRange}${filtering}`,
+      relative_url: `${commonEndpoint}?fields=spend,impressions,reach,actions,inline_link_clicks,purchase_roas,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${previousTimeRange}${filtering}`,
     }, // <<< CHỈ THÊM CÁI NÀY
   ];
   // --- KẾT THÚC BƯỚC 2 ---
@@ -7072,6 +7249,7 @@ async function loadAllDashboardCharts(campaignIds = []) {
 
   try {
     // 2. Gọi HÀM BATCH MỚI (1 request duy nhất)
+    window._LAST_CAMPAIGN_IDS = campaignIds;
     const results = await fetchDashboardInsightsBatch(campaignIds);
 
     // 🚩 CHECK EMPTY STATE: Nếu tổng spend = 0, hiện Empty Card
@@ -7424,14 +7602,14 @@ function initDateSelector() {
       const end = endInput.value;
 
       if (!start || !end) {
-        alert("⛔ Vui lòng chọn đầy đủ ngày!");
+        domAlert("⛔ Vui lòng chọn đầy đủ ngày!");
         return;
       }
 
       const s = new Date(start);
       const eD = new Date(end);
       if (eD < s) {
-        alert("⚠️ Ngày kết thúc phải sau ngày bắt đầu!");
+        domAlert("⚠️ Ngày kết thúc phải sau ngày bắt đầu!");
         return;
       }
 
@@ -7988,13 +8166,21 @@ if (quickFilterBox) {
         renderCampaignView(activeCampaigns);
       }
 
+      // --- 🔹 Campaigns with Spend ---
+      else if (view === "spent_ads") {
+        const spentCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+          const spend = +c.spend || 0;
+          return spend > 0;
+        });
+        renderCampaignView(spentCampaigns);
+      }
+
       // --- 🔹 Lead Ads (Optimization Goal) ---
       else if (view === "lead_ads_goal") {
         const leadAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
           c.adsets?.some(
             (adset) =>
-              adset.optimization_goal &&
-              adset.optimization_goal.toLowerCase().includes("lead")
+              adset.optimization_goal?.toLowerCase().includes("lead")
           )
         );
 
@@ -8006,8 +8192,8 @@ if (quickFilterBox) {
         const messageAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
           c.adsets?.some(
             (adset) =>
-              adset.optimization_goal &&
-              adset.optimization_goal.toLowerCase() === "replies"
+              adset.optimization_goal?.toLowerCase() === "replies" ||
+              adset.optimization_goal?.toLowerCase() === "messaging_conversation_started_7d"
           )
         );
 
@@ -8020,14 +8206,91 @@ if (quickFilterBox) {
           c.adsets?.some((adset) =>
             [
               "post_engagement",
-              "thruplay",
               "event_responses",
               "page_likes",
-            ].includes(adset.optimization_goal.toLowerCase())
+            ].includes(adset.optimization_goal?.toLowerCase())
           )
         );
 
         renderCampaignView(engageAdsCampaigns);
+      }
+
+      // --- 🔹 Traffic Ads ---
+      else if (view === "traffic_ads_goal") {
+        const trafficAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+          c.adsets?.some((adset) =>
+            [
+              "link_clicks",
+              "landing_page_views",
+            ].includes(adset.optimization_goal?.toLowerCase())
+          )
+        );
+        renderCampaignView(trafficAdsCampaigns);
+      }
+
+      // --- 🔹 Sales/Conversions Ads ---
+      else if (view === "sales_ads_goal") {
+        const salesAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+          c.adsets?.some((adset) =>
+            [
+              "offsite_conversions",
+              "value",
+              "conversions",
+            ].includes(adset.optimization_goal?.toLowerCase())
+          )
+        );
+        renderCampaignView(salesAdsCampaigns);
+      }
+
+      // --- 🔹 Video Views Ads ---
+      else if (view === "video_ads_goal") {
+        const videoAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+          c.adsets?.some((adset) =>
+            [
+              "thruplay",
+              "video_views",
+            ].includes(adset.optimization_goal?.toLowerCase())
+          )
+        );
+        renderCampaignView(videoAdsCampaigns);
+      }
+
+      // --- 🔹 App Promotion Ads ---
+      else if (view === "app_ads_goal") {
+        const appAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+          c.adsets?.some((adset) =>
+            [
+              "app_installs",
+              "app_events",
+            ].includes(adset.optimization_goal?.toLowerCase())
+          )
+        );
+        renderCampaignView(appAdsCampaigns);
+      }
+
+      // --- 🔹 High CTR (> 1%) ---
+      else if (view === "high_ctr") {
+        const highCtrCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+          const clicks = +c.inline_link_clicks || +c.clicks || 0;
+          const imps = +c.impressions || 0;
+          if (imps === 0) return false;
+          return (clicks / imps) * 100 >= 1;
+        });
+        renderCampaignView(highCtrCampaigns);
+      }
+
+      // --- 🔹 High ROAS (> 2) ---
+      else if (view === "high_roas") {
+        const highRoasCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+          const roasArr = c.purchase_roas || [];
+          const roasVal = roasArr.find(a =>
+            a.action_type === "purchase" || a.action_type === "omni_purchase" ||
+            a.action_type === "omni_purchase_roas" || a.action_type === "purchase_roas"
+          );
+          const val = roasVal ? +roasVal.value : 0;
+          return val >= 2;
+        });
+        renderCampaignView(highRoasCampaigns);
       }
 
       // --- 🔹 Brand Awareness (Optimization Goal) ---
@@ -8035,7 +8298,7 @@ if (quickFilterBox) {
         const awarenessAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
           c.adsets?.some((adset) =>
             ["reach", "ad_recall_lift", "impressions"].includes(
-              adset.optimization_goal.toLowerCase()
+              adset.optimization_goal?.toLowerCase()
             )
           )
         );
@@ -8063,20 +8326,83 @@ if (quickFilterBox) {
       quickFilterBox.classList.toggle("active");
     }
   });
+}
 
-  // 🧠 Click ra ngoài dropdown → tự đóng luôn
+// ⏳ Status Filter Logic (Ending soon / Ended)
+const statusFilterBox = document.querySelector(".status_filter");
+if (statusFilterBox) {
+  const selectedText = statusFilterBox.querySelector(".dom_selected");
+  const listItems = statusFilterBox.querySelectorAll(".dom_select_show li");
+  const dropdown = statusFilterBox.querySelector(".dom_select_show");
+
+  listItems.forEach((li) => {
+    li.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      // Xóa highlight cũ
+      listItems.forEach((x) => x.classList.remove("active"));
+      li.classList.add("active");
+
+      const label = li.querySelector("span:last-child")?.innerHTML || "";
+      const view = li.querySelector(".view_status")?.dataset.view || "";
+
+      selectedText.innerHTML = label;
+
+      if (view === "reset_status") {
+        selectedText.textContent = "Sắp kết thúc";
+        renderCampaignView(window._ALL_CAMPAIGNS);
+      } else {
+        const now = new Date();
+        const oneDayMs = 24 * 60 * 60 * 1000;
+
+        const filtered = window._ALL_CAMPAIGNS.filter(c => {
+          // Lấy end_time gần nhất từ adsets của campaign
+          const endTimes = (c.adsets || [])
+            .map(as => as.end_time ? new Date(as.end_time) : null)
+            .filter(d => d !== null);
+
+          if (!endTimes.length) return false;
+
+          // Đối với "Đã kết thúc", check xem có cái nào đã qua ngày hiện tại chưa
+          if (view === "ended_ads") {
+            return endTimes.some(d => d < now);
+          }
+
+          // Đối với "Sắp kết thúc x ngày"
+          const days = view === "ending_1d" ? 1 : 3;
+          return endTimes.some(d => {
+            const diff = d - now;
+            return diff > 0 && diff <= (days * oneDayMs);
+          });
+        });
+
+        renderCampaignView(filtered);
+      }
+
+      statusFilterBox.classList.remove("active");
+    });
+  });
+
+  statusFilterBox.addEventListener("click", (e) => {
+    // Chỉ toggle khi click vào nút chứ không phải click vào li bên trong
+    if (e.target.closest("li")) return;
+    statusFilterBox.classList.toggle("active");
+  });
+
+  // Đóng khi click ngoài
   document.addEventListener("click", (e) => {
-    if (!quickFilterBox.contains(e.target)) {
-      quickFilterBox.classList.remove("active");
+    if (!statusFilterBox.contains(e.target)) {
+      statusFilterBox.classList.remove("active");
     }
   });
 }
 
-// ── Global region/age chart toggle (called by inline onclick) ──
-window.toggleRegionView = function () {
-  const regionCard = document.getElementById("region_inner_card") || document.querySelector(".dom_region_inner");
-  if (regionCard) regionCard.classList.toggle("active");
-};
+// 🧠 Click ra ngoài dropdown → tự đóng luôn
+document.addEventListener("click", (e) => {
+  if (quickFilterBox && !quickFilterBox.contains(e.target)) {
+    quickFilterBox.classList.remove("active");
+  }
+});
 
 document.addEventListener("DOMContentLoaded", () => {
   // --- 📅 Initialize Date Selector ---
@@ -10208,7 +10534,7 @@ function setupAIReportModal() {
 function exportAdsToCSV() {
   const data = window._ALL_CAMPAIGNS;
   if (!data || !Array.isArray(data) || data.length === 0) {
-    alert("Không có dữ liệu để xuất!");
+    domAlert("Không có dữ liệu để xuất!");
     return;
   }
 
@@ -10345,7 +10671,10 @@ function updateBrandDropdownUI() {
 
 function openFilterSettings() {
   const modal = document.getElementById("filter_settings_modal");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("active"), 10);
+  }
   renderBrandSettingsToModal();
 }
 
@@ -10411,7 +10740,12 @@ window.quickToggleGoalChartMode = function () {
 
 function closeFilterSettings() {
   const modal = document.getElementById("filter_settings_modal");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => {
+      modal.style.display = "none";
+    }, 300);
+  }
 }
 
 function renderBrandSettingsToModal() {
@@ -11244,12 +11578,12 @@ if (_origLoadDashboardData) {
 
 // Wire up Share button
 document.getElementById("share_url_btn")?.addEventListener("click", shareCurrentView);
-document.getElementById("goal_settings_btn")?.addEventListener("click", openGoalSettings);
-
 // ── Goal Settings Modal Logic ────────────────────────────────
 function openGoalSettings() {
   const modal = document.getElementById("goal_settings_modal");
   if (!modal) return;
+  modal.style.display = "flex";
+  setTimeout(() => modal.classList.add("active"), 10);
 
   modal.innerHTML = `
     <div style="background:#fff; width:48rem; border-radius:18px; box-shadow:0 20px 50px rgba(0,0,0,0.15); display:flex; flex-direction:column; overflow:hidden;">
@@ -11293,8 +11627,17 @@ function openGoalSettings() {
   `;
 
   renderGoalKeywordsInModal();
-  modal.style.display = "flex";
 }
+window.openGoalSettings = openGoalSettings;
+
+function closeGoalSettings() {
+  const modal = document.getElementById("goal_settings_modal");
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => { modal.style.display = "none"; }, 300);
+  }
+}
+window.closeGoalSettings = closeGoalSettings;
 
 function renderGoalKeywordsInModal() {
   const list = document.getElementById("goal_keyword_list");
@@ -11322,10 +11665,6 @@ window.addNewGoalKeyword = function () {
   renderGoalKeywordsInModal();
 };
 
-window.closeGoalSettings = function () {
-  const modal = document.getElementById("goal_settings_modal");
-  if (modal) modal.style.display = "none";
-};
 
 window.saveGoalSettings = async function () {
   const inputs = document.querySelectorAll(".goal_keyword_input");
@@ -11380,10 +11719,432 @@ function showToast(msg, duration = 2500) {
   toast._timer = setTimeout(() => toast.classList.remove("show"), duration);
 }
 
-// ── Search handler for Full Actions Detail ──────────────────────
-window.filterFullActions = (query) => {
-  if (typeof renderFullActionsDetail === "function") {
-    renderFullActionsDetail(null, query);
+
+// ── 📊 Detailed Performance Report & Comparison ────────────────────
+
+let perfCalendarMonth = new Date().getMonth();
+let perfCalendarYear = new Date().getFullYear();
+let perfCompareMode = 'auto'; // 'auto', 'last_year', 'custom'
+let perfSelectedStartDate = null;
+let perfSelectedEndDate = null;
+
+const fmtPerfDate = (d) => {
+  if (!d) return "??/??";
+  const p = d.split("-");
+  return `${p[2]}/${p[1]}`;
+};
+
+window.openPerformanceDetail = function () {
+  const modal = document.getElementById("performance_modal");
+  if (!modal) return;
+
+  modal.style.display = "flex";
+  // Thêm class active để chạy animation popup
+  setTimeout(() => modal.classList.add("active"), 10);
+  document.body.style.overflow = "hidden";
+
+  // Reset state picker
+  perfCompareMode = 'auto';
+  perfSelectedStartDate = null;
+  perfSelectedEndDate = null;
+  const pnlReset = document.getElementById("perf_date_picker_panel");
+  if (pnlReset) pnlReset.style.display = "none";
+
+  const labelCurrent = document.getElementById("perf_current_date_range");
+  if (labelCurrent) labelCurrent.textContent = `${fmtPerfDate(startDate)} - ${fmtPerfDate(endDate)}`;
+
+  renderPerformanceTable();
+};
+
+window.togglePerfDatePicker = function () {
+  const panel = document.getElementById("perf_date_picker_panel");
+  if (!panel) return;
+  panel.style.display = panel.style.display === "none" ? "flex" : "none";
+  if (panel.style.display === "flex") {
+    renderPerfCalendar();
   }
 };
+
+window.setPerfCompareType = function (type, el) {
+  perfCompareMode = type;
+  const lis = el.parentElement.querySelectorAll("li");
+  lis.forEach(li => li.classList.remove("active"));
+  el.classList.add("active");
+
+  if (type === 'auto') {
+    perfSelectedStartDate = null;
+    perfSelectedEndDate = null;
+    document.getElementById("perf_compare_label").textContent = "Tự động (Kỳ trước)";
+    togglePerfDatePicker();
+    refreshPerformanceComparison();
+  } else if (type === 'last_year') {
+    const s = new Date(startDate + "T00:00:00");
+    const e = new Date(endDate + "T00:00:00");
+    s.setFullYear(s.getFullYear() - 1);
+    e.setFullYear(e.getFullYear() - 1);
+    perfSelectedStartDate = s.toISOString().slice(0, 10);
+    perfSelectedEndDate = e.toISOString().slice(0, 10);
+    document.getElementById("perf_compare_label").textContent = "Cùng kỳ năm ngoái";
+    togglePerfDatePicker();
+    refreshPerformanceComparison();
+  }
+};
+
+window.renderPerfCalendar = function () {
+  const container = document.getElementById("perf_calendar");
+  if (!container) return;
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const firstDay = new Date(perfCalendarYear, perfCalendarMonth, 1).getDay();
+  const daysInMonth = new Date(perfCalendarYear, perfCalendarMonth + 1, 0).getDate();
+  let html = `
+      <div class="calendar_nav">
+        <button onclick="changePerfMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+        <span>${monthNames[perfCalendarMonth]} ${perfCalendarYear}</span>
+        <button onclick="changePerfMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      <div class="calendar_grid">
+        <div class="calendar_day_name">S</div><div class="calendar_day_name">M</div><div class="calendar_day_name">T</div>
+        <div class="calendar_day_name">W</div><div class="calendar_day_name">T</div><div class="calendar_day_name">F</div>
+        <div class="calendar_day_name">S</div>
+   `;
+  for (let i = 0; i < firstDay; i++) html += `<div class="calendar_day empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${perfCalendarYear}-${String(perfCalendarMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    let cls = "calendar_day";
+    if (perfSelectedStartDate && dateStr === perfSelectedStartDate) cls += " selected start";
+    if (perfSelectedEndDate && dateStr === perfSelectedEndDate) cls += " selected end";
+    if (perfSelectedStartDate && perfSelectedEndDate && dateStr > perfSelectedStartDate && dateStr < perfSelectedEndDate) {
+      cls += " in_range";
+    }
+    html += `<div class="${cls}" onclick="selectPerfDate('${dateStr}')">${d}</div>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+};
+
+window.changePerfMonth = (dir) => {
+  perfCalendarMonth += dir;
+  if (perfCalendarMonth < 0) { perfCalendarMonth = 11; perfCalendarYear--; }
+  else if (perfCalendarMonth > 11) { perfCalendarMonth = 0; perfCalendarYear++; }
+  renderPerfCalendar();
+};
+
+window.selectPerfDate = (dateStr) => {
+  if (!perfSelectedStartDate || (perfSelectedStartDate && perfSelectedEndDate)) {
+    perfSelectedStartDate = dateStr;
+    perfSelectedEndDate = null;
+  } else {
+    if (dateStr < perfSelectedStartDate) {
+      perfSelectedEndDate = perfSelectedStartDate;
+      perfSelectedStartDate = dateStr;
+    } else {
+      perfSelectedEndDate = dateStr;
+    }
+  }
+
+  perfCompareMode = 'custom';
+  const sInp = document.getElementById("perf_start_date_input");
+  const eInp = document.getElementById("perf_end_date_input");
+  if (sInp) sInp.value = perfSelectedStartDate || "";
+  if (eInp) eInp.value = perfSelectedEndDate || "";
+
+  renderPerfCalendar();
+};
+
+window.applyPerfCompareDate = function () {
+  if (perfCompareMode === 'custom' && (!perfSelectedStartDate || !perfSelectedEndDate)) {
+    alert("Vui lòng chọn khoảng ngày so sánh (Ngày bắt đầu và kết thúc).");
+    return;
+  }
+  togglePerfDatePicker();
+  refreshPerformanceComparison();
+};
+
+window.closePerformanceDetail = function () {
+  const modal = document.getElementById("performance_modal");
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => {
+      modal.style.display = "none";
+    }, 300);
+  }
+  document.body.style.overflow = "auto";
+};
+
+window.refreshPerformanceComparison = async function () {
+  const loading = document.querySelector(".perf_loading");
+  const content = document.getElementById("performance_detail_content");
+
+  if (!perfSelectedStartDate) {
+    document.getElementById("perf_compare_label").textContent = "Tự động (Kỳ trước)";
+    renderPerformanceTable();
+    return;
+  }
+
+  if (loading) loading.style.display = "block";
+  const table = content.querySelector(".perf_table");
+  if (table) table.style.opacity = "0.5";
+
+  try {
+    let compareStart = perfSelectedStartDate;
+    let compareEnd = perfSelectedEndDate;
+
+    // Nếu chỉ có start (thường là auto/last_year), tự tính end
+    if (!compareEnd) {
+      const s = new Date(startDate + "T00:00:00");
+      const e = new Date(endDate + "T00:00:00");
+      const durationDays = Math.round((e - s) / 86400000);
+      const cs = new Date(compareStart + "T00:00:00");
+      const ce = new Date(cs);
+      ce.setDate(ce.getDate() + durationDays);
+      compareEnd = ce.toISOString().slice(0, 10);
+    }
+
+    const campaignIds = window._LAST_CAMPAIGN_IDS || [];
+    const filtering = campaignIds.length
+      ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: campaignIds }]))}`
+      : "";
+
+    const endpoint = `${BASE_URL}/act_${ACCOUNT_ID}/insights?fields=spend,impressions,reach,actions,inline_link_clicks,purchase_roas,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions${filtering}&time_range={"since":"${compareStart}","until":"${compareEnd}"}&access_token=${META_TOKEN}`;
+
+    const resp = await fetchJSON(endpoint);
+    renderPerformanceTable(resp.data?.[0] || {});
+  } catch (err) {
+    console.error("❌ Lỗi load so sánh:", err);
+  } finally {
+    if (loading) loading.style.display = "none";
+  }
+};
+
+
+
+function renderPerformanceTable(manualCompareData = null) {
+  const content = document.getElementById("performance_detail_content");
+  if (!content) return;
+
+  const results = window._DASHBOARD_BATCH_RESULTS || {};
+
+  // Helper xử lý data insights thành metrics object
+  const process = (data) => {
+    const insights = Array.isArray(data) ? data[0] || {} : data || {};
+    const acts = {};
+    (insights.actions || []).forEach(a => acts[a.action_type] = (acts[a.action_type] || 0) + (+a.value || 0));
+
+    const getAct = (types) => {
+      let s = 0;
+      const doneBase = new Set();
+      types.forEach(t => {
+        const base = t.startsWith("onsite_conversion.") ? t.replace("onsite_conversion.", "") : t;
+        if (doneBase.has(base)) return;
+        doneBase.add(base);
+
+        const onsite = "onsite_conversion." + base;
+        // Ưu tiên onsite nếu có, ko thì lấy base (ko cộng cả 2 vì Meta thường log duplicate)
+        if (acts[onsite]) {
+          s += acts[onsite];
+        } else if (acts[base]) {
+          s += acts[base];
+        }
+      });
+      return s;
+    };
+
+    const sumArr = (arr) => {
+      if (!arr) return 0;
+      if (Array.isArray(arr)) {
+        return arr.reduce((acc, a) => acc + (+a.value || 0), 0);
+      }
+      return +arr.value || 0;
+    };
+
+    const spend = +insights.spend || 0;
+    const impressions = +insights.impressions || 0;
+    const links = getAct(["link_click", "inline_link_clicks", "outbound_click"]) || +insights.clicks || 0;
+    const message_started = getAct(["onsite_conversion.messaging_conversation_started_7d", "messaging_conversation_started_7d"]);
+    const message_connection = getAct(["onsite_conversion.total_messaging_connection", "total_messaging_connection"]);
+    const lead = getAct(["onsite_conversion.lead_grouped", "lead", "onsite_web_lead"]);
+    const purchase = getAct(["purchase", "onsite_conversion.purchase"]);
+    const roas = +insights.purchase_roas || (Array.isArray(insights.purchase_roas) ? +insights.purchase_roas[0]?.value : 0) || 0;
+    const reach = +insights.reach || 0;
+
+    return {
+      spend, impressions, reach, message_started, message_connection, lead, purchase, roas,
+      link_click: links,
+      ctr: impressions > 0 ? (links / impressions) * 100 : 0,
+      cpc: links > 0 ? spend / links : 0,
+      cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+      frequency: reach > 0 ? impressions / reach : 0,
+      video_play: sumArr(insights.video_play_actions) || getAct(["video_play", "video_view"]),
+      thruplay: sumArr(insights.video_thruplay_watched_actions) || getAct(["thruplay", "video_thruplay_watched_actions"]),
+      video_p25: sumArr(insights.video_p25_watched_actions) || 0,
+      video_p50: sumArr(insights.video_p50_watched_actions) || 0,
+      video_p75: sumArr(insights.video_p75_watched_actions) || 0,
+      video_p95: sumArr(insights.video_p95_watched_actions) || 0,
+      video_p100: sumArr(insights.video_p100_watched_actions) || 0,
+      photo_view: getAct(["photo_view"]),
+      page_engagement: getAct(["page_engagement"]),
+      post_engagement: getAct(["post_engagement"]),
+      engagement: getAct(["post_engagement", "page_engagement", "post_interaction"]),
+      reaction: getAct(["post_reaction", "reaction", "like"]),
+      comment: getAct(["comment", "post_comment"]),
+      share: getAct(["post", "share"]),
+      follow: getAct(["page_like", "page_follow", "instagram_profile_follow", "onsite_conversion.page_like", "onsite_conversion.instagram_profile_follow", "like"]),
+    };
+  };
+
+  const cur = process(results.platformStats);
+  const prev = manualCompareData ? process(manualCompareData) : process(results.platformStats_previous);
+
+  const rows = [
+    { section: "Tổng quan tài chính" },
+    { id: "spend", label: "Chi tiêu (Spent)", icon: "fa-solid fa-coins", val: cur.spend, old: prev.spend, type: "money" },
+    { id: "cpm", label: "CPM (Mỗi 1000 lượt hiển thị)", icon: "fa-solid fa-gauge-high", val: cur.cpm, old: prev.cpm, type: "money" },
+    { id: "cpc", label: "CPC (Mỗi lượt click)", icon: "fa-solid fa-mouse-pointer", val: cur.cpc, old: prev.cpc, type: "money" },
+
+    { section: "Hiển thị & Tiếp cận" },
+    { id: "impressions", label: "Lượt hiển thị (Impressions)", icon: "fa-solid fa-eye", val: cur.impressions, old: prev.impressions, type: "num" },
+    { id: "reach", label: "Lượt tiếp cận (Reach)", icon: "fa-solid fa-street-view", val: cur.reach, old: prev.reach, type: "num" },
+    { id: "frequency", label: "Tần suất (Frequency)", icon: "fa-solid fa-repeat", val: cur.frequency, old: prev.frequency, type: "float" },
+    { id: "ctr", label: "Tỷ lệ click (CTR)", icon: "fa-solid fa-chart-line", val: cur.ctr, old: prev.ctr, type: "percent" },
+
+    { section: "Kết quả mục tiêu" },
+    { id: "message_started", label: "Mới nhắn tin (Started)", icon: "fa-brands fa-facebook-messenger", val: cur.message_started, old: prev.message_started, type: "num" },
+    { id: "message_connection", label: "Tin nhắn kết nối (Connection)", icon: "fa-solid fa-comments", val: cur.message_connection, old: prev.message_connection, type: "num" },
+    { id: "lead", label: "Khách hàng tiềm năng (Leads)", icon: "fa-solid fa-bullseye", val: cur.lead, old: prev.lead, type: "num" },
+    { id: "purchase", label: "Mua hàng (Purchase)", icon: "fa-solid fa-cart-shopping", val: cur.purchase, old: prev.purchase, type: "num" },
+    { id: "roas", label: "ROAS (Mua hàng)", icon: "fa-solid fa-money-bill-trend-up", val: cur.roas, old: prev.roas, type: "float" },
+
+    { section: "Tương tác nội dung" },
+    { id: "engage", label: "Tương tác bài viết", icon: "fa-solid fa-thumbs-up", val: cur.engagement, old: prev.engagement, type: "num" },
+    { id: "react", label: "Cảm xúc (Reactions)", icon: "fa-solid fa-heart", val: cur.reaction, old: prev.reaction, type: "num" },
+    { id: "comment", label: "Bình luận (Comments)", icon: "fa-solid fa-comment", val: cur.comment, old: prev.comment, type: "num" },
+    { id: "share", label: "Chia sẻ (Shares)", icon: "fa-solid fa-share", val: cur.share, old: prev.share, type: "num" },
+    { id: "follow", label: "Lượt thích Trang (Like Page)", icon: "fa-solid fa-thumbs-up", val: cur.follow, old: prev.follow, type: "num" },
+    { id: "photo", label: "Xem ảnh (Photo Views)", icon: "fa-solid fa-image", val: cur.photo_view, old: prev.photo_view, type: "num" },
+    { id: "link_click", label: "Link Clicks (Hành động)", icon: "fa-solid fa-link", val: cur.link_click, old: prev.link_click, type: "num" },
+
+    { section: "Phát Video & Thử thách" },
+    { id: "vplay", label: "Lượt xem Video", icon: "fa-solid fa-circle-play", val: cur.video_play, old: prev.video_play, type: "num" },
+    { id: "thru", label: "ThruPlays", icon: "fa-solid fa-forward-step", val: cur.thruplay, old: prev.thruplay, type: "num" },
+    { id: "video_p25", label: "Video xem 25%", icon: "fa-solid fa-hourglass-start", val: cur.video_p25, old: prev.video_p25, type: "num" },
+    { id: "video_p50", label: "Video xem 50%", icon: "fa-solid fa-hourglass-half", val: cur.video_p50, old: prev.video_p50, type: "num" },
+    { id: "video_p75", label: "Video xem 75%", icon: "fa-solid fa-hourglass-end", val: cur.video_p75, old: prev.video_p75, type: "num" },
+    { id: "video_p95", label: "Video xem 95%", icon: "fa-solid fa-hourglass", val: cur.video_p95, old: prev.video_p95, type: "num" },
+    { id: "video_p100", label: "Video xem 100%", icon: "fa-solid fa-clock", val: cur.video_p100, old: prev.video_p100, type: "num" },
+  ];
+
+  // --- 🧠 SMART INSIGHTS LOGIC ---
+  const getInsight = () => {
+    const calcDiff = (c, p) => (p > 0 ? ((c - p) / p) * 100 : 0);
+    const spendDiff = calcDiff(cur.spend, prev.spend);
+
+    const metricAnalysis = SUMMARY_METRICS.map(mid => {
+      const c = cur[mid] || 0;
+      const p = prev[mid] || 0;
+      const diff = calcDiff(c, p);
+      const label = METRIC_REGISTRY[mid]?.label || mid;
+      return { mid, label, diff };
+    });
+
+    // Pick the "most important" result to determine overall status
+    const mainResult = metricAnalysis.find(m => ["message", "lead", "link_click", "result"].includes(m.mid)) || metricAnalysis[metricAnalysis.length - 1];
+    const resDiff = mainResult.diff;
+
+    let evaluation = "";
+    let evalColor = "#64748b";
+
+    if (resDiff > spendDiff && spendDiff >= 0) {
+      evaluation = "CHI PHÍ TỐI ƯU RẤT TỐT";
+      evalColor = "#f59e0b"; // Golden Amber
+    } else if (resDiff >= 0 && spendDiff < 0) {
+      evaluation = "HIỆU QUẢ TĂNG DÙ GIẢM NGÂN SÁCH";
+      evalColor = "#f59e0b"; // Golden Amber
+    } else if (resDiff < spendDiff && spendDiff > 20) {
+      evaluation = "CẦN TỐI ƯU LẠI QUẢNG CÁO";
+      evalColor = "#f59e0b"; // Warning Orange
+    } else if (resDiff < 0) {
+      evaluation = "HIỆU QUẢ ĐANG GIẢM TRÚT";
+      evalColor = "#f59e0b"; // Warning Orange
+    } else {
+      evaluation = "HIỆU QUẢ ĐANG DUY TRÌ";
+      evalColor = "#f59e0b"; // Golden Amber
+    }
+
+    const getClr = (v) => v > 0 ? '#10b981' : (v < 0 ? '#ef4444' : '#64748b');
+
+    const details = metricAnalysis.map(m => `<b>${m.label}</b> ${m.diff >= 0 ? 'tăng' : 'giảm'} <span style="color:${getClr(m.diff)}; font-weight:800;">${Math.abs(m.diff).toFixed(1)}%</span>`).join(", ");
+
+    return `
+      <span style="color:${evalColor}; font-weight:800; font-size:1.45rem;">${evaluation}</span>. 
+      Ngân sách <b>${spendDiff >= 0 ? 'tăng' : 'giảm'} <span style="color:${getClr(spendDiff)}; font-weight:800;">${Math.abs(spendDiff).toFixed(1)}%</span></b>. 
+      ${details}.
+    `;
+  };
+
+  let html = `
+    <div class="perf_insight_banner" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.6rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1.5rem;">
+      <div style="width: 4rem; height: 4rem; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        <i class="fa-solid fa-wand-magic-sparkles" style="color: #ffa900; font-size: 1.8rem;"></i>
+      </div>
+      <div>
+        <p style="margin: 0; font-size: 1.1rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Nhận xét nhanh</p>
+        <p style="margin: 0.3rem 0 0; font-size: 1.4rem; color: #1e293b; font-weight: 500;">${getInsight()}</p>
+      </div>
+    </div>
+
+    <table class="perf_table">
+      <thead>
+        <tr>
+          <th style="width: 30%">Chỉ số (Metrics)</th>
+          <th style="width: 25%">Kỳ hiện tại</th>
+          <th style="width: 25%">Kỳ so sánh</th>
+          <th style="width: 20%">Thay đổi (%)</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  rows.forEach(r => {
+    if (r.section) {
+      html += `<tr><td colspan="4" class="perf_section_title">${r.section}</td></tr>`;
+      return;
+    }
+
+    const change = r.old > 0 ? ((r.val - r.old) / r.old) * 100 : (r.val > 0 ? 100 : 0);
+    const cls = change > 0 ? "increase" : (change < 0 ? "decrease" : "equal");
+    const icon = change > 0 ? "fa-caret-up" : (change < 0 ? "fa-caret-down" : "fa-equals");
+
+    const format = (v, t) => {
+      if (t === "money") return formatMoney(v);
+      if (t === "percent") return v.toFixed(2) + "%";
+      if (t === "float") return v.toFixed(2);
+      return formatNumber(v);
+    };
+
+    html += `
+      <tr>
+        <td>
+          <div class="perf_metric_label">
+            <i class="${r.icon}"></i>
+            <span>${r.label}</span>
+          </div>
+        </td>
+        <td><span class="perf_val_current">${format(r.val, r.type)}</span></td>
+        <td><span class="perf_val_compare">${format(r.old, r.type)}</span></td>
+        <td>
+          <div class="perf_change_badge ${cls}">
+            <i class="fa-solid ${icon}"></i>
+            ${change === 0 && r.val === 0 ? "0.0" : change.toFixed(1)}%
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  content.innerHTML = html;
+}
+
+// Xóa listener cũ không còn sử dụng
+
 

@@ -15,6 +15,7 @@ const SYNC_KEYS = [
     "dom_column_config",
     "goal_keywords",
     "goal_chart_mode",
+    "dom_summary_metrics",
 ];
 
 // ── Core helpers ────────────────────────────────────────────────────
@@ -71,6 +72,9 @@ function _applyToGlobal(key, value) {
             break;
         case "goal_chart_mode":
             if (typeof value === "string") window.GOAL_CHART_MODE = value;
+            break;
+        case "dom_summary_metrics":
+            if (Array.isArray(value)) window.SUMMARY_METRICS = value;
             break;
     }
 }
@@ -147,4 +151,11 @@ window.saveGoalSettingsSync = function (keywords, mode) {
  */
 window.saveViewPresetsSync = function (presets) {
     return _sheetPost({ key: "dom_view_presets", value: presets });
+};
+
+/**
+ * Save summary metrics to Sheet silently in background.
+ */
+window.saveSummaryMetricsSync = function (metrics) {
+    return _sheetPost({ key: "dom_summary_metrics", value: metrics });
 };

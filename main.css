@@ -162,6 +162,24 @@ html {
   /* default 10px */
   scroll-behavior: smooth;
   overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* ⏳ Status Icons spacing */
+.status_filter_icon {
+  margin-right: 8px;
+}
+
+/* ⚙️ Tooltip/Label consistency */
+.chart_settings_btn {
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.chart_settings_btn:hover {
+  opacity: 1;
+  transform: rotate(30deg);
 }
 
 /* Laptop 14 inch ~ 1366px width */
@@ -526,7 +544,7 @@ html {
 
 .dom_select.quick_filter {
   min-width: 20em;
-  border-radius: 15px;
+  border-radius: 50rem;
   background: white;
   box-shadow: 0 0 2px rgb(0, 0, 0, 0.2);
 }
@@ -557,6 +575,68 @@ html {
 .dom_select.quick_filter li i.green {
   color: green;
   opacity: 1;
+}
+
+.dom_select.status_filter {
+  min-width: 15rem;
+  border-radius: 50rem;
+  background: #fff;
+  margin-left: 0.8rem;
+}
+
+/* Dropdown của status_filter phải giống hệt quick_filter */
+.dom_select.status_filter .dom_select_show {
+  width: 20rem;
+  left: unset;
+  right: 0;
+  border-radius: 15px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.dom_select.status_filter.active .dom_select_show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.dom_select.status_filter li {
+  display: flex;
+  align-items: center;
+  padding: 0.8rem;
+  /* Giống quick_filter */
+  gap: 1rem;
+}
+
+/* Thêm span bao ngoài text giống quick_filter để canh lề chuẩn */
+.dom_select.status_filter li>span:last-child {
+  display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+.dom_select.status_filter li i {
+  width: 3rem;
+  /* Giống size box icon của quick_filter */
+  height: 3rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  font-size: 1.5rem;
+  opacity: 0.7;
+}
+
+.dom_select.status_filter li.divider {
+  padding: 0.5rem 1.5rem;
+  font-size: 1.1rem;
+  color: #94a3b8;
+  font-weight: 700;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 0.5rem;
+}
+
+.dom_select.status_filter li:hover {
+  background-color: var(--fadeClr500);
 }
 
 
@@ -1532,11 +1612,24 @@ tbody {
 .calendar_day.selected {
   background: var(--mainClr) !important;
   color: white !important;
-  font-weight: bold;
+  font-weight: 700;
+}
+
+.calendar_day.selected.start {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.calendar_day.selected.end {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .calendar_day.in_range {
-  background: rgba(255, 169, 0, 0.1);
+  background: rgba(255, 169, 0, 0.15);
+  border-radius: 0;
+  color: var(--mainClr);
+  font-weight: 600;
 }
 
 .calendar_day.today {
@@ -3264,13 +3357,17 @@ tbody {
 }
 
 .pct {
-  margin-left: 6px;
-  font-size: 0.9em;
-  font-weight: 500;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  margin-left: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
   display: inline-block;
-  line-height: 1.6;
+  line-height: 1;
   border-radius: 50rem;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.8rem;
+  z-index: 2;
 }
 
 .pct {
@@ -3348,7 +3445,7 @@ tbody {
 .dom_total_report>ul>li {
   font-weight: bold;
   border-radius: 10px;
-  padding: 1.5rem 2rem;
+  padding: 1.6rem 2rem;
   display: flex;
   justify-content: space-between;
   flex-direction: column;
@@ -3356,6 +3453,8 @@ tbody {
   font-size: 1.2rem;
   gap: 1.2rem;
   background-color: var(--fadeClr);
+  position: relative;
+  /* Enabled for absolute .pct badges */
 }
 
 .dom_campaign_filter>i {
@@ -5444,7 +5543,14 @@ tbody {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeInOverlay 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.ai_modal_overlay.active {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 @keyframes fadeInOverlay {
@@ -5465,9 +5571,16 @@ tbody {
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.25);
-  animation: slideUpModal 0.25s ease;
   overflow: hidden;
   border: 1px solid #ece9e0;
+  transform: translateY(30px);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.ai_modal_overlay.active .ai_modal_box {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 @keyframes slideUpModal {
@@ -5489,6 +5602,8 @@ tbody {
   padding: 1.6rem 2.4rem;
   background: #fff;
   border-bottom: 1px solid #eee;
+  border-radius: 12px 12px 0 0;
+  /* Add this to prevent sharp corners on top */
 }
 
 .ai_modal_header_left {
@@ -8102,15 +8217,16 @@ tbody {
   color: white !important;
 }
 
-/* ul = CSS grid 2 columns.
-   First item spans full width, rest form 2x2 auto-height grid */
+/* Google Ads Summary: Spent = 1 row, Others = 2 columns (grid) */
 #google_ads_container .dom_total_report>ul {
   display: grid !important;
   grid-template-columns: 1fr 1fr;
-  grid-auto-rows: 1fr;
   gap: 1rem;
   width: 100%;
-  flex-direction: unset !important;
+}
+
+#google_ads_container .dom_total_report>ul>li:first-child {
+  grid-column: 1 / -1;
 }
 
 /* First li (orange gradient header) = full width spanning both columns */
@@ -8119,28 +8235,36 @@ tbody {
   box-sizing: border-box;
 }
 
-/* 4 mini cards = auto sized by grid, fill evenly
-   Background: #f8f8f8 = Meta Interaction card gray */
+#google_ads_container .dom_total_report>ul>li:first-child {
+  position: relative;
+  transition: transform 0.2s;
+  min-height: 10rem;
+}
+
+#google_ads_container .dom_total_report>ul>li:hover {
+  transform: translateY(-2px);
+}
+
+/* 4 mini cards styling to match Meta horizontal cards */
 #google_ads_container .dom_total_report>ul>li:not(:first-child) {
   box-sizing: border-box;
   background: #f8f8f8 !important;
-  border-radius: 12px;
+  border-radius: 15px;
   box-shadow: none;
-  padding: 1.4rem 1.8rem;
-  gap: 0.8rem;
-  display: flex;
+  padding: 1.5rem 2.2rem;
+  gap: 0.5rem;
+  display: flex !important;
   flex-direction: column;
   justify-content: center;
 }
 
-/* Label (icon + text) row – small gray */
 #google_ads_container .dom_total_report>ul>li:not(:first-child)>span {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   color: #888;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.8rem;
   opacity: 1;
 }
 
@@ -8151,9 +8275,10 @@ tbody {
   color: #333 !important;
 }
 
-/* Remove comparison % because Google Ads has none */
+/* Google Ads now has comparison % - Styled like Meta pills */
 #google_ads_container .dom_total_report .pct {
   display: none;
+  /* We use .g_diff now */
 }
 
 
@@ -8352,4 +8477,335 @@ tbody {
   padding: 5rem 2rem;
   justify-content: center;
   align-items: center;
+}
+
+/* 📊 Performance Expansion & Detail Modal */
+.ai_modal_content {
+  background: #fff;
+  border-radius: 12px;
+  overflow: visible;
+  /* Change to visible to allow picker dropdown */
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e2e8f0;
+  position: relative;
+  transform: scale(0.95);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ai_modal_overlay.active .ai_modal_content {
+  transform: scale(1);
+  opacity: 1;
+}
+
+@keyframes modalPop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.perf_date_selector {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: #fff;
+  padding: 0.7rem 1.6rem;
+  border-radius: 3rem;
+  /* Pill shape like app */
+  border: 1.5px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.perf_date_selector:hover {
+  border-color: var(--mainClr);
+  background: #fffbeb;
+}
+
+.perf_date_selector span {
+  font-size: 1.25rem;
+}
+
+.summary_expand_btn {
+  position: absolute;
+  right: -1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3.2rem;
+  height: 3.2rem;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 20;
+  color: var(--mainClr);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  border: 1px solid #f1f5f9;
+}
+
+.summary_expand_btn:hover {
+  background: var(--mainClr);
+  color: white;
+  box-shadow: 0 6px 15px rgba(255, 169, 0, 0.4);
+}
+
+.summary_expand_btn i {
+  font-size: 1.4rem;
+}
+
+.perf_table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.perf_table th {
+  background: #f8fafc;
+  padding: 1.2rem 1.6rem;
+  text-align: left;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 700;
+  border-bottom: 2px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.perf_table td {
+  padding: 1.6rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 1.4rem;
+  color: #1e293b;
+  vertical-align: middle;
+}
+
+.perf_table tr:hover td {
+  background-color: #f8fafc;
+}
+
+.perf_metric_label {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  font-weight: 600;
+}
+
+.perf_metric_label i {
+  width: 3.2rem;
+  height: 3.2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 1.4rem;
+}
+
+.perf_val_current {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1.5rem;
+}
+
+.perf_val_compare {
+  color: #94a3b8;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.perf_change_badge {
+  padding: 0.5rem 1rem;
+  border-radius: 50rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.perf_change_badge.increase {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.perf_change_badge.decrease {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.perf_change_badge.equal {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.perf_trend_cell {
+  width: 12rem;
+}
+
+.perf_section_title {
+  background: #f1f5f9 !important;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #475569;
+  padding: 0.8rem 1.6rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.perf_date_picker_panel {
+  position: absolute;
+  top: calc(100% + 1rem);
+  left: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  z-index: 1000;
+  border: 1px solid #e2e8f0;
+  width: 58rem;
+  overflow: hidden;
+  animation: modalPop 0.25s ease;
+}
+
+.perf_date_picker_panel .time_picker_sidebar {
+  width: 22rem;
+  border-right: 1px solid #f1f5f9;
+}
+
+.perf_date_picker_panel #perf_calendar {
+  min-width: 32rem;
+}
+
+.perf_date_picker_panel .time_picker_footer {
+  padding-top: 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.perf_date_picker_panel .picker_inputs input {
+  padding: 0.6rem 1rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+
+
+
+/* Synchronization with Meta's native % labels */
+#google_ads_container .dom_total_report>ul>li>p>span:nth-child(2) {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.5rem;
+  font-size: 1rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 50rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* Increase/Decrease colors for secondary cards (gray background) - Exact Meta Match */
+#google_ads_container .dom_total_report>ul>li:not(:first-child) .increase {
+  background-color: #56b10018 !important;
+  color: rgba(20, 99, 0, 0.952) !important;
+}
+
+#google_ads_container .dom_total_report>ul>li:not(:first-child) .decrease {
+  background-color: #b1060018 !important;
+  color: rgba(192, 0, 0, 0.541) !important;
+}
+
+/* First card (Spent) - White badge for gradient contrast */
+#google_ads_container .dom_total_report>ul>li:first-child .increase,
+#google_ads_container .dom_total_report>ul>li:first-child .decrease {
+  background-color: rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#google_ads_container .dom_total_report>ul>li:first-child .increase {
+  color: rgba(20, 99, 0, 0.952) !important;
+}
+
+#google_ads_container .dom_total_report>ul>li:first-child .decrease {
+  color: rgba(192, 0, 0, 0.541) !important;
+}
+
+#google_ads_container .dom_total_report>ul>li:not(:first-child) {
+  min-height: 10rem;
+  padding-top: 5rem !important;
+  /* Prevent overlap with % badge */
+}
+
+#google_ads_container .dom_total_report>ul>li:first-child {
+  padding-top: 2.5rem !important;
+}
+
+.g_switcher {
+  display: flex;
+  background: #f1f5f9;
+  padding: 0.3rem;
+  border-radius: 8px;
+  margin-left: 1rem;
+}
+
+.g_switcher button {
+  padding: 0.4rem 1.2rem;
+  border-radius: 6px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.g_switcher button.active {
+  background: #fff;
+  color: #1e293b;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Google Ads Loading & Compact UI ── */
+.g_chart_container {
+  position: relative;
+  min-height: 25rem;
+}
+
+.g_chart_container.is-loading::after {
+  content: "\f110";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  color: var(--mainClr);
+  animation: fa-spin 1s infinite linear;
+  z-index: 5;
+}
+
+.g_chart_container.is-loading canvas {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.g_switcher button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

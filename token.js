@@ -10,3 +10,7 @@ window.ALLOWED_ACCOUNTS = [
 // Paste the Web App URL of settings_sync.gs after deploying it in Google Apps Script.
 // Leave empty ("") to keep settings local-only (localStorage).
 window.SETTINGS_SHEET_URL = "https://script.google.com/macros/s/AKfycbxOb5i2LZkhrl9QfwmoCMFhDjnOLU17a_em4a54b45mFScJRJj2nix3zVJ-u-0tMTDy/exec";
+
+// 📊 Google Ads Setup
+// Set to false to hide Google Ads tab and disable its report
+window.GOOGLE_ADS_SETUP = true;

@@ -235,19 +235,25 @@ function renderExtraGoalChart(data) {
         return value;
     };
 
+    const isFew = goals.length < 3;
+    const barWidth = isFew ? 0.35 : undefined;
+    const catWidth = isFew ? 0.65 : undefined;
+
     window.extra_goal_chart_instance = new Chart(ctx, {
         type: "bar",
         plugins: [ChartDataLabels],
         data: {
-            labels: goals,
+            labels: goals.map((g) => g.replace(/_/g, " ").toUpperCase()),
             datasets: [{
-                label: "Spend", // Added label for tooltip consistency
+                label: "Spend",
                 data: values,
                 backgroundColor: backgroundColors,
                 borderRadius: 8,
                 borderWidth: 0,
-                barThickness: 50,
-                maxBarThickness: 70
+                ...(isFew && {
+                    barPercentage: barWidth,
+                    categoryPercentage: catWidth,
+                }),
             }]
         },
         options: {
@@ -281,7 +287,9 @@ function renderExtraGoalChart(data) {
                     ticks: {
                         color: "#666",
                         font: { weight: "600", size: 9, family: "'Roboto', sans-serif" },
-                        autoSkip: false
+                        autoSkip: false,
+                        maxRotation: 45,
+                        minRotation: 0,
                     },
                     border: { display: false }
                 },

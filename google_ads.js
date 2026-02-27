@@ -2,6 +2,12 @@ console.log("Google Ads Script Loaded v2.0 - PRO DASHBOARD");
 
 let googleAdsRawData = [];
 let googleAdsFilteredData = [];
+let googleAdsPrevData = [];
+let googleAdsMonthlyData = [];
+let gTrendMode = 'daily'; // 'daily' or 'monthly'
+let isGAdsFetching = false;
+let isMonthlyFetching = false;
+let lastGAdsRange = "";
 
 // Chart instances
 const G_CHARTS = {};
@@ -15,46 +21,86 @@ const G_COLORS = [
 const GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbz4MOAioBU6fcWqjy54yJh3SBcc2VWgCf173GWuGTDLv-3D72XbBbBti5OlcFtuCvB6/exec";
 
 window.fetchGoogleAdsData = async function (force = false) {
+    if (window.GOOGLE_ADS_SETUP === false) return;
+
     const domContainer = document.querySelector(".dom_container");
     const containerView = document.getElementById("google_ads_container");
 
     // CSS (.dom_container.google_ads #google_ads_container) handles visibility
     // DO NOT set inline style here — it persists when switching away from google_ads tab
 
-    // Optimization: Don't fetch if we already have data, unless forced (e.g., date change)
-    if (!force && googleAdsRawData.length > 0) {
-        console.log("ℹ️ Using cached Google Ads data");
+    const currentRange = `${startDate}_${endDate}`;
+
+    // Optimization: Don't fetch if currently fetching or already have data for this range
+    if (isGAdsFetching) {
+        console.warn("⚠️ Already fetching Google Ads data...");
+        return;
+    }
+
+    if (!force && googleAdsRawData.length > 0 && lastGAdsRange === currentRange) {
+        console.log("ℹ️ Using cached Google Ads data for range:", currentRange);
         renderGoogleAdsView();
         return;
     }
 
+    isGAdsFetching = true;
+    lastGAdsRange = currentRange;
+
     _showGoogleSkeletons();
 
     try {
-        const url = new URL(GOOGLE_SHEET_API_URL);
+        const s = new Date(startDate);
+        const e = new Date(endDate);
+        const diff = e - s;
+        const pEnd = new Date(s.getTime() - 86400000);
+        const pStart = new Date(pEnd.getTime() - diff);
+        const ps = pStart.toISOString().split('T')[0];
+        const pe = pEnd.toISOString().split('T')[0];
 
-        // We fetch ALL data for the period, and filter locally if needed
-        // but the GAS script currently handles simple date range
-        if (startDate && endDate) {
-            url.searchParams.append("time_range", JSON.stringify({ since: startDate, until: endDate }));
+        const url = new URL(GOOGLE_SHEET_API_URL);
+        url.searchParams.append("time_range", JSON.stringify({ since: startDate, until: endDate }));
+
+        const prevUrl = new URL(GOOGLE_SHEET_API_URL);
+        prevUrl.searchParams.append("time_range", JSON.stringify({ since: ps, until: pe }));
+
+        const fetchTasks = [
+            fetch(url.toString()).then(r => r.ok ? r.json() : []),
+            fetch(prevUrl.toString()).then(r => r.ok ? r.json() : [])
+        ];
+
+        let needsMonthly = !googleAdsMonthlyData || googleAdsMonthlyData.length === 0;
+        if (needsMonthly && !isMonthlyFetching) {
+            isMonthlyFetching = true;
+            const now = new Date();
+            const startOfYear = now.getUTCFullYear() + "-01-01";
+            const todayStr = now.toISOString().split('T')[0];
+            const mUrl = new URL(GOOGLE_SHEET_API_URL);
+            mUrl.searchParams.append("time_range", JSON.stringify({ since: startOfYear, until: todayStr }));
+            fetchTasks.push(fetch(mUrl.toString()).then(r => r.ok ? r.json() : []));
         }
 
-        console.log("🔵 Google Ads API:", url.toString());
+        console.log("🔵 Google Ads API: Fetching required data in parallel...");
+        const results = await Promise.all(fetchTasks);
 
-        const response = await fetch(url.toString());
-        if (!response.ok) throw new Error("Network error " + response.status);
-        googleAdsRawData = await response.json();
-        console.log("✅ Google Ads Data:", googleAdsRawData.length, "rows");
+        googleAdsRawData = results[0];
+        googleAdsPrevData = results[1];
+        if (needsMonthly) {
+            googleAdsMonthlyData = results[2] || [];
+            isMonthlyFetching = false;
+        }
+
+        console.log("✅ Google Ads: Data pipeline complete.", googleAdsRawData.length, "rows");
         renderGoogleAdsView();
 
     } catch (error) {
-        console.error("❌ Google Ads fetch error:", error);
-        if (typeof showToast === 'function') showToast("❌ Lỗi kết nối Google Ads API.");
+        console.error("❌ Google Ads pipeline error:", error);
+        if (typeof showToast === 'function') showToast("❌ Lỗi đồng bộ dữ liệu Google Ads.");
         renderGoogleAdsView();
     } finally {
+        isGAdsFetching = false;
         _hideGoogleSkeletons();
     }
-};
+}
 
 function _showGoogleSkeletons() {
     document.querySelectorAll("#google_ads_container .dom_inner").forEach(card => {
@@ -110,6 +156,17 @@ function renderGoogleAdsView() {
 
     console.log(`📊 Google Ads filtered: ${googleAdsFilteredData.length} rows (${startDate} → ${endDate})`);
 
+    // Reset to Daily if filter is active and we're currently in Monthly
+    const hasActiveFilter = brandLabel && brandLabel.toUpperCase() !== "RESET" && brandLabel !== "Ampersand Group";
+    if (hasActiveFilter && gTrendMode === 'monthly') {
+        gTrendMode = 'daily';
+        const dailyBtn = document.getElementById("g_daily_btn");
+        const monthlyBtn = document.getElementById("g_monthly_btn");
+        if (dailyBtn) dailyBtn.classList.add("active");
+        if (monthlyBtn) monthlyBtn.classList.remove("active");
+        document.getElementById("g_trend_title").textContent = 'Daily Spent';
+    }
+
     // Calculate totals & derived metrics
     let totSpent = 0, totImp = 0, totClick = 0, totConv = 0, totStore = 0;
     googleAdsFilteredData.forEach(item => {
@@ -125,14 +182,60 @@ function renderGoogleAdsView() {
     const avgCpa = totConv > 0 ? (totSpent / totConv) : 0;
     const avgCvr = totClick > 0 ? (totConv / totClick * 100) : 0;
 
-    // ── Summary panel
-    _setHtml("g_spent", _fmtMoney(totSpent));
-    _setHtml("g_impression", _fmtNum(totImp));
-    _setHtml("g_click", _fmtNum(totClick));
-    _setHtml("g_conv", _fmtNum(totConv));
-    _setHtml("g_store", _fmtNum(totStore));
+    // Fetch monthly in parallel if not already loaded
+    if ((!googleAdsMonthlyData || googleAdsMonthlyData.length === 0) && !isMonthlyFetching) {
+        fetchGoogleAdsMonthlyData();
+    }
 
-    // ── KPI mini cards – Interaction style (2x2 grid like Meta)
+    // ── Pre-filter Previous Data by Brand
+    const prevFilteredByDate = googleAdsPrevData || [];
+    const prevFiltered = (brandLabel && brandLabel.toUpperCase() !== "RESET" && brandLabel !== "Ampersand Group")
+        ? prevFilteredByDate.filter(item => item.campaign && item.campaign.toLowerCase().includes(brandLabel.toLowerCase()))
+        : prevFilteredByDate;
+
+    const prevTotals = { spent: 0, imp: 0, click: 0, conv: 0, store: 0 };
+    prevFiltered.forEach(item => {
+        prevTotals.spent += parseFloat(item.spent || 0);
+        prevTotals.imp += parseFloat(item.impression || 0);
+        prevTotals.click += parseFloat(item.click || 0);
+        prevTotals.conv += parseFloat(item.total_conversions || 0);
+        prevTotals.store += parseFloat(item.store_visits || 0);
+    });
+
+    const metricsMap = [
+        { id: "g_spent", cur: totSpent, prev: prevTotals.spent, fmt: _fmtMoney },
+        { id: "g_impression", cur: totImp, prev: prevTotals.imp, fmt: _fmtNum },
+        { id: "g_click", cur: totClick, prev: prevTotals.click, fmt: _fmtNum },
+        { id: "g_conv", cur: totConv, prev: prevTotals.conv, fmt: _fmtNum },
+        { id: "g_store", cur: totStore, prev: prevTotals.store, fmt: _fmtNum }
+    ];
+
+    // Determine previous date range string for tooltip
+    let prevRangeStr = "";
+    if (startDate && endDate) {
+        const s = new Date(startDate);
+        const e = new Date(endDate);
+        const diff = e - s;
+        const pEnd = new Date(s.getTime() - 86400000);
+        const pStart = new Date(pEnd.getTime() - diff);
+        const ps = pStart.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        const pe = pEnd.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        prevRangeStr = `${ps} - ${pe}`;
+    }
+
+    metricsMap.forEach(m => {
+        let diffPct = null;
+        if (m.prev > 0) {
+            diffPct = ((m.cur - m.prev) / m.prev * 100).toFixed(1);
+        } else if (m.cur > 0) {
+            diffPct = "100";
+        } else if (m.cur === 0 && m.prev === 0) {
+            diffPct = "0";
+        }
+        _setHtml(m.id, m.fmt(m.cur), diffPct, prevRangeStr, m.fmt(m.prev));
+    });
+
+    // ── KPI mini cards
     const kpiEl = document.getElementById("g_kpi_cards");
     if (kpiEl) {
         kpiEl.innerHTML = `
@@ -154,14 +257,24 @@ function renderGoogleAdsView() {
     // ── All charts
     const trendSel = _getGSelectVal("g_trend_select") || "spent";
     const barSel = _getGSelectVal("g_bar_select") || "spent";
-    _renderTrendChart(googleAdsFilteredData, trendSel);
+
+    if (gTrendMode === 'monthly') {
+        _renderMonthlyChart(googleAdsMonthlyData, trendSel);
+    } else {
+        _renderTrendChart(googleAdsFilteredData, trendSel);
+    }
+
+    // ── Pre-calculate grouped data once for all charts
+    const groupedCampData = _groupByCampaign(googleAdsFilteredData);
+    const sortedCampsBySpent = Object.values(groupedCampData).sort((a, b) => b.spent - a.spent);
+
     _renderBarChart(googleAdsFilteredData, barSel);
     _renderDonutChart(googleAdsFilteredData);
     _renderFunnelChart(totImp, totClick, totConv, totStore);
-    _renderScatterChart(googleAdsFilteredData);
+    _renderCPVisitChart(googleAdsFilteredData, groupedCampData); // Pass pre-calculated
     _renderDualAxisChart(googleAdsFilteredData);
-    _renderTopCampaignCards(googleAdsFilteredData);
-    _renderCampaignTable(googleAdsFilteredData);
+    _renderTopCampaignCards(googleAdsFilteredData, sortedCampsBySpent); // Pass pre-calculated
+    _renderCampaignTable(googleAdsFilteredData, "", groupedCampData); // Pass pre-calculated
 
     // ── Filter listener
     const filterInput = document.getElementById("g_campaign_filter");
@@ -179,7 +292,12 @@ function renderGoogleAdsView() {
 // ─────────────────────────────────────────────
 function _initGoogleDropdowns() {
     [
-        { id: 'g_trend_select', onSelect: v => _renderTrendChart(googleAdsFilteredData, v) },
+        {
+            id: 'g_trend_select', onSelect: v => {
+                if (gTrendMode === 'monthly') _renderMonthlyChart(googleAdsMonthlyData, v);
+                else _renderTrendChart(googleAdsFilteredData, v);
+            }
+        },
         { id: 'g_bar_select', onSelect: v => _renderBarChart(googleAdsFilteredData, v) }
     ].forEach(({ id, onSelect }) => {
         const wrap = document.getElementById(id);
@@ -383,6 +501,7 @@ function _renderBarChart(data, metric) {
     const isPercent = metric === "ctr";
 
     const values = sorted.map(c => {
+        if (metric === "cpv") return c.store > 0 ? +(c.spent / c.store).toFixed(0) : 0;
         if (metric === "ctr") return c.imp > 0 ? +(c.click / c.imp * 100).toFixed(2) : 0;
         if (metric === "cpc") return c.click > 0 ? +(c.spent / c.click).toFixed(0) : 0;
         if (metric === "cpa") return c.conv > 0 ? +(c.spent / c.conv).toFixed(0) : 0;
@@ -429,9 +548,10 @@ function _renderBarChart(data, metric) {
                 legend: { display: false },
                 datalabels: {
                     anchor: 'end', align: 'end', offset: 2,
-                    font: { size: 11, weight: '600' }, color: '#555',
+                    font: { size: 10, weight: '700' }, color: '#444',
                     formatter: v => {
                         if (!v) return '';
+                        if (metric === "cpv") return _fmtShort(v);
                         if (isMoney) return _fmtShort(v);
                         if (isPercent) return v.toFixed(2) + '%';
                         return _fmtNum(v);
@@ -581,65 +701,206 @@ function _renderFunnelChart(imp, click, conv, store) {
     }).join('');
 }
 
+function _renderCPVisitChart(data, precalculatedGroup = null) {
+    const container = document.getElementById("g_cpvisit_wrap");
+    if (!container) return;
+
+    const campaigns = precalculatedGroup || _groupByCampaign(data);
+    const sorted = Object.values(campaigns)
+        .filter(c => c.store > 0)
+        .map(c => ({
+            name: c.name,
+            cpv: c.spent / c.store
+        }))
+        .sort((a, b) => a.cpv - b.cpv);
+
+    if (!sorted.length) {
+        container.innerHTML = `<p style="text-align:center;color:#999;padding-top:2rem;">Không có dữ liệu Store Visit</p>`;
+        return;
+    }
+
+    const maxCPV = Math.max(...sorted.map(c => c.cpv), 1);
+
+    container.innerHTML = sorted.map((c, i) => {
+        const pct = Math.max((c.cpv / maxCPV * 100), 5);
+        return `
+            <div style="margin-bottom:2rem;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:0.8rem;">
+                    <span style="font-size:1.2rem; color:#475569; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80%;" title="${c.name}">
+                        ${c.name}
+                    </span>
+                    <span style="font-size:1.6rem; font-weight:800; color:#1e293b;">${_fmtShort(c.cpv)}</span>
+                </div>
+                <div style="width:100%; background:#f1f5f9; height:3.4rem; border-radius:6px; overflow:hidden; position:relative; display:flex; align-items:center;">
+                    <div style="width:${pct}%; background:linear-gradient(90deg, #ffa900 0%, #ffcc33 100%); height:100%; border-radius:6px; transition:width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); display:flex; align-items:center; padding-left:1.2rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                        <i class="fa-solid fa-store" style="color:#fff; font-size:1.5rem;"></i>
+                    </div>
+                </div>
+            </div>`;
+    }).join("");
+}
+
 // ─────────────────────────────────────────────
-// 5. SCATTER CHART (Cost Efficiency)
+// MONTHLY SWITCHER LOGIC
 // ─────────────────────────────────────────────
-function _renderScatterChart(data) {
-    const ctx = document.getElementById("g_scatter_chart")?.getContext("2d");
+window.setGoogleTrendMode = async function (mode) {
+    if (gTrendMode === mode) return;
+
+    const dailyBtn = document.getElementById("g_daily_btn");
+    const monthlyBtn = document.getElementById("g_monthly_btn");
+    const chartWrap = document.querySelector("#google_ads_container .trendline .g_chart_wrap");
+
+    if (mode === 'monthly' && googleAdsMonthlyData.length === 0) {
+        // Show local skeleton ONLY for chart area if not yet loaded
+        if (chartWrap) {
+            chartWrap.classList.add("is-loading");
+            chartWrap.innerHTML = `
+                <div class="skeleton-container" style="padding:2.5rem; height:100%; display:flex; flex-direction:column; gap:1.5rem;">
+                    <div class="skeleton" style="height:2rem; width:40%; border-radius:6px;"></div>
+                    <div class="skeleton" style="flex:1; width:100%; border-radius:12px;"></div>
+                </div>
+            `;
+        }
+
+        // If not already fetching, start it. If it is, this just waits.
+        if (!isMonthlyFetching) fetchGoogleAdsMonthlyData();
+
+        // Poll for data every 500ms until available or timeout
+        let attempts = 0;
+        const checkData = setInterval(() => {
+            attempts++;
+            if (googleAdsMonthlyData.length > 0 || attempts > 20) {
+                clearInterval(checkData);
+                finishSwitch();
+            }
+        }, 500);
+        return;
+    }
+
+    function finishSwitch() {
+        gTrendMode = mode;
+        if (dailyBtn) dailyBtn.classList.toggle("active", mode === 'daily');
+        if (monthlyBtn) monthlyBtn.classList.toggle("active", mode === 'monthly');
+        document.getElementById("g_trend_title").textContent = mode === 'daily' ? 'Daily Spent' : 'Monthly Spent';
+
+        if (chartWrap) {
+            chartWrap.classList.remove("is-loading");
+            chartWrap.innerHTML = `<canvas id="g_trend_chart"></canvas>`;
+        }
+
+        if (mode === 'monthly') {
+            _renderMonthlyChart(googleAdsMonthlyData, _getGSelectVal("g_trend_select") || "spent");
+        } else {
+            _renderTrendChart(googleAdsFilteredData, _getGSelectVal("g_trend_select") || "spent");
+        }
+    }
+
+    finishSwitch();
+}
+
+async function fetchGoogleAdsMonthlyData() {
+    if (isMonthlyFetching) return;
+    isMonthlyFetching = true;
+
+    const now = new Date();
+    const startOfYear = now.getUTCFullYear() + "-01-01";
+    const todayStr = now.toISOString().split('T')[0];
+
+    try {
+        const url = new URL(GOOGLE_SHEET_API_URL);
+        url.searchParams.append("time_range", JSON.stringify({ since: startOfYear, until: todayStr }));
+        console.log("🔵 Google Ads: Fetching Monthly Data in background...");
+        const response = await fetch(url.toString());
+        if (response.ok) {
+            googleAdsMonthlyData = await response.json();
+            console.log("✅ Google Ads: Monthly Data cached.", googleAdsMonthlyData.length, "rows");
+
+            // Only re-render if user is currently looking at the monthly chart
+            if (gTrendMode === 'monthly') {
+                const trendSel = _getGSelectVal("g_trend_select") || "spent";
+                _renderMonthlyChart(googleAdsMonthlyData, trendSel);
+            }
+        }
+    } catch (e) {
+        console.error("❌ Monthly fetch failed:", e);
+    } finally {
+        isMonthlyFetching = false;
+        // Optimization: remove any specific monthly skeletons if any
+        const chartWrap = document.querySelector("#google_ads_container .trendline .g_chart_wrap");
+        if (chartWrap) chartWrap.classList.remove("is-loading");
+    }
+}
+
+function _renderMonthlyChart(data, metric) {
+    const ctx = document.getElementById("g_trend_chart")?.getContext("2d");
     if (!ctx) return;
-    if (G_CHARTS.scatter) G_CHARTS.scatter.destroy();
+    if (G_CHARTS.trend) G_CHARTS.trend.destroy();
 
-    const campaigns = _groupByCampaign(data);
-    const BUBBLE_COLORS = ['rgba(255,169,0,0.7)', 'rgba(0,30,165,0.6)', 'rgba(52,168,83,0.6)',
-        'rgba(234,67,53,0.6)', 'rgba(255,109,0,0.6)', 'rgba(156,39,176,0.6)', 'rgba(0,188,212,0.6)', 'rgba(96,125,139,0.6)'];
+    // Aggregate by month (0-11)
+    const monthlySum = new Array(12).fill(0);
+    const monthsFound = new Set();
 
-    const points = Object.values(campaigns).map((c, i) => ({
-        x: c.spent,
-        y: c.conv,
-        r: Math.min(Math.max(Math.sqrt(c.click || 1) * 1.0, 4), 16),
-        label: c.name,
-        bg: BUBBLE_COLORS[i % BUBBLE_COLORS.length]
-    }));
+    // Filter monthly data by brand if active
+    const brandLabel = (typeof CURRENT_CAMPAIGN_FILTER !== 'undefined') ? CURRENT_CAMPAIGN_FILTER : "";
+    const filtered = (brandLabel && brandLabel.toUpperCase() !== "RESET" && brandLabel !== "Ampersand Group")
+        ? data.filter(item => item.campaign && item.campaign.toLowerCase().includes(brandLabel.toLowerCase()))
+        : data;
 
-    G_CHARTS.scatter = new Chart(ctx, {
-        type: "bubble",
+    filtered.forEach(item => {
+        const d = new Date(item.date);
+        if (isNaN(d.getTime())) return;
+        const m = d.getMonth();
+        monthlySum[m] += parseFloat(item[metric] || 0);
+        monthsFound.add(m);
+    });
+
+    const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const values = monthlySum;
+    const isMoney = metric === "spent";
+
+    const maxVal = Math.max(...values, 1);
+    const maxIdx = values.indexOf(maxVal);
+
+    const gradGold = ctx.createLinearGradient(0, 0, 0, 300);
+    gradGold.addColorStop(0, 'rgba(255,169,0,1)');
+    gradGold.addColorStop(1, 'rgba(255,169,0,0.4)');
+
+    const gradGray = ctx.createLinearGradient(0, 0, 0, 300);
+    gradGray.addColorStop(0, 'rgba(210,210,210,0.9)');
+    gradGray.addColorStop(1, 'rgba(160,160,160,0.4)');
+
+    const bgColors = values.map((v, i) => (v === maxVal && v > 0) ? gradGold : gradGray);
+
+    G_CHARTS.trend = new Chart(ctx, {
+        type: "bar",
         data: {
-            datasets: points.map(p => ({
-                label: _truncate(p.label, 22),
-                data: [{ x: p.x, y: p.y, r: p.r }],
-                backgroundColor: p.bg,
-                borderColor: p.bg.replace('0.6', '1').replace('0.7', '1'),
-                borderWidth: 1.5,
-            }))
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: bgColors,
+                borderRadius: 6
+            }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            animation: { duration: 600, easing: 'easeOutQuart' },
             plugins: {
                 legend: { display: false },
-                datalabels: { display: false },
-                tooltip: {
-                    callbacks: {
-                        title: c => c[0].dataset.label,
-                        label: c => [
-                            `Spent: ${_fmtMoney(c.raw.x)}`,
-                            `Conv: ${_fmtNum(c.raw.y)}`,
-                            `Clicks ≈ ${_fmtNum(c.raw.r ** 2 / 3.24 | 0)}`
-                        ]
-                    }
+                datalabels: {
+                    anchor: 'end', align: 'end', offset: -2,
+                    font: { size: 9, weight: '700' }, color: '#888',
+                    formatter: v => v > 0 ? (isMoney ? _fmtShort(v) : _fmtNum(v)) : ''
                 }
             },
             scales: {
                 x: {
-                    title: { display: true, text: 'Spent (đ)', color: '#888', font: { size: 10 } },
-                    ticks: { callback: v => _fmtShort(v), color: '#666', font: { size: 9 } },
-                    grid: { color: 'rgba(0,0,0,0.03)', drawBorder: true, borderColor: 'rgba(0,0,0,0.05)' }
+                    grid: { color: 'rgba(0,0,0,0.05)', drawBorder: true, borderColor: 'rgba(0,0,0,0.05)' },
+                    ticks: { color: '#888', font: { size: 8, weight: '600' } }
                 },
                 y: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Conversions', color: '#888', font: { size: 10 } },
-                    ticks: { color: '#666', font: { size: 9 } },
-                    grid: { color: 'rgba(0,0,0,0.03)', drawBorder: true, borderColor: 'rgba(0,0,0,0.05)' }
+                    grid: { color: 'rgba(0,0,0,0.05)', drawBorder: true, borderColor: 'rgba(0,0,0,0.05)' },
+                    ticks: { display: false },
+                    suggestedMax: maxVal * 1.2
                 }
             }
         },
@@ -740,12 +1001,11 @@ function _renderDualAxisChart(data) {
 // ─────────────────────────────────────────────
 // 7. TOP / WORST CAMPAIGN INSIGHTS CARDS
 // ─────────────────────────────────────────────
-function _renderTopCampaignCards(data) {
+function _renderTopCampaignCards(data, precalculatedList = null) {
     const el = document.getElementById("g_top_campaigns");
     if (!el) return;
 
-    const campaigns = _groupByCampaign(data);
-    const list = Object.values(campaigns);
+    const list = precalculatedList || Object.values(_groupByCampaign(data));
 
     if (list.length === 0) {
         el.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:2rem;font-size:1.3rem;">Không có dữ liệu</div>`;
@@ -784,11 +1044,11 @@ function _renderTopCampaignCards(data) {
 // ─────────────────────────────────────────────
 // 8. DETAIL TABLE (like Meta Campaign Details)
 // ─────────────────────────────────────────────
-function _renderCampaignTable(data, filterText = "") {
+function _renderCampaignTable(data, filterText = "", precalculatedGroup = null) {
     const wrap = document.getElementById("g_campaign_table");
     if (!wrap) return;
 
-    const campaigns = _groupByCampaign(data);
+    const campaigns = precalculatedGroup || _groupByCampaign(data);
     let list = Object.values(campaigns).sort((a, b) => b.spent - a.spent);
 
     if (filterText) {
@@ -894,9 +1154,39 @@ function _truncate(str, n) {
     return str && str.length > n ? str.slice(0, n) + "…" : (str || "");
 }
 
-function _setHtml(id, val) {
+function _setHtml(id, val, diffPct = null, prevRange = "", prevVal = null) {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = `<span>${val}</span>`;
+    if (!el) return;
+
+    // First span for the main value
+    const valSpan = el.querySelector("span:first-child");
+    const target = valSpan || el;
+    target.textContent = val;
+
+    if (diffPct !== null) {
+        const valNum = parseFloat(diffPct);
+        if (valNum > 0) target.style.color = "#10b981";
+        else if (valNum < 0) target.style.color = "#ef4444";
+        else target.style.color = "";
+    }
+
+    // Second span for the percentage change
+    const diffSpan = el.querySelector("span:nth-child(2)");
+    if (diffSpan && diffPct !== null) {
+        const valNum = parseFloat(diffPct);
+        const isUp = valNum > 0;
+        const isDown = valNum < 0;
+
+        diffSpan.textContent = (isUp ? "+" : "") + diffPct + "%";
+        diffSpan.className = isUp ? "increase" : (isDown ? "decrease" : "");
+
+        let tooltipText = "";
+        if (prevRange) tooltipText += `Kỳ trước: ${prevRange}`;
+        if (prevVal !== null) {
+            tooltipText += (tooltipText ? ` (${prevVal})` : `Kỳ trước: ${prevVal}`);
+        }
+        if (tooltipText) diffSpan.setAttribute("data-tooltip", tooltipText);
+    }
 }
 
 window.refreshGoogleAds = renderGoogleAdsView;
