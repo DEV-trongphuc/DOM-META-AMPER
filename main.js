@@ -62,7 +62,8 @@ const METRIC_REGISTRY = {
   like: { id: "like", label: "Likes", icon: "fa-solid fa-heart", type: "action", action_type: "post_reaction", format: "number" },
   save: { id: "save", label: "Saves", icon: "fa-solid fa-bookmark", type: "action", action_type: "onsite_conversion.post_save", format: "number" },
 };
-let SUMMARY_METRICS = JSON.parse(localStorage.getItem("dom_summary_metrics")) || ["impressions", "reach", "message"];
+// --- Summary Metrics Logic ---
+var SUMMARY_METRICS = JSON.parse(localStorage.getItem("dom_summary_metrics")) || ["impressions", "reach", "message_started"];
 // --- Summary Metrics UI Logic ---
 window.openSummarySettings = function () {
   const modal = document.getElementById("summary_settings_modal");
@@ -164,7 +165,7 @@ window.closeSummarySettings = function () {
       modal.style.display = "none";
     }, 300);
   }
-  SUMMARY_METRICS = JSON.parse(localStorage.getItem("dom_summary_metrics")) || ["impressions", "reach", "message"];
+  SUMMARY_METRICS = JSON.parse(localStorage.getItem("dom_summary_metrics")) || ["impressions", "reach", "message_started"];
 };
 
 function updateSummaryCardHTML() {
@@ -2430,15 +2431,17 @@ async function main() {
 
   renderYears();
   initDashboard();
-  // 🚀 TỐI ƯU: Chạy song song các tiến trình khởi tạo và tải dữ liệu
+  // 🚀 TỐI ƯU: Tải settings xong mới tải dữ liệu để tránh lệch metrics
+  await (async () => {
+    if (typeof initSettingsSync === "function") {
+      await initSettingsSync(); // ☁️ Tải settings
+      if (typeof updateSummaryCardHTML === "function") updateSummaryCardHTML();
+    }
+  })();
+
   await Promise.all([
     initAccountSelector(), // 👤 Khởi tạo chọn tài khoản động
-    (async () => {
-      if (typeof initSettingsSync === "function") {
-        await initSettingsSync(); // ☁️ Tải settings
-      }
-      updateBrandDropdownUI(); // 🏷️ Khởi tạo bộ lọc sau khi có settings
-    })(),
+    updateBrandDropdownUI(), // 🏷️ Khởi tạo bộ lọc sau khi có settings
     loadDashboardData() // 📊 Tải dữ liệu chính
   ]);
 
