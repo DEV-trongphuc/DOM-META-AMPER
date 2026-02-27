@@ -471,6 +471,38 @@ html {
   height: 2.2rem;
 }
 
+/* Brand Filter in Performance Modal */
+.perf_brand_select .dom_select_show li {
+  padding: 1rem 1.6rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 1.2rem !important;
+  transition: all 0.2s;
+}
+
+.perf_brand_select .dom_select_show li img {
+  width: 2.4rem !important;
+  height: 2.4rem !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  flex-shrink: 0;
+}
+
+.perf_brand_select .dom_select_show li span {
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+}
+
+.perf_brand_select .dom_select_show li:hover {
+  background: #f1f5f9 !important;
+}
+
+.perf_brand_select .dom_select_show li.active {
+  background: #fff8eb !important;
+  color: var(--mainClr) !important;
+}
+
 /* Nút chức năng lẻ trong thẻ chính */
 .toolbar_btn {
   height: 3.8rem;
