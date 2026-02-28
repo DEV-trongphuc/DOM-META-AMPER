@@ -980,11 +980,26 @@
           </div>
 
           <!-- Quality -->
-          <div class="dom_inner dom_fade_item w30 box_shadow chart detail_quality_chart" id="detail_quality_chart">
+          <div class="dom_inner dom_fade_item w30 box_shadow chart detail_quality_chart" id="detail_quality_chart"
+            style="position:relative;">
             <h2>
-              <i class="fa-solid fa-thumbs-up main_clr"></i> Interaction
+              <span><i class="fa-solid fa-thumbs-up main_clr"></i> Interaction</span>
+              <span class="dom_title_button" id="video_funnel_toggle_btn" onclick="window.toggleVideoFunnel()"
+                title="Video Funnel">
+                <i class="fa-solid fa-repeat"></i> Video Funnel
+              </span>
             </h2>
             <div class="interaction"></div>
+            <!-- Video Funnel overlay (same pattern as dom_platform_abs) -->
+            <div class="video_funnel_panel" id="video_funnel_panel">
+              <h2>
+                <span><i class="fa-solid fa-film main_clr"></i> Video Funnel</span>
+                <span class="dom_title_button" onclick="window.toggleVideoFunnel()" title="Interaction">
+                  <i class="fa-solid fa-repeat"></i> Interaction
+                </span>
+              </h2>
+              <div id="video_funnel_content"></div>
+            </div>
           </div>
         </div>
 

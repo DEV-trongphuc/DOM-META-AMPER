@@ -247,9 +247,6 @@ function getMetricValue(item, metricId) {
     return +item[fieldKey] || 0;
   }
   if (meta.type === "action") {
-    // 🔍 Debug log settings
-    const isNewVideoMetric = ["video_view", "thruplay", "video_p50", "video_p100", "video_play"].includes(metricId);
-
     // Đặc biệt cho ROAS
     if (metricId === "roas") {
       const roasArr = item.purchase_roas || [];
@@ -298,10 +295,6 @@ function getMetricValue(item, metricId) {
     }
 
     const finalVal = act ? +act.value : (item[metricId] || 0);
-
-    if (isNewVideoMetric && Math.random() < 0.1) {
-      console.log(`[Video Debug] ${metricId}:`, finalVal, "Term:", actionType, "Found:", !!act);
-    }
     return finalVal;
   }
   if (meta.type === "action_value") {
@@ -1788,6 +1781,12 @@ function renderCampaignView(data) {
   const wrap = document.querySelector(".view_campaign_box");
   if (!wrap || !Array.isArray(data)) return;
 
+  // ✅ Auto-clear selections khi render lại (do filter/search thay đổi)
+  const selBar = document.getElementById("selection_summary_bar");
+  if (selBar) selBar.style.display = "none";
+  const headerCb = document.getElementById("select_all_cb");
+  if (headerCb) headerCb.checked = false;
+
   const now = Date.now();
   const activeLower = "active";
 
@@ -1902,6 +1901,15 @@ function renderCampaignView(data) {
   // === ⭐ TỐI ƯU 3: Render (dùng cờ đã tính) ===
   const htmlBuffer = [];
 
+  // ⭐ TỐI ƯU: Tính activeMetas MỘT LẦN ngoài vòng lặp thay vì mỗi campaign
+  const activeMetas = ACTIVE_COLUMNS.map(id => {
+    const meta = METRIC_REGISTRY[id];
+    if (meta) return meta;
+    const custom = CUSTOM_METRICS.find(m => m.id === id);
+    if (custom) return { ...custom, type: "custom" };
+    return null;
+  }).filter(Boolean);
+
   for (let i = 0; i < data.length; i++) {
     const c = data[i];
     const adsets = c.adsets; // adsets lúc này đã được sắp xếp
@@ -1934,15 +1942,6 @@ function renderCampaignView(data) {
       : `<div class="campaign_icon_wrap ${hasActiveAdset ? '' : 'inactive'}"><i class="${iconClass}"></i></div>`;
 
     const isMixed = c.isMixedGoal;
-
-    // === DYNAMIC COLUMNS CALCULATION ===
-    const activeMetas = ACTIVE_COLUMNS.map(id => {
-      const meta = METRIC_REGISTRY[id];
-      if (meta) return meta;
-      const custom = CUSTOM_METRICS.find(m => m.id === id);
-      if (custom) return { ...custom, type: "custom" };
-      return null;
-    }).filter(Boolean);
 
     const renderCells = (item, isMixed = false) => {
       return activeMetas.map(meta => {
@@ -4177,6 +4176,15 @@ async function handleAdsetInsightClick(btn) {
   // Hiển thị ngay Actions Detail từ bộ nhớ (trước khi gọi API breakdown)
   if (adsetObj) {
     renderFullActionsDetail(adsetObj);
+    // ✅ Reset flag + ẩn button + đóng panel khi mở adset mới
+    window._videoFunnelLoaded = false;
+    window._videoFunnelHasData = false;
+    const fBtn = document.getElementById("video_funnel_toggle_btn");
+    if (fBtn) fBtn.style.display = "none";
+    const fPanel = document.getElementById("video_funnel_panel");
+    if (fPanel) fPanel.classList.remove("active");
+    window.__lastAdsetObj = adsetObj;
+    renderVideoFunnel(adsetObj);
   }
 
   // Cập nhật quick stats
@@ -4437,6 +4445,10 @@ async function showAdsetDetail(adset_id) {
     renderInteraction(processedByDate);
     window.dataByDate = processedByDate;
 
+    // ✅ Dùng cùng nguồn với Full Actions Detail (lastFullActionsData)
+    window._videoFunnelLoaded = true;
+    renderVideoFunnel(lastFullActionsData);
+
     renderCharts({
       byHour: processedByHour,
       byAgeGender: processedByAgeGender,
@@ -4521,9 +4533,18 @@ async function handleViewClick(e, type = "ad") {
   const result = itemObj ? itemObj.result : parseFloat(adViewEl.dataset.result || 0);
   const cpr = itemObj ? getMetricValue(itemObj, "cpr") : parseFloat(adViewEl.dataset.cpr || 0);
 
-  // Hiển thị ngay Actions Detail từ bộ nhớ
+  // ✅ Luôn reset funnel khi mở ad mới (kể cả khi không có cache)
+  window._videoFunnelLoaded = false;
+  window._videoFunnelHasData = false;
+  const _fBtn = document.getElementById("video_funnel_toggle_btn");
+  if (_fBtn) _fBtn.style.display = "none";
+  const _fPanel = document.getElementById("video_funnel_panel");
+  if (_fPanel) _fPanel.classList.remove("active");
+
+  // Hiển thị ngay Actions Detail từ bộ nhớ + init Video Funnel
   if (itemObj) {
     renderFullActionsDetail(itemObj);
+    renderVideoFunnel(lastFullActionsData);
   }
 
   const thumb = adViewEl.dataset.thumb || "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
@@ -4865,7 +4886,7 @@ async function showAdDetail(ad_id) {
   try {
     // ⭐ THAY ĐỔI CHÍNH: Gọi hàm batch MỘT LẦN ở đây
     const results = await fetchAdDetailBatch(ad_id);
-    console.log(results);
+
 
     // Bóc tách kết quả từ object 'results'
     const {
@@ -4925,8 +4946,6 @@ async function showAdDetail(ad_id) {
 
     // Chuyển đổi các breakdown khác về dạng object {key: {spend, actions...}}
     const processBreakdown = (dataArray, keyField1, keyField2 = null) => {
-      console.log();
-
       const result = {};
       (dataArray || []).forEach((item) => {
         let key = item[keyField1] || "unknown";
@@ -4983,6 +5002,10 @@ async function showAdDetail(ad_id) {
 
     renderInteraction(processedByDate); // Truyền dữ liệu đã xử lý
     window.dataByDate = processedByDate; // Lưu data đã xử lý
+
+    // ✅ Refresh Video Funnel với data của ad (sau API)
+    window._videoFunnelLoaded = true;
+    renderVideoFunnel(lastFullActionsData);
 
     // ================== Render Chart ==================
     // Truyền dữ liệu đã xử lý vào hàm render
@@ -5119,7 +5142,6 @@ async function fetchAdDetailBatch(ad_id) {
 
     batchResponse.forEach((item, index) => {
       const name = batchRequests[index].name; // Lấy tên đã định danh
-      console.log(name);
 
       // Mặc định giá trị rỗng
       const defaultEmpty =
@@ -5730,8 +5752,143 @@ function renderInteraction(byDate) {
 
   wrap.innerHTML = html;
 
-  wrap.innerHTML = html;
+  // ✅ Update video funnel if adsetObj is available
+  if (window.__lastAdsetObj) {
+    renderVideoFunnel(window.__lastAdsetObj);
+    // This call is now handled by renderFullActionsDetail
+    // if (window.__lastAdsetObj) {
+    //   renderVideoFunnel(window.__lastAdsetObj);
+    // }
+  }
 }
+
+/**
+ * Render CSS-only Video Funnel chart (không dùng Chart.js)
+ * Dững dữ liệu từ adsetObj.actions (giống Full Actions Detail)
+ * Pipeline: 3s View → 25% → 50% → 75% → 95% → ThruPlay → p100
+ */
+function renderVideoFunnel(adsetObj) {
+  const content = document.getElementById("video_funnel_content");
+  if (!content) return;
+
+  // actions[] array (action_type lookup)
+  const actionsArr = Array.isArray(adsetObj?.actions) ? adsetObj.actions : [];
+
+  const getVal = (key) => {
+    // Nguồn 1: actions[] array (giống Full Actions Detail actionsSource loop)
+    const entry = actionsArr.find(a => a.action_type === key);
+    if (entry) return parseInt(entry.value || 0);
+    // Nguồn 2: top-level field trên adsetObj (giống Full Actions Detail vfs fallback)
+    const topLevel = adsetObj?.[key];
+    if (topLevel) {
+      return parseInt(Array.isArray(topLevel) ? (topLevel[0]?.value || 0) : (topLevel?.value || topLevel) || 0);
+    }
+    return 0;
+  };
+
+  // Các bước của funnel video
+  const steps = [
+    { key: "video_view", label: "Video View (3s)", color: "gold" },
+    { key: "video_p25_watched_actions", label: "Video 25%", color: "gold" },
+    { key: "video_p50_watched_actions", label: "Video 50%", color: "amber" },
+    { key: "video_p75_watched_actions", label: "Video 75%", color: "amber" },
+    { key: "video_p95_watched_actions", label: "Video 95%", color: "orange" },
+    { key: "video_thruplay_watched_actions", label: "ThruPlay", color: "orange" },
+    { key: "video_p100_watched_actions", label: "Video 100%", color: "gray" },
+  ];
+
+  const values = steps.map(s => getVal(s.key));
+  const maxVal = Math.max(...values) || 1;
+  const hasVideo = values.some(v => v > 0);
+  window._videoFunnelHasData = hasVideo;
+
+  // ✅ Hiện / ẩn nút + tự động switch sang Video Funnel nếu có data
+  const toggleBtn = document.getElementById("video_funnel_toggle_btn");
+  const funnelPanel = document.getElementById("video_funnel_panel");
+  if (toggleBtn) toggleBtn.style.display = hasVideo ? "inline-flex" : "none";
+  if (funnelPanel) {
+    if (hasVideo) funnelPanel.classList.add("active");
+    else funnelPanel.classList.remove("active");
+  }
+
+  if (!hasVideo) {
+    content.innerHTML = `<p style="text-align:center;padding:2rem;color:#94a3b8;font-size:1.3rem;">
+      <i class="fa-solid fa-circle-info"></i> Không có dữ liệu video.
+    </p>`;
+    return;
+  }
+
+  // ✅ Gắn value vào step và sort giảm dần theo giá trị
+  const stepsWithVal = steps
+    .map((s, i) => ({ ...s, val: values[i] }))
+    .filter(s => s.val > 0)
+    .sort((a, b) => b.val - a.val);
+
+  const fmt = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
+  const pct = (n) => maxVal > 0 ? ((n / maxVal) * 100).toFixed(1) + "%" : "–";
+  const dropHtml = (cur, prev) => {
+    if (!prev) return "";
+    const d = ((prev - cur) / prev * 100).toFixed(0);
+    return `<span class="vf_drop"><i class="fa-solid fa-arrow-down"></i> -${d}%</span>`;
+  };
+
+  let html = "";
+  stepsWithVal.forEach((step, i) => {
+    const val = step.val;
+    const widthPct = Math.max(8, Math.round((val / maxVal) * 100));
+    const retentionPct = i === 0 ? "100%" : pct(val);
+    const prevVal = i > 0 ? stepsWithVal[i - 1].val : 0;
+    const drop = i > 0 ? dropHtml(val, prevVal) : "";
+
+    html += `
+      ${i > 0 ? '<div class="vf_connector"></div>' : ""}
+      <div class="vf_step">
+        <div class="vf_meta">
+          <div class="vf_name">${step.label}</div>
+          ${drop}
+        </div>
+        <div class="vf_bar_wrap">
+          <div class="vf_bar ${step.color}" style="width:${widthPct}%;">
+            <span>${retentionPct}</span>
+          </div>
+        </div>
+        <div class="vf_count">${fmt(val)}</div>
+      </div>`;
+  });
+
+  content.innerHTML = html;
+}
+
+/**
+ * Toggle Video Funnel panel (giống pattern Spent Platform / Details)
+ * Nếu không có data video → show toast
+ */
+window.toggleVideoFunnel = function () {
+  const panel = document.getElementById("video_funnel_panel");
+  if (!panel) return;
+
+  // Chỉ show toast khi đã load xong API mà vẫn không có video
+  if (window._videoFunnelLoaded && !window._videoFunnelHasData) {
+    const existing = document.getElementById("_vf_toast");
+    if (existing) existing.remove();
+    const toast = document.createElement("div");
+    toast.id = "_vf_toast";
+    toast.style.cssText = `
+      position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff; padding: 1.2rem 2.4rem;
+      border-radius: 12px; font-size: 1.3rem; font-weight: 600;
+      z-index: 99999; display: flex; align-items: center; gap: 1rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    `;
+    toast.innerHTML = `<i class="fa-solid fa-circle-xmark" style="color:#f87171;"></i> Không có định dạng video.`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+    return;
+  }
+
+  // Mở panel luôn (nếu chưa load xong thì hiện nội dung hiện tại)
+  panel.classList.toggle("active");
+};
 
 /**
  * Render all available actions in a scrollable list from the item's existing data
@@ -5905,64 +6062,121 @@ function renderFullActionsDetail(manualTotals, filterQuery = "") {
     return;
   }
 
-  // Combine Core + Sorted Actions
-  let html = filteredCore.map(m => {
-    const desc = METRIC_DESCRIPTIONS[m.label] || "Key performance indicator for this campaign.";
+  // ⭐ TỐI ƯU: Xây dựng reverse lookup map 1 lần, tránh iterate aliasGroupMap mỗi action entry
+  const labelToAliasKey = Object.create(null);
+  for (const [key, grpLabel] of Object.entries(aliasGroupMap)) {
+    if (!labelToAliasKey[grpLabel]) labelToAliasKey[grpLabel] = key;
+  }
+  const registryLabelToKey = Object.create(null);
+  for (const k in METRIC_REGISTRY) {
+    const m = METRIC_REGISTRY[k];
+    if (m.label && !registryLabelToKey[m.label]) registryLabelToKey[m.label] = m.action_type || k;
+  }
+
+  // ===== NHÓM CÁC METRICS =====
+  const GROUP_DEFS = [
+    {
+      key: "performance", label: "Performance", icon: "fa-gauge-high",
+      match: (label) => ["Cost Per Click (CPC)", "Click-Through Rate (CTR)", "Engagement", "Video Plays"].includes(label)
+    },
+    {
+      key: "video", label: "Video", icon: "fa-film",
+      match: (label) => label.includes("Video") || label.includes("ThruPlay")
+    },
+    {
+      key: "social", label: "Social Interaction", icon: "fa-thumbs-up",
+      match: (label) => ["Reactions/Likes", "Saves", "Shares", "Comments", "Post Net Like", "Link Clicks", "Follows", "Media Views"].some(k => label.includes(k))
+    },
+    {
+      key: "messaging", label: "Messaging", icon: "fa-comment-dots",
+      match: (label) => label.includes("Message") || label.includes("Messenger") || label.includes("Messaging")
+    },
+    {
+      key: "leads", label: "Leads & Conversion", icon: "fa-bullseye",
+      match: (label) => label.includes("Lead") || label.includes("Registration") || label.includes("Pixel") || label.includes("Offsite") || label.includes("Conversion")
+    },
+  ];
+
+  const renderCard = (label, valStr, icon, titleAttr, isMoney = false, formatFn = null) => {
+    const displayVal = formatFn ? formatFn(parseFloat(valStr)) : formatNumber(parseInt(valStr));
     return `
-      <div class="action_detail_card core" title="${desc}">
-        <div style="display: flex; align-items: center; gap: 1rem;">
+      <div class="action_detail_card" title="${titleAttr}">
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
           <div class="icon_box">
-            <i class="fa-solid ${m.icon}" style="font-size: 1.5rem; color: var(--mainClr);"></i>
-          </div>
-          <span class="label_text">${m.label}</span>
-        </div>
-        <div class="value_text">${m.format(m.val)}</div>
-        <div class="footer_meta">
-           <span style="opacity: 0.7;">Metrics:</span> <code class="technical_key">${m.key}</code>
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  html += actionEntries.map(([label, val]) => {
-    let icon = "fa-chart-simple";
-    if (label.includes("Lead")) icon = "fa-bullseye";
-    if (label.includes("Message")) icon = "fa-comment-dots";
-    if (label.includes("Save")) icon = "fa-bookmark";
-    if (label.includes("Engagement")) icon = "fa-fingerprint";
-    if (label.includes("View")) icon = "fa-play-circle";
-    if (label.includes("ThruPlay")) icon = "fa-bolt";
-    if (label.includes("Click")) icon = "fa-mouse-pointer";
-    if (label.includes("Reaction") || label.includes("Like")) icon = "fa-heart";
-
-    let technicalKey = "";
-    for (const [key, grpLabel] of Object.entries(aliasGroupMap)) {
-      if (grpLabel === label) { technicalKey = key; break; }
-    }
-    if (!technicalKey) {
-      for (const k in METRIC_REGISTRY) {
-        if (METRIC_REGISTRY[k].label === label) { technicalKey = METRIC_REGISTRY[k].action_type || k; break; }
-      }
-    }
-    if (!technicalKey) technicalKey = label.toLowerCase().replace(/\s+/g, "_");
-
-    const desc = METRIC_DESCRIPTIONS[label] || `Total value for ${label} action type.`;
-
-    return `
-      <div class="action_detail_card" title="${desc}">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div class="icon_box">
-            <i class="fa-solid ${icon}" style="font-size: 1.4rem; color: #475569;"></i>
+            <i class="fa-solid ${icon}" style="font-size: 1.3rem; color: #475569;"></i>
           </div>
           <span class="label_text">${label}</span>
         </div>
-        <div class="value_text">${formatNumber(val)}</div>
-        <div class="footer_meta">
-           <span style="opacity: 0.7;">Metrics:</span> <code class="technical_key">${technicalKey}</code>
+        <div class="value_text">${displayVal}</div>
+      </div>`;
+  };
+
+  const renderCoreCard = (m) => `
+    <div class="action_detail_card core" title="${m.key}">
+      <div style="display: flex; align-items: center; gap: 0.8rem;">
+        <div class="icon_box">
+          <i class="fa-solid ${m.icon}" style="font-size: 1.3rem; color: var(--mainClr);"></i>
         </div>
+        <span class="label_text">${m.label}</span>
       </div>
-    `;
-  }).join("");
+      <div class="value_text">${m.format(m.val)}</div>
+    </div>`;
+
+  const renderSectionHeader = (group) => `
+    <div class="fad_section_header" style="grid-column:1/-1;">
+      <i class="fa-solid ${group.icon}"></i> ${group.label}
+    </div>`;
+
+  // Phân loại action entries vào từng nhóm
+  const grouped = {};
+  GROUP_DEFS.forEach(g => grouped[g.key] = []);
+  const others = [];
+
+  actionEntries.forEach(([label, val]) => {
+    const grp = GROUP_DEFS.find(g => g.match(label));
+    if (grp) grouped[grp.key].push([label, val]);
+    else others.push([label, val]);
+  });
+
+  // Core metrics luôn vào Performance
+  const coreHtml = filteredCore.map(renderCoreCard).join("");
+
+  const getIcon = (label) => {
+    if (label.includes("Lead") || label.includes("Conversion") || label.includes("Offsite")) return "fa-bullseye";
+    if (label.includes("Message") || label.includes("Messenger") || label.includes("Messaging")) return "fa-comment-dots";
+    if (label.includes("Save")) return "fa-bookmark";
+    if (label.includes("Engagement")) return "fa-fingerprint";
+    if (label.includes("Video") || label.includes("ThruPlay") || label.includes("View")) return "fa-play-circle";
+    if (label.includes("Click")) return "fa-mouse-pointer";
+    if (label.includes("Reaction") || label.includes("Like")) return "fa-heart";
+    if (label.includes("Share")) return "fa-share-nodes";
+    if (label.includes("Comment")) return "fa-comment";
+    if (label.includes("Follow")) return "fa-user-plus";
+    return "fa-chart-simple";
+  };
+
+  let html = "";
+
+  GROUP_DEFS.forEach(grp => {
+    const items = grouped[grp.key];
+    const isCoreGroup = grp.key === "performance";
+    if (!items.length && (isCoreGroup ? !filteredCore.length : true)) return;
+
+    html += renderSectionHeader(grp);
+    if (isCoreGroup) html += coreHtml;
+    items.forEach(([label, val]) => {
+      const technicalKey = labelToAliasKey[label] || registryLabelToKey[label] || label.toLowerCase().replace(/\s+/g, "_");
+      html += renderCard(label, val, getIcon(label), technicalKey);
+    });
+  });
+
+  if (others.length) {
+    html += `<div class="fad_section_header" style="grid-column:1/-1;"><i class="fa-solid fa-ellipsis"></i> Other</div>`;
+    others.forEach(([label, val]) => {
+      const technicalKey = labelToAliasKey[label] || registryLabelToKey[label] || label.toLowerCase().replace(/\s+/g, "_");
+      html += renderCard(label, val, getIcon(label), technicalKey);
+    });
+  }
 
   listWrap.innerHTML = html;
 }
@@ -6501,11 +6715,20 @@ function renderChartByDevice(dataByDevice) {
 
   if (window.chart_by_device_instance) {
     window.chart_by_device_instance.destroy();
-    window.chart_by_device_instance = null; // Gán null
+    window.chart_by_device_instance = null;
   }
 
+  // ✅ Reset DOM: luôn move canvas ra container rồi mới xóa wrapper/legend cũ
+  const container = ctx.closest(".chart_device_wrap")
+    || ctx.closest(".device_chart_box")?.parentElement
+    || ctx.parentElement;
+  if (container && ctx.parentElement !== container) {
+    container.insertBefore(ctx, container.firstChild);
+  }
+  container?.querySelectorAll(".device_chart_box, .device_legend_custom").forEach(el => el.remove());
+
   if (!validEntries.length) {
-    return; // Không có data, không vẽ chart
+    return;
   }
 
   validEntries.sort((a, b) => b[1] - a[1]);
@@ -6573,24 +6796,15 @@ function renderChartByDevice(dataByDevice) {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1, // Fix hình tròn không bị méo
-      cutout: "70%", // 💫 tạo lỗ tròn
+      aspectRatio: 1,
+      cutout: "70%",
       plugins: {
-        legend: {
-          position: "bottom",
-          labels: {
-            color: "#333",
-            boxWidth: 14,
-            padding: 10,
-          },
-        },
+        // ✅ Ẩn legend mặc định (rối khi nhiều mục)
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: (ctx) =>
-              `${ctx.label}: ${formatNumber(ctx.raw)} (${(
-                (ctx.raw / total) *
-                100
-              ).toFixed(1)}%)`,
+              `${ctx.label}: ${formatNumber(ctx.raw)} (${((ctx.raw / total) * 100).toFixed(1)}%)`,
           },
         },
         datalabels: { display: false },
@@ -6599,6 +6813,46 @@ function renderChartByDevice(dataByDevice) {
     },
     plugins: [centerTextPlugin],
   });
+
+  // ✅ Layout: chart nhỏ bên trái + legend căn trái bên phải
+  const legendWrap = ctx.closest(".chart_device_wrap") || ctx.parentElement;
+
+  // Wrap canvas vào div nhỏ (nếu chưa có)
+  let chartBox = legendWrap?.querySelector(".device_chart_box");
+  if (!chartBox) {
+    chartBox = document.createElement("div");
+    chartBox.className = "device_chart_box";
+    chartBox.style.cssText = "flex:0 0 150px;width:150px;height:150px;position:relative;";
+    ctx.parentNode.insertBefore(chartBox, ctx);
+    chartBox.appendChild(ctx);
+  }
+
+  // Layout wrapper: flex row
+  if (legendWrap) {
+    legendWrap.style.cssText = "display:flex;align-items:center;gap:20px;padding:8px 0;";
+  }
+
+  // Legend: cột dọc căn trái
+  let legendEl = legendWrap?.querySelector(".device_legend_custom");
+  if (!legendEl) {
+    legendEl = document.createElement("div");
+    legendEl.className = "device_legend_custom";
+    legendWrap?.appendChild(legendEl);
+  }
+  legendEl.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:7px;flex:1;";
+
+  const solidColors = ["rgba(255,171,0,0.9)", "rgba(156,163,175,0.7)", "rgba(38,42,83,0.9)", "rgba(0,59,59,0.7)", "rgba(153,0,0,0.7)", "#ccc"];
+  const top3 = labels.slice(0, 3);
+  const othersVal = resultData.slice(3).reduce((a, b) => a + b, 0);
+  const legendItems = top3.map((lbl, i) => ({ label: lbl, color: solidColors[i] || "#ccc" }));
+  if (othersVal > 0) legendItems.push({ label: "Others", color: "#ccc" });
+
+  legendEl.innerHTML = legendItems.map(item =>
+    `<span style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#444;font-weight:600;">
+      <span style="width:10px;height:10px;border-radius:50%;background:${item.color};flex-shrink:0;"></span>
+      ${item.label}
+    </span>`
+  ).join("");
 }
 
 function renderChartByRegion(dataByRegion) {
@@ -6614,10 +6868,52 @@ function renderChartByRegion(dataByRegion) {
       .trim()
       .replace(/^\w/, (c) => c.toUpperCase());
 
+  // ✅ Helper mạnh hơn getResults() cho breakdown data (object format)
+  // Meta API breakdown đôi khi trả về "messaging_conversation_started_7d"
+  // thay vì "onsite_conversion.messaging_conversation_started_7d"
+  const getBreakdownResult = (v) => {
+    const acts = v.actions || {};
+    // nếu không có action nào → 0
+    if (!Object.keys(acts).length) return 0;
+
+    // 1. Thử getResults() bình thường trước
+    const normal = getResults(v);
+    if (normal > 0) return normal;
+
+    // 2. Thử tất cả values trong resultMapping (kể cả phiên bản ngắn không có tiền tố)
+    const goal = VIEW_GOAL || "";
+    const goalKey = GOAL_GROUP_LOOKUP[goal] || "";
+    const triedTypes = new Set();
+
+    // Ưu tiên resultType chính của goal hiện tại
+    const main = resultMapping[goal];
+    if (main) triedTypes.add(main);
+
+    // Thêm tất cả các goals trong nhóm
+    if (goalKey && goalMapping[goalKey]) {
+      for (const g of goalMapping[goalKey]) {
+        const t = resultMapping[g];
+        if (t) triedTypes.add(t);
+      }
+    }
+
+    for (const fullType of triedTypes) {
+      // Thử đúng key
+      if (acts[fullType] > 0) return +acts[fullType];
+      // Thử phiên bản ngắn (bỏ tiền tố "onsite_conversion.")
+      const shortType = fullType.replace(/^onsite_conversion\./, "");
+      if (shortType !== fullType && acts[shortType] > 0) return +acts[shortType];
+    }
+
+    // 3. Fallback: lấy action value lớn nhất trong object
+    const vals = Object.values(acts).map(Number).filter(n => n > 0);
+    return vals.length ? Math.max(...vals) : 0;
+  };
+
   const entries = Object.entries(dataByRegion).map(([k, v]) => ({
     name: prettyName(k),
     spend: v.spend || 0,
-    result: getResults(v) || 0,
+    result: getBreakdownResult(v),
   }));
 
   const totalSpend = entries.reduce((acc, e) => acc + e.spend, 0);
@@ -6651,63 +6947,79 @@ function renderChartByRegion(dataByRegion) {
   const spentData = top5.map((e) => e.spend);
   const resultData = top5.map((e) => e.result);
 
-  // 🎯 Highlight theo Result
-  const maxResultIndex = resultData.indexOf(Math.max(...resultData));
+  // ✅ Kiểm tra có result thực không
+  const hasResult = resultData.some((v) => v > 0);
 
-  // ✨ Gradient vàng quyền lực
+  // ✅ Bar hẹp khi ít region (giống goal_chart)
+  const isFew = top5.length < 3;
+
+  // 🎨 Màu theo style goal_chart
+  const maxSpendIndex = spentData.indexOf(Math.max(...spentData));
+
+  // 🎯 Highlight bar spend cao nhất = vàng, còn lại = xám (style goal_chart)
   const gradientGold = c2d.createLinearGradient(0, 0, 0, 300);
   gradientGold.addColorStop(0, "rgba(255,169,0,1)");
   gradientGold.addColorStop(1, "rgba(255,169,0,0.4)");
 
-  // 🌫 Gradient xám thanh lịch
   const gradientGray = c2d.createLinearGradient(0, 0, 0, 300);
   gradientGray.addColorStop(0, "rgba(210,210,210,0.9)");
   gradientGray.addColorStop(1, "rgba(160,160,160,0.4)");
 
-  // ✅ Apply màu theo chỉ số maxResultIndex
-  const spentColors = labels.map((_, i) =>
-    i === maxResultIndex ? gradientGold : gradientGray
+  const gradientNavy = c2d.createLinearGradient(0, 0, 0, 300);
+  gradientNavy.addColorStop(0, "rgba(38,42,83,0.95)");
+  gradientNavy.addColorStop(1, "rgba(38,42,83,0.45)");
+
+  // Spend: bar cao nhất = gold, còn lại = gray (giống goal_chart)
+  const spentColors = spentData.map((_, i) =>
+    i === maxSpendIndex ? gradientGold : gradientGray
   );
 
-  const resultColors = labels.map((_, i) =>
-    i === maxResultIndex ? gradientGold : gradientGray
-  );
+  // Datasets
+  const datasets = [
+    {
+      label: "Spend",
+      data: spentData,
+      backgroundColor: spentColors,
+      borderWidth: 0,
+      borderRadius: 8,
+      yAxisID: "ySpend",
+      ...(isFew && { barPercentage: 0.35, categoryPercentage: 0.65 }),
+    },
+  ];
+
+  if (hasResult) {
+    const maxResultIndex = resultData.indexOf(Math.max(...resultData));
+    datasets.push({
+      label: "Result",
+      data: resultData,
+      backgroundColor: resultData.map((_, i) =>
+        i === maxResultIndex ? gradientGray : "rgba(200,200,200,0.5)"
+      ),
+      borderWidth: 0,
+      borderRadius: 6,
+      yAxisID: "yResult",
+      // ✅ Bar nhỏ hơn Spend — giống cột xám trong AgeGender chart
+      barPercentage: 0.45,
+      categoryPercentage: 0.6,
+    });
+  }
 
   window.chart_by_region_instance = new Chart(c2d, {
     type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Spent",
-          data: spentData,
-          backgroundColor: spentColors,
-          borderWidth: 0,
-          borderRadius: 6,
-          yAxisID: "ySpend",
-        },
-        {
-          label: "Result",
-          data: resultData,
-          backgroundColor: resultColors,
-          borderWidth: 0,
-          borderRadius: 6,
-          yAxisID: "yResult",
-        },
-      ],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
-      layout: { padding: { left: 10, right: 10 } },
+      layout: { padding: { left: 10, right: 10, bottom: 20 } },
+      animation: { duration: 600, easing: "easeOutQuart" },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             title: (ctx) => fullNamesDetail[ctx[0].dataIndex] || ctx[0].label,
             label: (ctx) =>
-              `${ctx.dataset.label}: ${ctx.dataset.label === "Spent"
+              `${ctx.dataset.label}: ${ctx.dataset.label === "Spend"
                 ? formatMoneyShort(ctx.raw)
                 : ctx.raw
               }`,
@@ -6717,14 +7029,10 @@ function renderChartByRegion(dataByRegion) {
           anchor: "end",
           align: "end",
           offset: 2,
-          font: { weight: "600", size: 11 },
+          font: { size: 11, weight: "600" },
           color: "#555",
           formatter: (value, ctx) =>
-            ctx.dataset.label === "Spent"
-              ? formatMoneyShort(value)
-              : value > 0
-                ? value
-                : "",
+            value > 0 ? formatMoneyShort(value) : "",
         },
       },
       scales: {
@@ -6732,33 +7040,34 @@ function renderChartByRegion(dataByRegion) {
           grid: {
             color: "rgba(0,0,0,0.03)",
             drawBorder: true,
+            borderColor: "rgba(0,0,0,0.05)",
           },
           ticks: {
-            color: "#444",
-            font: { weight: "600", size: 11 },
-            maxRotation: 0,
-            minRotation: 0,
+            color: "#666",
+            font: { weight: "600", size: 8.5 },
             autoSkip: false,
+            maxRotation: 45,
+            minRotation: 0,
           },
         },
         ySpend: {
           type: "linear",
           position: "left",
-          grid: { color: "rgba(0,0,0,0.03)" },
           beginAtZero: true,
+          grid: { color: "rgba(0,0,0,0.03)", drawBorder: true, borderColor: "rgba(0,0,0,0.05)" },
           ticks: { display: false },
-          suggestedMax: Math.max(...spentData) * 1.1,
+          suggestedMax: Math.max(...spentData) * 1.2,
         },
         yResult: {
           type: "linear",
           position: "right",
-          grid: { drawOnChartArea: false },
+          display: hasResult,
           beginAtZero: true,
+          grid: { drawOnChartArea: false },
           ticks: { display: false },
-          suggestedMax: Math.max(...resultData) * 1.1,
+          suggestedMax: hasResult ? Math.max(...resultData) * 1.5 : 1,
         },
       },
-      animation: { duration: 600, easing: "easeOutQuart" },
     },
     plugins: [ChartDataLabels],
   });
