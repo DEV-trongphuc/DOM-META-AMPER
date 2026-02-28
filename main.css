@@ -2572,12 +2572,12 @@ tbody {
 /* Hiệu ứng lướt từ phải sang */
 @keyframes slideInRight {
   0% {
-    transform: translateX(100%) translateY(-50%);
+    transform: translateX(100%);
     opacity: 0.5;
   }
 
   100% {
-    transform: translateX(0) translateY(-50%);
+    transform: translateX(0);
     opacity: 1;
   }
 }
@@ -2616,26 +2616,126 @@ tbody {
 }
 
 .dom_ai_report {
-  opacity: 0;
-  transform: translateX(100%) translateY(-50%);
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-  max-height: 0;
-  display: none;
-}
-
-.dom_ai_report_close {
-  position: absolute;
+  position: fixed;
+  display: flex;
+  flex-direction: column;
   top: 0;
   right: 0;
-  padding: 3rem;
-  font-size: 2rem;
-  cursor: pointer;
-  transition: 0.3s ease;
+  width: calc(100% - 26rem);
+  height: 100vh;
+  background: #f5f5f7;
+  z-index: 999999;
+  box-shadow: -4px 0 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateX(100%);
+  transition: transform 0.38s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
+  opacity: 0;
+  visibility: hidden;
 }
 
-.dom_ai_report_close:hover {
-  color: var(--mainClr);
+/* ── AI Report Panel Header ─────────────────── */
+.ai_report_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.8rem 2.4rem;
+  background: linear-gradient(135deg, #1a1a2e 0%, #262a53 60%, #1a1a2e 100%);
+  border-bottom: 3px solid #ffa900;
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+.ai_report_header_left {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.ai_report_robot_icon {
+  font-size: 2.8rem;
+  color: #ffa900;
+  filter: drop-shadow(0 0 8px rgba(255, 169, 0, 0.6));
+  animation: ai_pulse 2s ease-in-out infinite;
+}
+
+@keyframes ai_pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+}
+
+.ai_report_header_title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.05em;
+}
+
+.ai_report_header_sub {
+  font-size: 1.15rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40rem;
+}
+
+.ai_report_header_actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.ai_report_btn_export {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: linear-gradient(135deg, #ffa900, #ffcc44);
+  color: #1a1a2e;
+  border: none;
+  border-radius: 50px;
+  padding: 0.8rem 1.8rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 169, 0, 0.35);
+}
+
+.ai_report_btn_export:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 169, 0, 0.5);
+}
+
+.ai_report_btn_close {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.ai_report_btn_close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .btn_download_pdf {
@@ -2659,42 +2759,29 @@ tbody {
 }
 
 .dom_ai_report.active {
-  display: block;
-  position: fixed !important;
-  background: #fffef9;
-  z-index: 999999;
-  top: 50%;
-  transform: translateY(-50%);
-  right: 0;
-  border-radius: 5px;
-  width: calc(98% - 25rem);
-  padding: 4rem;
-  padding-right: 2rem;
-  box-shadow: 0 0 5px rgb(0, 0, 0, 0.3);
-  overflow-y: hidden;
-  max-height: unset;
-  height: 100vh;
+  transform: translateX(0);
+  opacity: 1;
   pointer-events: all;
-
-  /* Hiệu ứng trượt ra (mở) */
-  animation: slideInRight 0.35s ease forwards;
-  animation-delay: 2.5s;
+  visibility: visible;
 }
 
-/* 🔹 Khi đang đóng (lướt vào) */
+
 .dom_ai_report.closing {
-  animation: slideOutRight 0.4s ease forwards;
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 @keyframes slideOutRight {
   from {
     opacity: 1;
-    transform: translateX(0) translateY(-50%);
+    transform: translateX(0);
   }
 
   to {
     opacity: 0;
-    transform: translateX(100%) translateY(-50%);
+    transform: translateX(100%);
   }
 }
 
@@ -2821,18 +2908,23 @@ tbody {
 }
 
 .dom_ai_report h5 {
-  font-size: 1.6rem;
-  font-weight: bold;
-  color: #313131e0;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
-  border-top: 1px solid rgb(0, 0, 0, 0.1);
-  padding-top: 2rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem 1.4rem;
+  background: linear-gradient(90deg, rgba(255, 169, 0, 0.1) 0%, transparent 100%);
+  border-left: 3px solid #ffa900;
+  border-radius: 0 8px 8px 0;
 }
 
 .dom_ai_report h5>i {
-  color: var(--mainClr);
-  margin-right: 0.5rem;
+  color: #ffa900;
+  font-size: 1.4rem;
 }
 
 .dom_ai_report ul {
@@ -2848,12 +2940,12 @@ tbody {
 }
 
 .dom_ai_report_content {
-  line-height: 1.4;
-  margin-top: 1rem;
-  height: 90vh;
-  padding-bottom: 15rem;
-  overflow: auto;
-  padding-right: 2rem;
+  flex: 1;
+  overflow-y: auto;
+  padding: 2.5rem 3rem;
+  padding-bottom: 8rem;
+  line-height: 1.6;
+  background: #f5f5f7;
 }
 
 .dom_ai_report_content b {
@@ -2985,7 +3077,8 @@ tbody {
   border-radius: 15px;
 }
 
-.dom_ai_report.active~.dom_overlay_ai {
+.dom_ai_report.active~.dom_overlay_ai,
+.dom_overlay_ai.ai_scanning {
   position: fixed;
   inset: 0;
   z-index: 99998;
@@ -3372,20 +3465,185 @@ tbody {
 }
 
 .dom_ai_report .mini_table {
-  margin-bottom: 2rem;
-  background-color: var(--fadeClr);
-  border-radius: 5px;
+  width: 100%;
+  border-radius: 12px;
   overflow: hidden;
-}
-
-.dom_select.compare .dom_select_show {
-  max-height: unset;
-  overflow: unset;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
 }
 
 .dom_ai_report .mini_table thead {
-  background-color: #3a3a3aad;
-  color: white;
+  background: linear-gradient(135deg, #1a1a2e 0%, #262a53 100%);
+  color: #fff;
+}
+
+.dom_ai_report .mini_table thead th {
+  padding: 1.1rem 1.4rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: left;
+  border: none;
+}
+
+.dom_ai_report .mini_table tbody td {
+  padding: 1rem 1.4rem;
+  font-size: 1.2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+.dom_ai_report .mini_table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dom_ai_report .mini_table tbody tr:hover td {
+  background: rgba(255, 169, 0, 0.06);
+}
+
+.dom_ai_report .mini_table tbody td:first-child {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.dom_ai_report h6 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1.5rem 0 0.8rem;
+}
+
+/* KPI Grid */
+.ai_kpi_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.2rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.kpi_item {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.4rem 1.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi_item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.kpi_item>span {
+  font-size: 1.1rem;
+  color: #64748b;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.kpi_item>b {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1a1a2e;
+}
+
+.kpi_item>b.metric-good {
+  color: #16a34a;
+}
+
+.kpi_item>b.metric-bad {
+  color: #dc2626;
+}
+
+/* Insight List */
+.insight_list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+
+.insight_list>li {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  border-left: 4px solid #ffa900;
+  font-size: 1.25rem;
+  line-height: 1.6;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  color: #374151;
+}
+
+.insight_list>li>i {
+  margin-right: 0.6rem;
+}
+
+.recommendation-action {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1.15rem;
+  color: #1a1a2e;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* No result note */
+.no-result-note {
+  font-size: 1.2rem;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 8px;
+  padding: 1rem 1.4rem;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1.5rem;
+}
+
+/* ai_report_block */
+.ai_report_block {
+  background: #fff;
+  border-radius: 16px;
+  padding: 2rem 2.4rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.ai_report_block h4 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 2px solid rgba(255, 169, 0, 0.2);
+}
+
+.ai_report_block h4>i {
+  color: #ffa900;
+  font-size: 1.6rem;
+}
+
+/* Timestamp */
+.timestamp {
+  display: block;
+  font-size: 1.1rem;
+  color: #94a3b8;
+  text-align: right;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .pct {
@@ -4240,13 +4498,58 @@ tbody {
   color: var(--mainClr);
 }
 
+#chart_by_hour {
+  transform: translateY(-2rem);
+}
+
 .campaign_main .ad_name,
 .adset_item .ad_name {
   line-height: 1.6;
+  flex-wrap: nowrap !important;
+  overflow: hidden;
+}
+
+/* Tên adset/ad: 1 dòng, truncate nếu dài */
+.adset_item .ad_name>span:first-child,
+.ad_item .ad_name>span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+/* Badges và icon btn không bị co */
+.adset_item .ad_name .smart_badge_row,
+.ad_item .ad_name .smart_badge_row,
+.adset_item .ad_name .adset_inline_insight_btn,
+.ad_item .ad_name .ad_inline_insight_btn,
+.adset_item .ad_name .fa-copy,
+.ad_item .ad_name .fa-copy {
+  flex-shrink: 0;
 }
 
 .ad_item .ad_name {
   cursor: pointer;
+}
+
+/* 2-line name layout: dòng 1 = tên, dòng 2 = badges + icons */
+.ad_name_text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  width: 100%;
+}
+
+.ad_name_meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  min-height: 0;
 }
 
 .adset_item:hover,
@@ -4268,9 +4571,11 @@ tbody {
 
 .adset_item>.ads_name>a {
   display: flex;
-  justify-content: center;
   align-items: center;
   gap: 1rem;
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
 }
 
 .campaign_main>.ads_name {
@@ -4407,6 +4712,8 @@ tbody {
   padding-left: 1rem;
   padding-right: 1rem;
   width: 100%;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .ad_set {
@@ -7472,9 +7779,9 @@ tbody {
   position: relative;
   z-index: 1;
   background: #fff;
-  border-radius: 16px;
-  width: min(680px, 95vw);
-  max-height: 80vh;
+  border-radius: 20px;
+  width: min(900px, 96vw);
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -7490,14 +7797,14 @@ tbody {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1.6rem 2rem;
+  padding: 2rem 2.8rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.07);
   background: linear-gradient(135deg, #1a1a2e 0%, #262a53 100%);
   color: #fff;
 }
 
 .kb_header h3 {
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-weight: 700;
   flex: 1;
   gap: 0.8rem;
@@ -7514,8 +7821,8 @@ tbody {
   color: #ffa900;
   border: 1px solid rgba(255, 169, 0, 0.3);
   border-radius: 20px;
-  padding: 0.2rem 1rem;
-  font-size: 1.1rem;
+  padding: 0.3rem 1.2rem;
+  font-size: 1.3rem;
   font-weight: 600;
 }
 
@@ -7523,11 +7830,11 @@ tbody {
   background: rgba(255, 255, 255, 0.1);
   border: none;
   color: #fff;
-  width: 3rem;
-  height: 3rem;
+  width: 3.6rem;
+  height: 3.6rem;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 1.4rem;
+  font-size: 1.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7540,10 +7847,10 @@ tbody {
 
 .kb_body {
   overflow-y: auto;
-  padding: 1.6rem 2rem;
+  padding: 2rem 2.8rem;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 2rem;
+  gap: 0.6rem 3rem;
 }
 
 .kb_group {
@@ -7551,25 +7858,25 @@ tbody {
 }
 
 .kb_group_title {
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #ffa900;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
 }
 
 .kb_row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0;
+  padding: 0.7rem 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   gap: 1rem;
 }
 
 .kb_desc {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   color: #444;
   flex: 1;
 }
@@ -7588,13 +7895,13 @@ tbody {
   background: #f1f3f5;
   border: 1px solid #ccc;
   border-bottom-width: 2px;
-  border-radius: 5px;
-  padding: 0.15rem 0.55rem;
-  font-size: 1.05rem;
+  border-radius: 6px;
+  padding: 0.25rem 0.75rem;
+  font-size: 1.2rem;
   font-family: ui-monospace, monospace;
   color: #333;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
-  min-width: 2.4rem;
+  min-width: 2.8rem;
   text-align: center;
 }
 
@@ -9358,6 +9665,43 @@ tbody {
   min-width: 4rem;
 }
 
+#detail_delivery_estimate {
+  width: 100% !important;
+  display: block !important;
+  align-items: unset !important;
+  justify-content: unset !important;
+}
+
+#detail_delivery_estimate>div {
+  width: 100%;
+}
+
+/* Fix age bar bị mất do .detail_gender > div override + flex-shrink */
+.detail_gender>.detail_age_bar {
+  display: block !important;
+  position: relative !important;
+  height: 1rem !important;
+  min-height: 1rem !important;
+  overflow: hidden !important;
+  align-items: unset !important;
+  justify-content: unset !important;
+  flex-shrink: 0 !important;
+}
+
+/* Fix age text numbers (28, 45) */
+.detail_gender>.age_text {
+  display: flex !important;
+  width: 100% !important;
+  justify-content: space-between !important;
+  align-items: unset !important;
+  flex-shrink: 0 !important;
+}
+
+/* Tất cả direct children không shrink → container scroll thay vì co items */
+.detail_gender>* {
+  flex-shrink: 0;
+}
+
 .vf_meta {
   width: 9rem;
   flex-shrink: 0;
@@ -9393,4 +9737,68 @@ tbody {
   margin: 0 auto;
   border-radius: 1px;
   transform: translateX(2rem);
+}
+
+/* ── Smart Badges ── */
+.dom_smart_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  line-height: 1.6;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.smart_badge_row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.badge_best {
+  background: #dcfce7;
+  color: #14532d;
+  border: 1px solid #86efac;
+}
+
+.badge_scale {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #4ade80;
+}
+
+.badge_review {
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.badge_learning {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.badge_fatigue {
+  background: #fdf4ff;
+  color: #6b21a8;
+  border: 1px solid #e9d5ff;
+}
+
+.badge_stale {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+#smart_badges_toggle.active {
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+  background: #fffbeb !important;
 }

@@ -592,7 +592,8 @@
                 </div>
                 <div class="dom_platform_item">
                   <p>
-                    <img src="https://freelogopng.com/images/all_img/1664035778meta-icon-png.png" />
+                    <img
+                      src="https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/social-medias/thread-block-logo-1-i73pfbwpt6bmcgvlcae3sc.png/thread-block-logo-1-14s5twxzakpdzka2bufeir.png" />
                     <span> Other Platform</span>
                   </p>
                   <p id="other_spent">-</p>
@@ -794,7 +795,6 @@
                 style="margin-left: 0.8rem; border: none; font-size: 1.3rem; padding: 1rem 2.5rem; height: auto; display: flex; align-items: center; justify-content: center; gap: 0.8rem;">
                 <i class="fa-solid fa-file-csv" style="font-size: 1.8rem;"></i> Export CSV
               </button>
-
 
             </div>
 
@@ -1039,9 +1039,15 @@
                 </div>
                 <p class="detail_text">Gender</p>
                 <div class="detail_gender_bar">
-                  <p>Nam</p>
-                  <p>Nữ</p>
-                  <p>Khác</p>
+                  <p>Male</p>
+                  <p>Female</p>
+                  <p>Other</p>
+                </div>
+                <p class="detail_text">Audience Definition</p>
+                <div id="detail_delivery_estimate">
+                  <div
+                    style="height:3rem;background:#f1f5f9;border-radius:8px;animation:skeleton-loading 1.2s ease-in-out infinite;">
+                  </div>
                 </div>
                 <p class="detail_text">Optimize</p>
                 <div class="detail_optimize detail_gender_bar">
@@ -1067,12 +1073,13 @@
                 <p class="detail_text">Brand Safety Excluded</p>
                 <div class="detail_brand_safety detail_gender_bar"></div>
               </div>
+
             </div>
           </div>
         </div>
         <div class="dom_row">
           <div class="dom_detail_ad">
-            <div class="dom_inner dom_fade_item wfull box_shadow chart show">
+            <div class="dom_inner dom_fade_item wfull box_shadow chart show" style="padding-bottom:2rem;">
               <h2>
                 <i class="fa-solid fa-stopwatch main_clr"></i>
                 24-hour Spent - Result
@@ -1080,6 +1087,7 @@
               <div class="chart-wrapper">
                 <canvas id="chart_by_hour"></canvas>
               </div>
+              <div id="schedule_intelligence"></div>
             </div>
             <div class="dom_inner dom_fade_item w25 box_shadow chart show">
               <h2 class="op8">
@@ -1483,12 +1491,25 @@
         </div>
       </div>
       <div class="dom_ai_report">
-        <i class="fa-solid fa-xmark dom_ai_report_close"></i>
-        <h3><i class="fa-solid fa-robot"></i> REPORT FOR -</h3>
+        <div class="ai_report_header">
+          <div class="ai_report_header_left">
+            <i class="fa-solid fa-robot ai_report_robot_icon"></i>
+            <div>
+              <p class="ai_report_header_title">DOM AI REPORT</p>
+              <p class="ai_report_header_sub" id="ai_report_subtitle">Phân tích hiệu suất quảng cáo</p>
+            </div>
+          </div>
+          <div class="ai_report_header_actions">
+            <button class="ai_report_btn_export" id="btn_export_docx" title="Xuất báo cáo Word (.docx)">
+              <i class="fa-solid fa-file-word"></i>
+              <span>Xuất DOCX</span>
+            </button>
+            <button class="ai_report_btn_close" id="ai_report_close_btn">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
         <div class="dom_ai_report_content"></div>
-        <!-- <button class="btn_download_pdf">
-            <i class="fa-solid fa-circle-down"></i>
-          </button> -->
       </div>
       <div class="dom_overlay">
         <h5><i class="fa-solid fa-angles-left"></i> Click to return</h5>

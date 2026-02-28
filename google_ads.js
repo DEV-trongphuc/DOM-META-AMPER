@@ -9,6 +9,9 @@ let isGAdsFetching = false;
 let isMonthlyFetching = false;
 let lastGAdsRange = "";
 
+// Expose để main.js có thể check cache khi switch tab
+Object.defineProperty(window, 'googleAdsRawData', { get: () => googleAdsRawData, configurable: true });
+
 // Chart instances
 const G_CHARTS = {};
 
@@ -31,10 +34,21 @@ window.fetchGoogleAdsData = async function (force = false) {
 
     const currentRange = `${startDate}_${endDate}`;
     if (isGAdsFetching) return;
+
+    // ✅ Cache guard: nếu data đã có và date range không đổi → chỉ render lại
+    if (!force && googleAdsRawData.length > 0 && lastGAdsRange === currentRange) {
+        console.log("⚡ Google Ads: Using cached data, skipping API call.");
+        renderGoogleAdsView();
+        return;
+    }
+
     lastGAdsRange = currentRange;
+    window._lastGAdsRange = currentRange; // Expose for tab-switch check in main.js
     isGAdsFetching = true;
 
-    _showGoogleSkeletons();
+    // Chỉ show skeleton khi user đang ở tab Google Ads (không phải preload background)
+    const isOnGadsTab = document.querySelector(".dom_container")?.classList.contains("google_ads");
+    if (isOnGadsTab) _showGoogleSkeletons();
 
     try {
         const s = new Date(startDate);
@@ -66,15 +80,24 @@ window.fetchGoogleAdsData = async function (force = false) {
         }
 
         console.log("✅ Google Ads: Mega Pipeline complete.", googleAdsRawData.length, "current /", googleAdsPrevData.length, "prev rows");
-        renderGoogleAdsView();
+
+        // Chỉ render UI nếu user đang ở tab google_ads
+        const _isOnTab = document.querySelector(".dom_container")?.classList.contains("google_ads");
+        if (_isOnTab) {
+            renderGoogleAdsView();
+        } else {
+            console.log("⚡ [Preload] Google Ads data cached. Will render when tab is opened.");
+        }
 
     } catch (error) {
         console.error("❌ Google Ads pipeline error:", error);
-        if (typeof showToast === 'function') showToast("❌ Lỗi đồng bộ dữ liệu Google Ads.");
-        renderGoogleAdsView();
+        if (typeof showToast === 'function' && document.querySelector(".dom_container")?.classList.contains("google_ads")) {
+            showToast("❌ Lỗi đồng bộ dữ liệu Google Ads.");
+        }
     } finally {
         isGAdsFetching = false;
-        _hideGoogleSkeletons();
+        const _isOnTabFinal = document.querySelector(".dom_container")?.classList.contains("google_ads");
+        if (_isOnTabFinal) _hideGoogleSkeletons();
     }
 }
 

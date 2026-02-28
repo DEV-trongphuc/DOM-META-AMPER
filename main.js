@@ -1914,6 +1914,16 @@ function renderCampaignView(data) {
     const c = data[i];
     const adsets = c.adsets; // adsets lúc này đã được sắp xếp
 
+    // ── Smart Badges: tính CPR trung bình campaign ──
+    const _badgesOn = window._smartBadgesEnabled !== false;
+    let _campAvgCpr = null;
+    if (_badgesOn && adsets && adsets.length > 1) {
+      const _validCpr = adsets
+        .map(as => (as.result > 0 ? as.spend / as.result : null))
+        .filter(v => v !== null);
+      _campAvgCpr = _validCpr.length ? _validCpr.reduce((s, v) => s + v, 0) / _validCpr.length : null;
+    }
+
     // Dùng cờ `_isActive` và `_activeAdsetCount` đã tính
     const hasActiveAdset = c._isActive;
     const activeAdsetCountForDisplay = c._activeAdsetCount;
@@ -2069,6 +2079,9 @@ function renderCampaignView(data) {
       }
 
       const adsHtml = new Array(ads.length);
+      // Tính CPR trung bình ads trong adset này (cho badge cấp ad)
+      const _adValidCprs = ads.map(ad => ad.result > 0 ? ad.spend / ad.result : null).filter(v => v !== null);
+      const _adAvgCpr = _adValidCprs.length > 1 ? _adValidCprs.reduce((s, v) => s + v, 0) / _adValidCprs.length : null;
       for (let k = 0; k < ads.length; k++) {
         const ad = ads[k];
         const isActive = ad.status?.toLowerCase() === activeLower;
@@ -2082,8 +2095,30 @@ function renderCampaignView(data) {
               </label>
               <a>
                 <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${ad.thumbnail}" data-ad-id-img="${ad.id}" />
-                <p class="ad_name" style="display:flex;align-items:center;gap:0.6rem;">
-                  <span>ID: ${ad.id}</span>
+                <p class="ad_name" style="display:flex;flex-direction:column;gap:0.25rem;min-width:0;">
+                  <span class="ad_name_text">ID: ${ad.id}</span>
+                  <span class="ad_name_meta">
+                    ${(() => {
+            const adCpr = ad.result > 0 ? ad.spend / ad.result : null;
+            const adFreq = +ad.frequency || 0;
+            const adResult = +ad.result || 0;
+            const adSpend = +ad.spend || 0;
+            const adStatus = (ad.status || '').toLowerCase();
+            const b = [];
+            if (adCpr !== null && _adAvgCpr !== null && adCpr < _adAvgCpr * 0.70 && adStatus === 'active')
+              b.push(`<span class="dom_smart_badge badge_scale" title="CPR vượt trội"><i class="fa-solid fa-bolt"></i> Scale</span>`);
+            else if (adCpr !== null && _adAvgCpr !== null && adCpr < _adAvgCpr * 0.80)
+              b.push(`<span class="dom_smart_badge badge_best" title="Best Performance"><i class="fa-solid fa-star"></i> Best Performance</span>`);
+            if (adCpr !== null && _adAvgCpr !== null && adCpr > _adAvgCpr * 1.30)
+              b.push(`<span class="dom_smart_badge badge_review" title="CPR cao"><i class="fa-solid fa-circle-exclamation"></i> Review</span>`);
+            if (adResult > 0 && adResult < 30 && adStatus === 'active')
+              b.push(`<span class="dom_smart_badge badge_learning" title="Learning phase"><i class="fa-solid fa-graduation-cap"></i> Learning</span>`);
+            if (adFreq > 4)
+              b.push(`<span class="dom_smart_badge badge_fatigue" title="Fatigue freq ${adFreq.toFixed(1)}"><i class="fa-solid fa-battery-quarter"></i> Fatigue</span>`);
+            if (adSpend === 0 && adStatus === 'active')
+              b.push(`<span class="dom_smart_badge badge_stale" title="No spend"><i class="fa-solid fa-ban"></i> No spend</span>`);
+            return b.join('');
+          })()}
                   <i class="fa-regular fa-copy ad_copy_id" 
                      data-id="${ad.id}"
                      title="Copy ID"
@@ -2140,24 +2175,47 @@ function renderCampaignView(data) {
               <div class="adset_goal_thumb ${hasActiveAd ? '' : 'inactive'}">
                 <i class="${getCampaignIcon(as.optimization_goal)}"></i>
               </div>
-              <p class="ad_name" style="display:flex;align-items:center;gap:0.6rem;">
-                <span>${as.name}</span>
-                <span class="adset_inline_insight_btn"
-                  data-adset-id="${as.id}"
-                  data-name="${as.name}"
-                  data-goal="${as.optimization_goal}"
-                  data-spend="${as.spend}"
-                  data-reach="${as.reach}"
-                  data-impressions="${as.impressions}"
-                  data-result="${as.result}"
-                  data-cpr="${getMetricValue(as, 'cpr')}"
-                  data-thumbs="${encodeURIComponent(JSON.stringify((as.ads || []).slice(0, 3).map(a => a.thumbnail || '').filter(Boolean)))}"
-                  title="Xem insight adset"
-                  onclick="event.stopPropagation();const b=this.closest('.adset_item').querySelector('.adset_insight_btn');if(b)handleAdsetInsightClick(b);"
-                  style="display:inline-flex;align-items:center;justify-content:center;width:2.4rem;height:2.4rem;border-radius:8px;background:#f1f5f9;color:#64748b;cursor:pointer;flex-shrink:0;opacity:0;transition:opacity 0.15s;font-size:1.1rem;"
-                  onmouseenter="this.style.opacity='1';this.style.background='#fffbeb';this.style.color='#f59e0b';"
-                  onmouseleave="this.style.opacity='0';this.style.background='#f1f5f9';this.style.color='#64748b';">
-                  <i class="fa-solid fa-magnifying-glass-chart"></i>
+              <p class="ad_name" style="display:flex;flex-direction:column;gap:0.25rem;min-width:0;">
+                <span class="ad_name_text">${as.name}</span>
+                <span class="ad_name_meta">
+                  ${(() => {
+          const asCpr = as.result > 0 ? as.spend / as.result : null;
+          const asFreq = +as.frequency || 0;
+          const asStatus = (as.status || '').toLowerCase();
+          const asResult = +as.result || 0;
+          const asSpend = +as.spend || 0;
+          const badges = [];
+          if (asCpr !== null && _campAvgCpr !== null && asCpr < _campAvgCpr * 0.70 && asStatus === 'active')
+            badges.push(`<span class="dom_smart_badge badge_scale" title="CPR v\u01b0\u1ee3t tr\u1ed9i \u226530% \u2014 n\u00ean scale"><i class="fa-solid fa-bolt"></i> Scale</span>`);
+          else if (asCpr !== null && _campAvgCpr !== null && asCpr < _campAvgCpr * 0.80)
+            badges.push(`<span class="dom_smart_badge badge_best" title="Best Performance \u2014 CPR th\u1ea5p h\u01a1n TB \u226520%"><i class="fa-solid fa-star"></i> Best Performance</span>`);
+          if (asCpr !== null && _campAvgCpr !== null && asCpr > _campAvgCpr * 1.30)
+            badges.push(`<span class="dom_smart_badge badge_review" title="CPR cao h\u01a1n TB \u226530% \u2014 c\u1ea7n xem x\u00e9t"><i class="fa-solid fa-circle-exclamation"></i> Review</span>`);
+          if (asResult > 0 && asResult < 50 && asStatus === 'active')
+            badges.push(`<span class="dom_smart_badge badge_learning" title="<50 results \u2014 giai \u0111o\u1ea1n h\u1ecdc"><i class="fa-solid fa-graduation-cap"></i> Learning</span>`);
+          if (asFreq > 3.5)
+            badges.push(`<span class="dom_smart_badge badge_fatigue" title="Frequency ${asFreq.toFixed(1)} \u2014 creative c\u00f3 th\u1ec3 m\u1ec7t"><i class="fa-solid fa-battery-quarter"></i> Fatigue</span>`);
+          if (asSpend === 0 && asStatus === 'active')
+            badges.push(`<span class="dom_smart_badge badge_stale" title="Active nh\u01b0ng kh\u00f4ng c\u00f3 spend"><i class="fa-solid fa-ban"></i> No spend</span>`);
+          return badges.join('');
+        })()}
+                  <span class="adset_inline_insight_btn"
+                    data-adset-id="${as.id}"
+                    data-name="${as.name}"
+                    data-goal="${as.optimization_goal}"
+                    data-spend="${as.spend}"
+                    data-reach="${as.reach}"
+                    data-impressions="${as.impressions}"
+                    data-result="${as.result}"
+                    data-cpr="${getMetricValue(as, 'cpr')}"
+                    data-thumbs="${encodeURIComponent(JSON.stringify((as.ads || []).slice(0, 3).map(a => a.thumbnail || '').filter(Boolean)))}"
+                    title="Xem insight adset"
+                    onclick="event.stopPropagation();const b=this.closest('.adset_item').querySelector('.adset_insight_btn');if(b)handleAdsetInsightClick(b);"
+                    style="display:inline-flex;align-items:center;justify-content:center;width:2.4rem;height:2.4rem;border-radius:8px;background:#f1f5f9;color:#64748b;cursor:pointer;flex-shrink:0;opacity:0;transition:opacity 0.15s;font-size:1.1rem;"
+                    onmouseenter="this.style.opacity='1';this.style.background='#fffbeb';this.style.color='#f59e0b';"
+                    onmouseleave="this.style.opacity='0';this.style.background='#f1f5f9';this.style.color='#64748b';">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i>
+                  </span>
                 </span>
               </p>
             </a>
@@ -2430,7 +2488,27 @@ async function loadCampaignList() {
     renderGoalChart(allAds);
     // ✅ Load extra details (Device, Platform position, overall stats)
     if (typeof loadExtraCharts === "function") loadExtraCharts();
-    // updateSummaryUI(campaigns);
+
+    // ⚡ Background preload Google Ads (silent — không show skeleton/UI)
+    // Delay nhẹ để không tranh bandwidth với Meta render
+    setTimeout(() => {
+      if (
+        typeof window.fetchGoogleAdsData === 'function' &&
+        window.GOOGLE_ADS_SETUP !== false
+      ) {
+        const currentRange = `${startDate}_${endDate}`;
+        const alreadyLoaded =
+          Array.isArray(window.googleAdsRawData) &&
+          window.googleAdsRawData.length > 0 &&
+          window._lastGAdsRange === currentRange;
+
+        if (!alreadyLoaded) {
+          console.log("⚡ [Preload] Fetching Google Ads in background...");
+          window.fetchGoogleAdsData(false);
+        }
+      }
+    }, 2000);
+
   } catch (err) {
     console.error("❌ Error in Flow 2 (Campaign List):", err);
   }
@@ -3573,6 +3651,20 @@ function resetAllFilters() {
   document.querySelector(".dom_container")?.classList.remove("is-empty");
 }
 
+// ── Smart Badges Toggle ──────────────────────────────────────────
+window._smartBadgesEnabled = true; // mặc định ON
+
+window.toggleSmartBadges = function (btn) {
+  window._smartBadgesEnabled = !window._smartBadgesEnabled;
+  const on = window._smartBadgesEnabled;
+  btn.style.borderColor = on ? '#f59e0b' : '#e2e8f0';
+  btn.style.color = on ? '#f59e0b' : '#64748b';
+  btn.style.background = on ? '#fffbeb' : '#fff';
+  btn.title = on ? 'Ẩn Smart Badges' : 'Hiển thị Smart Badges';
+  // Re-render table
+  if (window.lastRenderData) renderCampaignTable(window.lastRenderData);
+};
+
 main();
 const formatMoney = (v) =>
   v && !isNaN(v) ? Math.round(v).toLocaleString("vi-VN") + "đ" : "0đ";
@@ -4324,6 +4416,7 @@ async function showAdsetDetail(adset_id) {
       { method: "GET", name: "byPlatform", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=publisher_platform,platform_position${timeRangeParam}` },
       { method: "GET", name: "byDevice", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&breakdowns=impression_device${timeRangeParam}` },
       { method: "GET", name: "byDate", relative_url: `${adset_id}/insights?fields=spend,impressions,reach,actions,${videoFieldsParam}&time_increment=1${timeRangeParam}` },
+      { method: "GET", name: "deliveryEstimate", relative_url: `${adset_id}/delivery_estimate?fields=estimate_mau_lower_bound,estimate_mau_upper_bound,estimate_dau_lower_bound,estimate_dau_upper_bound` },
     ];
 
     const batchResponse = await fetchJSON(BASE_URL, {
@@ -4360,6 +4453,10 @@ async function showAdsetDetail(adset_id) {
     // Render targeting
     const targeting = results.targeting || {};
     renderTargetingToDOM(targeting);
+
+    // Render delivery estimate (audience size bar)
+    const deliveryData = (results.deliveryEstimate || [])[0] || {};
+    renderDeliveryEstimate(deliveryData);
 
     const processBreakdown = (arr, k1, k2 = null) => {
       const out = {};
@@ -5671,7 +5768,90 @@ function renderTargetingToDOM(targeting) {
   }
 }
 
-// ================== Render Interaction ==================
+// ================== Render Delivery Estimate (Audience Size Bar) ==================
+function renderDeliveryEstimate(data) {
+  const wrap = document.getElementById("detail_delivery_estimate");
+  if (!wrap) return;
+
+  const lower = data?.estimate_mau_lower_bound;
+  const upper = data?.estimate_mau_upper_bound;
+
+  // --- Xác định vị trí "breadth" trên thanh Narrow → Broad ---
+  // Dùng log10 scale: <100K=Narrow, 100K-1M=So So, >1M=Broad
+  let breadthPercent = 50; // default giữa
+  let label = "Medium";
+  let labelColor = "#f59e0b";
+
+  if (lower != null && upper != null) {
+    const mid = (lower + upper) / 2;
+    if (mid < 50000) {
+      breadthPercent = 10;
+      label = "Very Narrow";
+      labelColor = "#ef4444";
+    } else if (mid < 200000) {
+      breadthPercent = 28;
+      label = "Narrow";
+      labelColor = "#f97316";
+    } else if (mid < 1000000) {
+      breadthPercent = 50;
+      label = "Balanced";
+      labelColor = "#f59e0b";
+    } else if (mid < 10000000) {
+      breadthPercent = 72;
+      label = "Broad";
+      labelColor = "#22c55e";
+    } else {
+      breadthPercent = 92;
+      label = "Very Broad";
+      labelColor = "#16a34a";
+    }
+  }
+
+  // --- Format số lớn ---
+  const fmtNum = (n) => {
+    if (!n && n !== 0) return "?";
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+    if (n >= 1_000) return (n / 1_000).toFixed(0) + "K";
+    return n.toLocaleString();
+  };
+
+  const sizeText = (lower != null && upper != null)
+    ? `${fmtNum(lower)} – ${fmtNum(upper)}`
+    : "Unavailable";
+
+  wrap.innerHTML = `
+    <div style="margin-top:0.6rem;">
+      <!-- 3-segment bar -->
+      <div style="position:relative; height:0.9rem; border-radius:999px; overflow:hidden; display:flex; gap:2px; margin-bottom:0.5rem;">
+        <div style="flex:1; background:#fca5a5; border-radius:999px 0 0 999px;"></div>
+        <div style="flex:1; background:#fde68a;"></div>
+        <div style="flex:1; background:#86efac; border-radius:0 999px 999px 0;"></div>
+      </div>
+      <!-- Marker -->
+      <div style="position:relative; height:1.4rem; margin-bottom:0.4rem;">
+        <div style="position:absolute; left:calc(${breadthPercent}% - 6px); top:0; width:0; height:0;
+          border-left: 6px solid transparent; border-right: 6px solid transparent;
+          border-bottom: 10px solid ${labelColor};"></div>
+      </div>
+      <!-- Labels dưới thanh -->
+      <div style="display:flex; justify-content:space-between; font-size:1rem; color:#94a3b8; font-weight:500; margin-bottom:0.8rem;">
+        <span>Narrow</span>
+        <span style="color:${labelColor}; font-weight:700;">${label}</span>
+        <span>Broad</span>
+      </div>
+      <!-- Audience size -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.7rem 1rem; display:flex; align-items:center; gap:0.8rem;">
+        <i class="fa-solid fa-users" style="color:#64748b; font-size:1.1rem;"></i>
+        <div>
+          <div style="font-size:0.95rem; color:#94a3b8; font-weight:500; line-height:1;">Est. audience size</div>
+          <div style="font-size:1.25rem; font-weight:700; color:#1e293b; line-height:1.4;">${sizeText}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
 function renderInteraction(byDate) {
   // Original was byDevice, changed to byDate as it seems more logical
   const wrap = document.querySelector(".interaction");
@@ -6693,167 +6873,202 @@ function renderChartByHour(dataByHour) {
   });
 }
 
+// ================== Schedule Intelligence ==================
+function renderScheduleIntelligence(dataByHour) {
+  const wrap = document.getElementById("schedule_intelligence");
+  if (!wrap || !dataByHour) return;
+
+  const hourKeys = Object.keys(dataByHour);
+  if (!hourKeys.length) { wrap.innerHTML = ""; return; }
+
+  const hourStats = hourKeys.map(hk => {
+    const d = dataByHour[hk];
+    const spend = d.spend || 0;
+    const result = getResults(d) || 0;
+    const hour = parseInt(hk.slice(0, 2), 10);
+    const cpr = result > 0 ? spend / result : null;
+    return { hour, spend, result, cpr };
+  }).filter(s => s.spend > 0);
+
+  if (!hourStats.length) { wrap.innerHTML = ""; return; }
+
+  const hasResults = hourStats.some(s => s.result > 0);
+
+  const sorted = [...hourStats].sort((a, b) => {
+    if (hasResults) {
+      if (a.cpr !== null && b.cpr === null) return -1;
+      if (a.cpr === null && b.cpr !== null) return 1;
+      if (a.cpr !== null && b.cpr !== null) return a.cpr - b.cpr;
+    }
+    return b.spend - a.spend;
+  });
+
+  // FA icons cho top 3 (thay emoji)
+  const medalIcons = [
+    `<i class="fa-solid fa-trophy" style="color:#f59e0b;font-size:1rem;"></i>`,
+    `<i class="fa-solid fa-medal" style="color:#94a3b8;font-size:1rem;"></i>`,
+    `<i class="fa-solid fa-award" style="color:#cd7c2f;font-size:1rem;"></i>`,
+  ];
+
+  const best = sorted.slice(0, 3).map((s, i) => {
+    return `<span style="display:inline-flex;align-items:center;gap:0.4rem;background:#fff;
+      border:1.5px solid ${i === 0 ? '#f59e0b' : '#fcd34d'};border-radius:6px;
+      padding:0.2rem 0.8rem;font-weight:700;color:${i === 0 ? '#92400e' : '#b45309'};white-space:nowrap;">
+      ${medalIcons[i]} ${s.hour}h–${s.hour + 1}h${s.cpr ? `<span style="font-weight:400;opacity:0.6;font-size:0.9em;">(${(s.cpr / 1000).toFixed(1)}k CPR)</span>` : ''}
+    </span>`;
+  }).join("");
+
+  const withResult = hourStats.filter(s => s.cpr !== null);
+  let worstHtml = "";
+  if (withResult.length > 3) {
+    const worst = [...withResult].sort((a, b) => b.cpr - a.cpr)[0];
+    worstHtml = `<span style="display:inline-flex;align-items:center;gap:0.3rem;color:#ef4444;font-size:1rem;margin-left:0.2rem;">
+      <i class="fa-solid fa-triangle-exclamation"></i> Tránh ${worst.hour}h</span>`;
+  }
+
+  const metricLabel = hasResults ? "CPR thấp nhất" : "Spend cao nhất";
+
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;padding:0.8rem 1.2rem;margin-top:0.8rem;
+      background:linear-gradient(135deg,#fffbeb,#fef9ec);border:1px solid #fde68a;
+      border-radius:10px;font-size:1.25rem;">
+      <span style="display:flex;align-items:center;gap:0.4rem;font-weight:700;color:#92400e;white-space:nowrap;">
+        <i class="fa-solid fa-clock" style="color:#f59e0b;"></i> Best hours
+        <span style="font-weight:400;opacity:0.6;font-size:0.9em;">(${metricLabel})</span>
+      </span>
+      ${best}
+      ${worstHtml}
+    </div>
+  `;
+}
+
 function renderChartByDevice(dataByDevice) {
   if (!dataByDevice) return;
 
   const ctx = document.getElementById("chart_by_device");
   if (!ctx) return;
-  const c2d = ctx.getContext("2d");
 
-  const prettyName = (key) => {
-    return key
-      .replace(/_/g, " ") // chuyển _ thành space
-      .replace(
-        /\w\S*/g,
-        (w) => w[0].toUpperCase() + w.substring(1).toLowerCase()
-      );
-  };
-
-  const validEntries = Object.entries(dataByDevice)
-    .map(([k, v]) => [prettyName(k), getResults(v) || 0])
-    .filter(([_, val]) => val > 0);
-
+  // Destroy old chart
   if (window.chart_by_device_instance) {
     window.chart_by_device_instance.destroy();
     window.chart_by_device_instance = null;
   }
 
-  // ✅ Reset DOM: luôn move canvas ra container rồi mới xóa wrapper/legend cũ
-  const container = ctx.closest(".chart_device_wrap")
-    || ctx.closest(".device_chart_box")?.parentElement
-    || ctx.parentElement;
-  if (container && ctx.parentElement !== container) {
-    container.insertBefore(ctx, container.firstChild);
-  }
-  container?.querySelectorAll(".device_chart_box, .device_legend_custom").forEach(el => el.remove());
+  const prettyName = (key) =>
+    key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
-  if (!validEntries.length) {
-    return;
-  }
+  // Dùng spend (không phải result) để thống nhất với extra_details
+  const validEntries = Object.entries(dataByDevice)
+    .map(([k, v]) => {
+      const spend = typeof v === 'object' ? (v.spend || 0) : 0;
+      const result = typeof v === 'object' ? (getResults(v) || 0) : 0;
+      return { key: k, label: prettyName(k), spend, result };
+    })
+    .filter(e => e.spend > 0 || e.result > 0)
+    .sort((a, b) => (b.spend || b.result) - (a.spend || a.result));
 
-  validEntries.sort((a, b) => b[1] - a[1]);
-  const labels = validEntries.map(([k]) => k);
-  const resultData = validEntries.map(([_, v]) => v);
+  if (!validEntries.length) return;
 
-  const highlightColors = [
-    "rgba(255,171,0,0.9)", // vàng
+  const useSpend = validEntries.some(e => e.spend > 0);
+  const values = validEntries.map(e => useSpend ? e.spend : e.result);
+  const labels = validEntries.map(e => e.label);
+  const total = values.reduce((a, b) => a + b, 0);
 
-    "rgba(156,163,175,0.7)",
-  ];
-  const fallbackColors = [
-    "rgba(38,42,83,0.9)", // xanh đậm
-    "rgba(0, 59, 59, 0.7)",
-    "rgba(0, 71, 26, 0.7)",
-    "rgba(153, 0, 0, 0.7)",
-  ];
-  const colors = resultData.map((_, i) =>
-    i < 2 ? highlightColors[i] : fallbackColors[i - 2] || "#ccc"
-  );
+  const topLabel = labels[0];
+  const topPercent = total > 0 ? ((values[0] / total) * 100).toFixed(1) : '0';
 
-  const total = resultData.reduce((a, b) => a + b, 0);
-  const maxIndex = resultData.indexOf(Math.max(...resultData));
-  const maxLabel = labels[maxIndex];
-  const maxPercent = ((resultData[maxIndex] / total) * 100).toFixed(1);
-
-  // 🎯 Plugin custom: show % giữa lỗ — dùng chartArea để tính tâm chính xác
-  const centerTextPlugin = {
-    id: "centerText",
-    afterDraw(chart) {
-      const { width, ctx } = chart;
-      const { top, bottom } = chart.chartArea;
-      const centerX = width / 2;
-      const centerY = (top + bottom) / 2; // ← tâm thực sự của vùng chart
-
-      ctx.save();
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#333";
-
-      ctx.font = "bold 18px sans-serif";
-      ctx.fillText(`${maxPercent}%`, centerX, centerY - 11);
-
-      ctx.font = "12px sans-serif";
-      ctx.fillText(maxLabel, centerX, centerY + 11);
-      ctx.restore();
-    },
+  // Icon map theo device type
+  const getIcon = (key) => {
+    const k = key.toLowerCase();
+    if (k.includes('desktop')) return 'fa-desktop';
+    if (k.includes('tablet') || k.includes('ipad')) return 'fa-tablet-screen-button';
+    return 'fa-mobile-screen';
   };
 
-  // 🎨 Render chart
-  window.chart_by_device_instance = new Chart(c2d, {
-    type: "doughnut",
+  // Icon color map
+  const iconColors = ['#4267B2', '#E1306C', '#f59e0b', '#10b981', '#6366f1'];
+
+  // Rebuild container HTML — layout: list card trái + donut phải
+  const container = ctx.closest(".chart_device_wrap") || ctx.parentElement;
+  container.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:2rem;padding:4px 0;flex-wrap:wrap;">
+      <div id="_dev_list_left" style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:1rem;"></div>
+      <div style="flex:1;min-width:140px;max-width:200px;position:relative;display:flex;justify-content:center;align-items:center;">
+        <div style="position:relative;width:100%;">
+          <canvas id="_dev_canvas_inner"></canvas>
+          <div style="position:absolute;text-align:center;pointer-events:none;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;">
+            <p style="font-size:1.8rem;font-weight:800;color:#333;margin:0;line-height:1.2;">${topPercent}%</p>
+            <p style="font-size:1rem;color:#666;margin:0.3rem 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${topLabel}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Render list items
+  const listEl = container.querySelector('#_dev_list_left');
+  validEntries.slice(0, 5).forEach((entry, i) => {
+    const val = values[i];
+    const displayVal = useSpend
+      ? parseInt(val).toLocaleString('vi-VN') + '₫'
+      : formatNumber(val) + ' results';
+
+    const item = document.createElement('div');
+    item.style.cssText = `
+      display:flex;flex-direction:column;gap:0.4rem;
+      padding:0.9rem 1.2rem;border-radius:12px;
+      border:1px solid #f0f0f0;background:#fff;
+      box-shadow:0 2px 5px rgba(0,0,0,0.045);
+    `;
+    item.innerHTML = `
+      <p style="display:flex;align-items:center;gap:0.8rem;font-weight:600;color:#555;font-size:1rem;margin:0;">
+        <i class="fa-solid ${getIcon(entry.key)}" style="color:${iconColors[i] || '#94a3b8'};font-size:1.2rem;"></i>
+        <span>${entry.label}</span>
+      </p>
+      <p style="font-weight:700;font-size:1.4rem;color:#333;margin:0;padding-left:2rem;">${displayVal}</p>
+    `;
+    listEl.appendChild(item);
+  });
+
+  // Donut chart
+  const newCanvas = container.querySelector('#_dev_canvas_inner');
+  window.chart_by_device_instance = new Chart(newCanvas.getContext('2d'), {
+    type: 'doughnut',
     data: {
       labels,
-      datasets: [
-        {
-          label: "Results",
-          data: resultData,
-          backgroundColor: colors,
-          borderColor: "#fff",
-          borderWidth: 2,
-        },
-      ],
+      datasets: [{
+        data: values,
+        backgroundColor: values.map((_, i) => i === 0 ? '#FFA900' : '#E0E0E0'),
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverBackgroundColor: values.map((_, i) => i === 0 ? '#FFB700' : '#D0D0D0'),
+      }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1,
-      cutout: "70%",
+      cutout: '70%',
       plugins: {
-        // ✅ Ẩn legend mặc định (rối khi nhiều mục)
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) =>
-              `${ctx.label}: ${formatNumber(ctx.raw)} (${((ctx.raw / total) * 100).toFixed(1)}%)`,
-          },
+            label: (c) => {
+              const pct = ((c.raw / total) * 100).toFixed(1);
+              const val = useSpend
+                ? parseInt(c.raw).toLocaleString('vi-VN') + '₫'
+                : formatNumber(c.raw);
+              return `${c.label}: ${val} (${pct}%)`;
+            }
+          }
         },
         datalabels: { display: false },
       },
-      hoverOffset: 8,
-    },
-    plugins: [centerTextPlugin],
+      hoverOffset: 6,
+    }
   });
-
-  // ✅ Layout: chart nhỏ bên trái + legend căn trái bên phải
-  const legendWrap = ctx.closest(".chart_device_wrap") || ctx.parentElement;
-
-  // Wrap canvas vào div nhỏ (nếu chưa có)
-  let chartBox = legendWrap?.querySelector(".device_chart_box");
-  if (!chartBox) {
-    chartBox = document.createElement("div");
-    chartBox.className = "device_chart_box";
-    chartBox.style.cssText = "flex:0 0 150px;width:150px;height:150px;position:relative;";
-    ctx.parentNode.insertBefore(chartBox, ctx);
-    chartBox.appendChild(ctx);
-  }
-
-  // Layout wrapper: flex row
-  if (legendWrap) {
-    legendWrap.style.cssText = "display:flex;align-items:center;gap:20px;padding:8px 0;";
-  }
-
-  // Legend: cột dọc căn trái
-  let legendEl = legendWrap?.querySelector(".device_legend_custom");
-  if (!legendEl) {
-    legendEl = document.createElement("div");
-    legendEl.className = "device_legend_custom";
-    legendWrap?.appendChild(legendEl);
-  }
-  legendEl.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:7px;flex:1;";
-
-  const solidColors = ["rgba(255,171,0,0.9)", "rgba(156,163,175,0.7)", "rgba(38,42,83,0.9)", "rgba(0,59,59,0.7)", "rgba(153,0,0,0.7)", "#ccc"];
-  const top3 = labels.slice(0, 3);
-  const othersVal = resultData.slice(3).reduce((a, b) => a + b, 0);
-  const legendItems = top3.map((lbl, i) => ({ label: lbl, color: solidColors[i] || "#ccc" }));
-  if (othersVal > 0) legendItems.push({ label: "Others", color: "#ccc" });
-
-  legendEl.innerHTML = legendItems.map(item =>
-    `<span style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#444;font-weight:600;">
-      <span style="width:10px;height:10px;border-radius:50%;background:${item.color};flex-shrink:0;"></span>
-      ${item.label}
-    </span>`
-  ).join("");
 }
+
+
 
 function renderChartByRegion(dataByRegion) {
   if (!dataByRegion) return;
@@ -6873,8 +7088,11 @@ function renderChartByRegion(dataByRegion) {
   // thay vì "onsite_conversion.messaging_conversation_started_7d"
   const getBreakdownResult = (v) => {
     const acts = v.actions || {};
-    // nếu không có action nào → 0
     if (!Object.keys(acts).length) return 0;
+
+    // ✅ Mess campaign region dùng key này
+    if (acts["onsite_conversion.total_messaging_connection"] > 0)
+      return +acts["onsite_conversion.total_messaging_connection"];
 
     // 1. Thử getResults() bình thường trước
     const normal = getResults(v);
@@ -6885,11 +7103,9 @@ function renderChartByRegion(dataByRegion) {
     const goalKey = GOAL_GROUP_LOOKUP[goal] || "";
     const triedTypes = new Set();
 
-    // Ưu tiên resultType chính của goal hiện tại
     const main = resultMapping[goal];
     if (main) triedTypes.add(main);
 
-    // Thêm tất cả các goals trong nhóm
     if (goalKey && goalMapping[goalKey]) {
       for (const g of goalMapping[goalKey]) {
         const t = resultMapping[g];
@@ -6898,9 +7114,7 @@ function renderChartByRegion(dataByRegion) {
     }
 
     for (const fullType of triedTypes) {
-      // Thử đúng key
       if (acts[fullType] > 0) return +acts[fullType];
-      // Thử phiên bản ngắn (bỏ tiền tố "onsite_conversion.")
       const shortType = fullType.replace(/^onsite_conversion\./, "");
       if (shortType !== fullType && acts[shortType] > 0) return +acts[shortType];
     }
@@ -7221,6 +7435,8 @@ const getLogo = (key, groupKey = "") => {
     return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRemnhxz7XnQ1BiDuwUlmdQoYO9Wyko5-uOGQ&s";
   if (k.includes("instagram"))
     return "https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg";
+  if (k.includes("threads"))
+    return "https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/social-medias/thread-block-logo-1-i73pfbwpt6bmcgvlcae3sc.png/thread-block-logo-1-14s5twxzakpdzka2bufeir.png";
 
   return "https://raw.githubusercontent.com/DEV-trongphuc/DOM_MISA_IDEAS_CRM/refs/heads/main/DOM_MKT%20(2).png";
 };
@@ -7404,6 +7620,7 @@ function renderCharts({
 }) {
   renderDetailDailyChart(byDate, "spend");
   renderChartByHour(byHour);
+  renderScheduleIntelligence(byHour);
   renderChartByAgeGender(byAgeGender);
   renderChartByRegion(byRegion);
   renderChartByDevice(byDevice);
@@ -9388,7 +9605,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (gAdsEl) gAdsEl.style.removeProperty('display');
 
       if (view === "google_ads") {
-        if (typeof window.fetchGoogleAdsData === 'function') window.fetchGoogleAdsData(false);
+        // Nếu data đã được load ngầm từ trước và date range không đổi → chỉ render lại, không fetch
+        const currentRange = `${startDate}_${endDate}`;
+        const dataAlreadyLoaded = Array.isArray(window.googleAdsRawData) && window.googleAdsRawData.length > 0;
+        if (dataAlreadyLoaded && window._lastGAdsRange === currentRange) {
+          if (typeof window.renderGoogleAdsView === 'function') window.renderGoogleAdsView();
+        } else {
+          if (typeof window.fetchGoogleAdsData === 'function') window.fetchGoogleAdsData(false);
+        }
       }
 
       // 👉 Nếu là nút account thì mới fetch
@@ -10399,41 +10623,62 @@ async function generateDeepReportDetailed({
 
   const formatPercent = (n) => `${(safeNumber(n) * 100).toFixed(2)}%`;
 
-  // Hàm getResultsSafe (từ code của bạn, đã tốt)
+  // Hàm getResultsSafe — hỗ trợ cả array actions (raw) và object actions (processBreakdown)
   const getResultsSafe = (dataSegment) => {
-    if (window.getResults)
-      return safeNumber(window.getResults(dataSegment, VIEW_GOAL));
-    const actions = dataSegment?.actions || {};
-    const g = (VIEW_GOAL || goal || "").toUpperCase();
-    if (g === "REACH") return safeNumber(dataSegment.reach || 0);
-    if (g === "LEAD_GENERATION" || g === "QUALITY_LEAD") {
-      const leadKeys = ["onsite_conversion.lead_grouped"];
-      let leadSum = 0;
-      for (const k of leadKeys) {
-        if (actions[k]) leadSum += safeNumber(actions[k]);
+    if (!dataSegment) return 0;
+    const actions = dataSegment.actions || {};
+    const g = (goal || VIEW_GOAL || "").toUpperCase();
+
+    // 1. Thử window.getResults trước (đã handle resultMapping chi tiết)
+    if (window.getResults) {
+      const r = safeNumber(window.getResults(dataSegment, goal || VIEW_GOAL));
+      if (r > 0) return r;
+    }
+
+    // 2. Nếu getResults trả 0 → Meta breakdown không có action chính
+    //    → Fallback thứ tự ưu tiên phổ biến trong breakdown data
+    //    Xử lý cả 2 format: actions là object {...} hoặc array [{action_type, value}]
+    const getAction = (key) => {
+      if (Array.isArray(actions)) {
+        const found = actions.find(a => a.action_type === key);
+        return found ? safeNumber(found.value) : 0;
       }
-      if (leadSum > 0) return leadSum;
-    }
-    if (g === "REPLIES" || g === "MESSAGE") {
-      if (actions["onsite_conversion.messaging_conversation_started_7d"])
-        return safeNumber(
-          actions["onsite_conversion.messaging_conversation_started_7d"]
-        );
-    }
-    const preferred = [
-      "offsite_conversion.purchase",
-      "purchase",
-      "onsite_conversion.lead_grouped",
+      return safeNumber(actions[key] || 0);
+    };
+
+    // Goal-specific overrides
+    if (g === "REACH") return safeNumber(dataSegment.reach || 0);
+    if (g === "IMPRESSIONS") return safeNumber(dataSegment.impressions || 0);
+
+    // Ordered fallback chain — từ chuyển đổi cao đến thấp nhất
+    const fallbackChain = [
+      "onsite_conversion.total_messaging_connection", // ← key mess trong region breakdown
       "onsite_conversion.messaging_conversation_started_7d",
+      "onsite_conversion.lead_grouped",
+      "offsite_conversion.fb_pixel_lead",
+      "offsite_conversion.purchase",
       "landing_page_view",
+      "onsite_conversion.post_save",
+      "post_reaction",
+      "comment",
       "link_click",
       "post_engagement",
     ];
-    for (const k of preferred) {
-      if (actions[k]) return safeNumber(actions[k]);
+
+    for (const k of fallbackChain) {
+      const v = getAction(k);
+      if (v > 0) return v;
     }
+
+    // Last resort: lấy tổng tất cả action values (nếu có)
+    if (!Array.isArray(actions)) {
+      const total = Object.values(actions).reduce((s, v) => s + safeNumber(v), 0);
+      if (total > 0) return total;
+    }
+
     return 0;
   };
+
 
   const calculateCPR = (spend, result, VIEW_GOAL = "") => {
     spend = safeNumber(spend);
@@ -10498,7 +10743,7 @@ async function generateDeepReportDetailed({
       const spend = safeNumber(item.spend);
       const impressions = safeNumber(item.impressions);
       const reach = safeNumber(item.reach);
-      const result = getResults(item);
+      const result = getResultsSafe(item);
       const linkClicks = safeNumber(
         item.actions?.link_click || item.actions?.link_clicks || 0
       );
@@ -10527,14 +10772,25 @@ async function generateDeepReportDetailed({
     totalImpressions = 0,
     totalReach = 0,
     totalResults = 0,
-    totalLinkClicks = 0;
+    totalLinkClicks = 0,
+    totalPostEngagement = 0;
   byDateArr.forEach((d) => {
     totalSpend += d.spend;
     totalImpressions += d.impressions;
     totalReach += d.reach;
     totalResults += d.result;
     totalLinkClicks += d.linkClicks;
+    // Post engagement từ actions object
+    totalPostEngagement += safeNumber(d.postEngagement);
   });
+
+  // Bổ sung postEngagement vào computeBreakdownMetrics nếu chưa có
+  // Tính tổng post_engagement từ byDate raw nếu byDateArr không có
+  if (totalPostEngagement === 0 && byDate) {
+    Object.values(byDate).forEach(d => {
+      totalPostEngagement += safeNumber((d.actions || {}).post_engagement || 0);
+    });
+  }
 
   const overallCPR = calculateCPR(totalSpend, totalResults, goal);
   const overallCPM =
@@ -10552,6 +10808,7 @@ async function generateDeepReportDetailed({
     totalReach,
     totalResults,
     totalLinkClicks,
+    totalPostEngagement,
     overallCPR,
     overallCPM,
     overallFreq,
@@ -11173,7 +11430,6 @@ function createKpiGrid(summary, delayStart = 1) {
   if (!summary || !summary.formatted) return "";
   const { formatted, goal } = summary;
 
-  // Thêm CTR và CVR vào lưới KPI
   return `
     <h5 class="fade_in_item delay-${delayStart}"><i class="fa-solid fa-chart-pie"></i> Tóm tắt Phễu Hiệu suất</h5>
     <div class="ai_kpi_grid fade_in_item delay-${delayStart + 1}">
@@ -11199,17 +11455,21 @@ function createKpiGrid(summary, delayStart = 1) {
     }">${formatted.overallCTR || "N/A"}</b>
         </div>
         <div class="kpi_item">
-            <span>CVR (Click -> Kết quả)</span>
+            <span>CVR (Click → Kết quả)</span>
              <b class="${summary.overallCVRProxy < 0.02 ? "metric-bad" : "metric-good"
     }">${formatted.overallCVRProxy || "N/A"}</b>
         </div>
         <div class="kpi_item">
             <span>Tiếp cận (Reach)</span>
-            <b>${summary.totalReach || "N/A"}</b>
+            <b>${summary.totalReach ? summary.totalReach.toLocaleString('vi-VN') : "N/A"}</b>
         </div>
         <div class="kpi_item">
             <span>Tần suất (Freq)</span>
             <b>${formatted.overallFreq || "N/A"}</b>
+        </div>
+        <div class="kpi_item">
+            <span>Post Engagement</span>
+            <b>${summary.totalPostEngagement ? summary.totalPostEngagement.toLocaleString('vi-VN') : "N/A"}</b>
         </div>
     </div>
   `;
@@ -11414,63 +11674,154 @@ function formatKeyName(key, type) {
 }
 
 function setupAIReportModal() {
-  // 1. Tìm các phần tử DOM cần thiết
   const openButton = document.querySelector(".ai_report_compare");
   const reportContainer = document.querySelector(".dom_ai_report");
-  const closeButton = reportContainer.querySelector(".dom_ai_report_close");
-  const reportTitle = reportContainer.querySelector("h3");
-
-  // 2. Kiểm tra xem các phần tử có tồn tại không
-  if (!openButton || !reportContainer || !closeButton || !reportTitle) {
-    console.warn(
-      "Không tìm thấy các phần tử AI Report (nút mở, container, nút đóng hoặc tiêu đề)."
-    );
+  if (!openButton || !reportContainer) {
+    console.warn("Không tìm thấy các phần tử AI Report.");
     return;
   }
 
-  // 3. Gán sự kiện Click cho nút MỞ report
-  openButton.addEventListener("click", (e) => {
-    e.preventDefault(); // Ngăn hành vi mặc định (nếu là thẻ <a>)
-
-    // Lấy ngày tháng từ .dom_date
-    const dateEl = document.querySelector(".dom_date");
-    const dateText = dateEl ? dateEl.textContent.trim() : "N/A";
-
-    // Cập nhật tiêu đề
-    reportTitle.innerHTML = `
-    
-    <p><img src="https://dev-trongphuc.github.io/DOM_MISA_IDEAS_CRM/logotarget.png">
-      <span>DOM AI REPORT </span></p>
-    <p class="report_time">${dateText}</p>
-   `;
-
-    // Hiển thị modal
-    reportContainer.classList.add("active");
-
-    // Gọi hàm chạy phân tích
-    if (typeof runDeepReport === "function") {
-      runDeepReport(); // Gọi hàm của bạn
-    } else {
-      console.error("Hàm runDeepReport() không được định nghĩa.");
-      // Hiển thị lỗi trên UI nếu cần
+  // ── Close: hỗ trợ cả nút mới (ai_report_btn_close) và cũ (dom_ai_report_close)
+  const closeHandler = () => {
+    reportContainer.classList.add("closing");
+    setTimeout(() => {
+      reportContainer.classList.remove("active", "closing");
       const contentEl = reportContainer.querySelector(".dom_ai_report_content");
-      if (contentEl) {
-        contentEl.innerHTML =
-          '<p style="color:red; padding: 20px;">Lỗi: Không tìm thấy hàm runDeepReport().</p>';
-      }
+      if (contentEl) contentEl.innerHTML = "";
+    }, 400);
+  };
+
+  const newCloseBtn = document.getElementById("ai_report_close_btn");
+  const oldCloseBtn = reportContainer.querySelector(".dom_ai_report_close");
+  if (newCloseBtn) newCloseBtn.addEventListener("click", closeHandler);
+  if (oldCloseBtn) oldCloseBtn.addEventListener("click", closeHandler);
+
+  // ── Open
+  openButton.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    // Cập nhật subtitle
+    const adNameEl = document.querySelector(".dom_detail_id > span:first-child");
+    const adName = adNameEl ? adNameEl.textContent.trim() : "";
+    const dateEl = document.querySelector(".dom_date");
+    const dateText = dateEl ? dateEl.textContent.trim() : "";
+    const subtitleEl = document.getElementById("ai_report_subtitle");
+    if (subtitleEl) {
+      subtitleEl.textContent = adName ? `${adName} · ${dateText}` : dateText;
     }
+
+    // ① Kích hoạt animation màu NGAY LẬP TỨC
+    const overlay = document.querySelector(".dom_overlay_ai");
+    if (overlay) {
+      overlay.classList.remove("ai_scanning"); // reset nếu đang chạy
+      void overlay.offsetWidth;               // force reflow để restart animation
+      overlay.classList.add("ai_scanning");
+    }
+
+    // ② Chạy phân tích data ngầm (không cần chờ)
+    if (typeof runDeepReport === "function") {
+      runDeepReport();
+    } else {
+      const contentEl = reportContainer.querySelector(".dom_ai_report_content");
+      if (contentEl) contentEl.innerHTML = '<p style="color:#e17055;padding:20px;">Lỗi: Không tìm thấy hàm runDeepReport().</p>';
+    }
+
+    // ③ Sau đúng 3s (animation màu xong) → trượt panel ra
+    reportContainer.classList.remove("closing");
+    setTimeout(() => {
+      if (overlay) overlay.classList.remove("ai_scanning");
+      reportContainer.classList.add("active");
+    }, 2800);
   });
 
-  // 4. Gán sự kiện Click cho nút ĐÓNG report
-  closeButton.addEventListener("click", () => {
-    reportContainer.classList.remove("active");
+  // ── DOCX Export
+  const exportBtn = document.getElementById("btn_export_docx");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", exportAIReportToDocx);
+  }
+}
 
-    // Tùy chọn: Xóa nội dung report cũ khi đóng
-    const contentEl = reportContainer.querySelector(".dom_ai_report_content");
-    if (contentEl) {
-      contentEl.innerHTML = ""; // Xóa nội dung để lần sau load lại
-    }
-  });
+// ── Export AI Report → DOCX (dùng html-docx-js CDN)
+function exportAIReportToDocx() {
+  const contentEl = document.querySelector(".dom_ai_report_content");
+  if (!contentEl || !contentEl.innerHTML.trim()) {
+    if (typeof domAlert === 'function') domAlert("Chưa có nội dung báo cáo để xuất!");
+    return;
+  }
+
+  // Lấy tên ad + date
+  const subtitleEl = document.getElementById("ai_report_subtitle");
+  const fileName = `DOM_AI_Report_${(subtitleEl?.textContent || 'report').replace(/[·\/\s:]/g, '_')}.docx`;
+
+  // Nếu html-docx-js đã load → dùng luôn
+  if (window.htmlDocx) {
+    _doDocxExport(contentEl.innerHTML, fileName);
+    return;
+  }
+
+  // Lazy load html-docx-js từ CDN
+  const exportBtn = document.getElementById("btn_export_docx");
+  if (exportBtn) { exportBtn.disabled = true; exportBtn.querySelector("span").textContent = "Đang chuẩn bị..."; }
+
+  const script = document.createElement("script");
+  script.src = "https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js";
+  script.onload = () => {
+    if (exportBtn) { exportBtn.disabled = false; exportBtn.querySelector("span").textContent = "Xuất DOCX"; }
+    _doDocxExport(contentEl.innerHTML, fileName);
+  };
+  script.onerror = () => {
+    if (exportBtn) { exportBtn.disabled = false; exportBtn.querySelector("span").textContent = "Xuất DOCX"; }
+    if (typeof domAlert === 'function') domAlert("❌ Không thể tải thư viện DOCX. Kiểm tra kết nối mạng.");
+  };
+  document.head.appendChild(script);
+}
+
+function _doDocxExport(innerHtml, fileName) {
+  try {
+    const adName = document.getElementById("ai_report_subtitle")?.textContent || '';
+    const dateStr = new Date().toLocaleDateString('vi-VN');
+    const fullHtml = `
+      <!DOCTYPE html><html><head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; line-height: 1.6; margin: 24px; }
+          h2 { font-size: 16pt; color: #222; border-bottom: 1px solid #999; padding-bottom: 8px; margin: 0 0 6px; }
+          p.meta { font-size: 9pt; color: #777; margin: 0 0 20px; }
+          h4 { font-size: 13pt; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin: 20px 0 10px; }
+          h5 { font-size: 11pt; color: #333; border-left: 3px solid #999; padding-left: 8px; margin: 14px 0 6px; background: none; }
+          h6 { font-size: 9pt; color: #777; text-transform: uppercase; margin: 10px 0 4px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 10pt; }
+          th { background-color: #444; color: #fff; padding: 7px 9px; text-align: left; }
+          td { border: 1px solid #ddd; padding: 6px 9px; color: #333; }
+          tr:nth-child(even) td { background-color: #f5f5f5; }
+          .kpi_item { display: inline-block; border: 1px solid #ddd; padding: 6px 12px; margin: 3px; font-size: 10pt; }
+          li { margin-bottom: 6px; }
+          .recommendation-action { color: #555; font-style: italic; }
+          .timestamp { color: #aaa; font-size: 8pt; }
+          .no-result-note { color: #aaa; font-style: italic; }
+          /* Ẩn các element không cần */
+          .fade_in_item:not(.show) { opacity: 1 !important; transform: none !important; }
+          i.fa-solid, i.fa-regular { display: none; }
+        </style>
+      </head><body>
+        <h2>DOM AI REPORT</h2>
+        <p class="meta">${adName} · Xuất ngày ${dateStr}</p>
+        ${innerHtml}
+      </body></html>`;
+
+    const blob = window.htmlDocx.asBlob(fullHtml, { orientation: 'portrait', margins: { top: 720, right: 720, bottom: 720, left: 720 } });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (typeof showToast === 'function') showToast(`✅ Đã xuất: ${fileName}`);
+  } catch (err) {
+    console.error("DOCX export error:", err);
+    if (typeof domAlert === 'function') domAlert("❌ Lỗi khi xuất DOCX: " + err.message);
+  }
 }
 
 /**
