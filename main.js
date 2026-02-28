@@ -3996,6 +3996,9 @@ window.openCompareModal = function (itemA, itemB) {
   const labelA = getItemLabel(itemA);
   const labelB = getItemLabel(itemB);
 
+  // Track which column is the comparison BASE ("A" or "B")
+  let compareBase = "A";
+
   // Format current date range
   const dateStr = (startDate && endDate)
     ? `📅 ${startDate} → ${endDate}`
@@ -4021,13 +4024,13 @@ window.openCompareModal = function (itemA, itemB) {
             <i class="fa-regular fa-calendar" style="color:#f59e0b;"></i>
             ${startDate} &nbsp;→&nbsp; ${endDate}
           </span>
+          <span style="font-size:1rem;color:#94a3b8;font-style:italic;margin-left:0.7rem;">So sánh 2 mục khác nhau chỉ số chỉ mang tính tham khảo</span>
         </div>` : ""}
     </div>
     <button onclick="closeCompareModal()" style="align-self:flex-start;width:3.6rem;height:3.6rem;border-radius:50%;border:none;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:1.2rem;">
       <i class="fa-solid fa-xmark" style="font-size:1.6rem;color:#64748b;"></i>
     </button>
   `;
-
 
   // Short column labels
   const short = (s) => s.length > 20 ? s.slice(0, 18) + "…" : s;
@@ -4036,10 +4039,14 @@ window.openCompareModal = function (itemA, itemB) {
   colHeads.style.display = "none";
 
   // Helper to build a compare row <tr>
-  function makeRow(icon, label, valA, valB, fmtA, fmtB, id) {
+  // baseVal = the reference column, compareVal = the other column
+  function makeRow(icon, label, rawA, rawB, fmtA, fmtB, id) {
+    // selectedVal = cột đang chọn làm cơ sở, refVal = cột tham chiếu (còn lại)
+    const selectedVal = compareBase === "A" ? rawA : rawB;
+    const refVal = compareBase === "A" ? rawB : rawA;
     let badgeHtml = `<span class="perf_change_badge equal">—</span>`;
-    if (valA > 0) {
-      const pct = ((valB - valA) / valA) * 100;
+    if (refVal > 0) {
+      const pct = ((selectedVal - refVal) / refVal) * 100;
       const isGoodUp = !["cpm", "cpr", "frequency"].includes(id);
       const isIncrease = pct >= 0;
       const isPositive = isIncrease ? isGoodUp : !isGoodUp;
@@ -4060,45 +4067,71 @@ window.openCompareModal = function (itemA, itemB) {
     </tr>`;
   }
 
-  // Build rows
+  // Collect row data for re-render without re-fetching values
+  const rowData = [];
   const allCustom = CUSTOM_METRICS || [];
-  let bodyHtml = `<table class="perf_table"><thead><tr>
-    <th>CHỈ SỐ (METRICS)</th>
-    <th title="${labelA}">${short(labelA)}</th>
-    <th title="${labelB}" style="color:#94a3b8;">${short(labelB)}</th>
-    <th>THAY ĐỔI (%)</th>
-  </tr></thead><tbody>`;
 
   for (const group of COMPARE_GROUPS) {
-    const rowsArr = [];
+    const groupRows = [];
     for (const id of group.ids) {
       const meta = METRIC_REGISTRY[id];
       if (!meta) continue;
-      const valA = getMetricValue(itemA, id) || 0;
-      const valB = getMetricValue(itemB, id) || 0;
-      if (valA === 0 && valB === 0) continue;
-      rowsArr.push(makeRow(meta.icon, meta.label, valA, valB, formatMetric(valA, meta.format), formatMetric(valB, meta.format), id));
+      const rawA = getMetricValue(itemA, id) || 0;
+      const rawB = getMetricValue(itemB, id) || 0;
+      if (rawA === 0 && rawB === 0) continue;
+      groupRows.push({ icon: meta.icon, label: meta.label, rawA, rawB, fmtA: formatMetric(rawA, meta.format), fmtB: formatMetric(rawB, meta.format), id });
     }
-
-    // Custom metrics appended to last group
     if (group === COMPARE_GROUPS[COMPARE_GROUPS.length - 1] && allCustom.length > 0) {
       for (const cm of allCustom) {
-        const valA = evaluateFormula(itemA, cm.formula) || 0;
-        const valB = evaluateFormula(itemB, cm.formula) || 0;
-        if (valA === 0 && valB === 0) continue;
-        rowsArr.push(makeRow("fa-solid fa-flask", cm.label || cm.id, valA, valB, formatMetric(valA, cm.format || "number"), formatMetric(valB, cm.format || "number"), cm.id));
+        const rawA = evaluateFormula(itemA, cm.formula) || 0;
+        const rawB = evaluateFormula(itemB, cm.formula) || 0;
+        if (rawA === 0 && rawB === 0) continue;
+        groupRows.push({ icon: "fa-solid fa-flask", label: cm.label || cm.id, rawA, rawB, fmtA: formatMetric(rawA, cm.format || "number"), fmtB: formatMetric(rawB, cm.format || "number"), id: cm.id });
+      }
+    }
+    if (groupRows.length > 0) rowData.push({ group, rows: groupRows });
+  }
+
+  // Build & inject table HTML
+  function renderTable() {
+    const shortA = short(labelA);
+    const shortB = short(labelB);
+    const baseStyleA = compareBase === "A"
+      ? `font-weight:800;color:#1e293b;cursor:pointer;border-bottom:2.5px solid #f59e0b;padding-bottom:2px;`
+      : `font-weight:600;color:#94a3b8;cursor:pointer;`;
+    const baseStyleB = compareBase === "B"
+      ? `font-weight:800;color:#1e293b;cursor:pointer;border-bottom:2.5px solid #f59e0b;padding-bottom:2px;`
+      : `font-weight:600;color:#94a3b8;cursor:pointer;`;
+    const hintA = compareBase === "A" ? ` <i class="fa-solid fa-star" style="font-size:0.8em;color:#f59e0b;" title="Đang dùng làm cơ sở"></i>` : ``;
+    const hintB = compareBase === "B" ? ` <i class="fa-solid fa-star" style="font-size:0.8em;color:#f59e0b;" title="Đang dùng làm cơ sở"></i>` : ``;
+
+    let html = `<table class="perf_table"><thead><tr>
+      <th style="font-size:1rem;">CHỈ SỐ (METRICS)</th>
+      <th title="${labelA} — Nhấn để dùng làm cơ sở" style="${baseStyleA}" onclick="window._compareSetBase('A')">${shortA}${hintA}</th>
+      <th title="${labelB} — Nhấn để dùng làm cơ sở" style="${baseStyleB}" onclick="window._compareSetBase('B')">${shortB}${hintB}</th>
+      <th style="font-size:1rem;">THAY ĐỔI (%)</th>
+    </tr><tr>
+      <td colspan="4" style="padding:0 0 0.6rem;font-size:0.95rem;color:#94a3b8;font-style:italic;">★ Nhấn vào tên cột để chọn làm cơ sở so sánh</td>
+    </tr></thead><tbody>`;
+
+    for (const { group, rows } of rowData) {
+      html += `<tr><td colspan="4" class="perf_section_title" style="padding-top:1.6rem;">${group.label}</td></tr>`;
+      for (const r of rows) {
+        html += makeRow(r.icon, r.label, r.rawA, r.rawB, r.fmtA, r.fmtB, r.id);
       }
     }
 
-    if (rowsArr.length === 0) continue;
-    bodyHtml += `<tr><td colspan="4" class="perf_section_title" style="padding-top:1.6rem;">${group.label}</td></tr>`;
-    bodyHtml += rowsArr.join("");
+    html += `</tbody></table>`;
+    body.innerHTML = html;
   }
 
-  bodyHtml += `</tbody></table>`;
+  // Expose setter so onclick can update base and re-render
+  window._compareSetBase = function (col) {
+    compareBase = col;
+    renderTable();
+  };
 
-  body.innerHTML = bodyHtml;
-
+  renderTable();
 
   modal.style.display = "flex";
   setTimeout(() => modal.classList.add("active"), 10);
