@@ -1301,6 +1301,17 @@
         <!-- ===== GOOGLE ADS REPORT ===== -->
         <div id="google_ads_container">
 
+          <!-- Sync info bar -->
+          <div class="g_sync_bar">
+            <span class="g_sync_info">
+              <i class="fa-solid fa-rotate main_clr"></i>
+              Dữ liệu đồng bộ lúc: <span id="g_last_sync">--</span>
+            </span>
+            <button class="g_sync_btn" id="g_sync_btn" onclick="triggerGAdsSync()">
+              <i class="fa-solid fa-rotate-right"></i> Sync
+            </button>
+          </div>
+
           <!-- ROW 1: Summary + Daily Chart + Bar Chart (3-up) -->
           <div class="dom_row flex">
             <div class="dom_inner w25 box_shadow chart">
@@ -1367,7 +1378,7 @@
                   <ul class="dom_select_show">
                     <li data-view="spent" class="active"><span class="radio_box active"></span><span>Spent</span></li>
                     <li data-view="click"><span class="radio_box"></span><span>Click</span></li>
-                    <li data-view="total_conversions"><span class="radio_box"></span><span>Conversions</span></li>
+                    <li data-view="all_conversions"><span class="radio_box"></span><span>All Conversions</span></li>
                     <li data-view="store_visits"><span class="radio_box"></span><span>Store Visit</span></li>
                     <li data-view="impression"><span class="radio_box"></span><span>Impression</span></li>
                   </ul>
@@ -1391,7 +1402,7 @@
                   <ul class="dom_select_show">
                     <li data-view="spent" class="active"><span class="radio_box active"></span><span>Spent</span></li>
                     <li data-view="click"><span class="radio_box"></span><span>Click</span></li>
-                    <li data-view="total_conversions"><span class="radio_box"></span><span>Conversions</span></li>
+                    <li data-view="all_conversions"><span class="radio_box"></span><span>All Conversions</span></li>
                     <li data-view="ctr"><span class="radio_box"></span><span>CTR (%)</span></li>
                     <li data-view="cpc"><span class="radio_box"></span><span>CPC</span></li>
                     <li data-view="cpa"><span class="radio_box"></span><span>CPA</span></li>
@@ -1406,28 +1417,28 @@
           </div>
 
           <!-- ROW 2: Funnel + Donut + Scatter (equal thirds) -->
-          <div class="dom_row flex">
+          <div class="dom_row flex" style="align-items:stretch;">
 
             <!-- Funnel Performance (LEFT) -->
-            <div class="dom_inner g_third box_shadow chart">
+            <div class="dom_inner g_third box_shadow chart" style="display:flex;flex-direction:column;overflow:hidden;">
               <h2><i class="fa-solid fa-filter main_clr"></i> Funnel Performance</h2>
-              <div id="g_funnel_wrap" class="g_funnel_wrap"></div>
+              <div id="g_funnel_wrap" class="g_funnel_wrap" style="flex:1;overflow-y:auto;min-height:0;"></div>
               <div class="g_metric_row">
                 <div class="g_metric_item">
-                  <div class="g_metric_label">CPC</div>
-                  <div id="g_cpc" class="g_metric_val">-</div>
+                  <div class="g_metric_label"><i class="fa-solid fa-utensils"></i> Menu</div>
+                  <div id="g_stat_menu" class="g_metric_val">-</div>
                 </div>
                 <div class="g_metric_item">
-                  <div class="g_metric_label">CPA</div>
-                  <div id="g_cpa" class="g_metric_val">-</div>
+                  <div class="g_metric_label"><i class="fa-solid fa-phone"></i> Calls</div>
+                  <div id="g_stat_calls" class="g_metric_val">-</div>
                 </div>
                 <div class="g_metric_item">
-                  <div class="g_metric_label">CVR</div>
-                  <div id="g_cvr" class="g_metric_val">-</div>
+                  <div class="g_metric_label"><i class="fa-solid fa-bag-shopping"></i> Orders</div>
+                  <div id="g_stat_orders" class="g_metric_val">-</div>
                 </div>
                 <div class="g_metric_item">
-                  <div class="g_metric_label">CTR</div>
-                  <div id="g_ctr" class="g_metric_val">-</div>
+                  <div class="g_metric_label"><i class="fa-solid fa-ellipsis"></i> Other</div>
+                  <div id="g_stat_other" class="g_metric_val">-</div>
                 </div>
               </div>
             </div>
@@ -1442,16 +1453,81 @@
             </div>
 
             <!-- CPVisit Chart – Store Visit Efficiency (RIGHT) -->
-            <div class="dom_inner g_third box_shadow chart">
+            <div class="dom_inner g_third box_shadow chart" style="display:flex;flex-direction:column;overflow:hidden;">
               <h2><i class="fa-solid fa-store main_clr"></i> CPVisit Efficiency</h2>
               <div id="g_cpvisit_wrap" class="g_funnel_wrap"
-                style="overflow-y:auto; max-height: 32rem; padding-right: 0.5rem; margin-top: 1rem;">
+                style="flex:1;overflow-y:auto;min-height:0;padding-right:0.5rem;margin-top:1rem;">
                 <!-- JS populated bars -->
               </div>
             </div>
           </div>
 
-          <!-- ROW 3: Detail Campaign Table – Meta Campaign Details style -->
+          <!-- Campaign Insight shared header -->
+          <hr style="border:none;border-top:1px solid #e9ecef;margin:2.4rem 0 1.6rem 0;">
+          <div class="dom_row" style="margin-top:0;margin-bottom:0;padding-bottom:0;">
+            <div class="dom_table_header campaign_insigh"
+              style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+              <h2 class="campaign_insigh_title"><i class="fa-solid fa-magnifying-glass-chart main_clr"></i> Campaign
+                Insight</h2>
+              <div style="display:flex;gap:0.8rem;align-items:center;">
+                <!-- Campaign filter -->
+                <div class="dom_select daily_total" id="g_insight_camp_select"
+                  style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                  <i class="fa-solid fa-bullhorn"></i>
+                  <div class="flex">
+                    <p class="dom_selected">All Campaigns</p>
+                  </div>
+                  <i class="fa-solid fa-angle-down"></i>
+                  <ul class="dom_select_show" id="g_hourly_camp_list">
+                    <li data-view="__all__" class="active"><span class="radio_box active"></span><span>All
+                        Campaigns</span></li>
+                  </ul>
+                </div>
+                <!-- Metric selector -->
+                <div class="dom_select daily_total" id="g_insight_metric_select"
+                  style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                  <i class="fa-solid fa-chart-area"></i>
+                  <div class="flex">
+                    <p class="dom_selected">Clicks</p>
+                  </div>
+                  <i class="fa-solid fa-angle-down"></i>
+                  <ul class="dom_select_show">
+                    <li data-view="click" class="active"><span class="radio_box active"></span><span>Clicks</span></li>
+                    <li data-view="imp"><span class="radio_box"></span><span>Impressions</span></li>
+                    <li data-view="spent"><span class="radio_box"></span><span>Spent</span></li>
+                    <li data-view="conv"><span class="radio_box"></span><span>All Conversions</span></li>
+                    <li data-view="visits"><span class="radio_box"></span><span>Store Visits</span></li>
+                    <li data-view="dir"><span class="radio_box"></span><span>Directions</span></li>
+                    <li data-view="calls"><span class="radio_box"></span><span>Calls</span></li>
+                    <li data-view="menu"><span class="radio_box"></span><span>Menu</span></li>
+                    <li data-view="orders"><span class="radio_box"></span><span>Orders</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 3: Hourly Activity + Device Breakdown -->
+          <div class="dom_row flex" style="margin-top:0;">
+
+            <!-- Hourly Activity Chart -->
+            <div class="dom_inner w65 box_shadow chart">
+              <h2><i class="fa-solid fa-clock main_clr"></i> Hourly Activity</h2>
+              <div class="g_chart_wrap" style="margin-top:1rem;">
+                <canvas id="g_hourly_chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Device Breakdown -->
+            <div class="dom_inner w35 box_shadow chart">
+              <h2><i class="fa-solid fa-mobile-screen main_clr"></i> Device Breakdown</h2>
+              <div id="g_device_card_wrap" style="margin-top:1.5rem;background:#fff;border-radius:12px;"></div>
+            </div>
+
+          </div>
+
+
+          <!-- ROW 4: Detail Campaign Table -->
           <div class="dom_row flex">
             <div class="dom_inner view_campaign g_campaign_wrap" style="margin-top: 3rem;">
               <div class="dom_table_header">
@@ -1461,7 +1537,7 @@
                     <input id="g_campaign_filter" placeholder="Search campaign..." />
                     <i class="fa-solid fa-magnifying-glass"></i>
                   </div>
-                  <a href="https://docs.google.com/spreadsheets/d/1IHbkjf3dv9_UMi9MvX09ijRd2EOUHMbJXLchFBO3-UE/edit?usp=sharing"
+                  <a href="https://docs.google.com/spreadsheets/d/1sAEE2_5jVR6UF59C3VyQLqNJS8knwFn4J1A_2RFPF2c/edit?usp=sharing"
                     target="_blank" class="g_view_raw_btn" title="View Raw Data">
                     <img
                       src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Google_Sheets_2020_Logo.svg/250px-Google_Sheets_2020_Logo.svg.png"

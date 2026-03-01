@@ -21,7 +21,7 @@ const G_COLORS = [
     '#9C27B0', '#00BCD4', '#FF5722', '#607D8B', '#795548'
 ];
 
-const GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbz4MOAioBU6fcWqjy54yJh3SBcc2VWgCf173GWuGTDLv-3D72XbBbBti5OlcFtuCvB6/exec";
+const GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwEmgc4Q5aT7ldo98I3gBKZ3mafx0ybHIWbqdMbk8LQMONzkwz3zVQShHXeJcBDfbPY/exec";
 
 window.fetchGoogleAdsData = async function (force = false) {
     if (window.GOOGLE_ADS_SETUP === false) return;
@@ -69,6 +69,12 @@ window.fetchGoogleAdsData = async function (force = false) {
 
         // Transform COMPACT JSON back to array of objects
         const allData = _fromCompact(compactData);
+
+        // Show last sync time
+        if (compactData.syncedAt) {
+            const el = document.getElementById('g_last_sync');
+            if (el) el.textContent = compactData.syncedAt;
+        }
 
         // Split data into Current and Previous arrays
         googleAdsRawData = allData.filter(item => item.date >= startDate && item.date <= endDate);
@@ -141,6 +147,31 @@ function _hideGoogleSkeletons() {
 }
 
 // ─────────────────────────────────────────────
+// MANUAL SYNC
+// ─────────────────────────────────────────────/** Manual sync trigger */
+async function triggerGAdsSync() {
+    const btn = document.getElementById('g_sync_btn');
+    if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+    _showGoogleSkeletons();
+    try {
+        const url = `${GOOGLE_SHEET_API_URL}?action=sync`;
+        const resp = await fetch(url);
+        const result = resp.ok ? await resp.json() : null;
+        if (result && result.syncedAt) {
+            const el = document.getElementById('g_last_sync');
+            if (el) el.textContent = result.syncedAt;
+        }
+        await fetchGoogleAdsData(true);
+        if (typeof showToast === 'function') showToast('✅ Đồng bộ thành công!');
+    } catch (e) {
+        console.error('Sync error:', e);
+        if (typeof showToast === 'function') showToast('❌ Sync thất bại!');
+    } finally {
+        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+    }
+}
+
+// ─────────────────────────────────────────────
 // MAIN RENDER
 // ─────────────────────────────────────────────
 function renderGoogleAdsView() {
@@ -181,12 +212,40 @@ function renderGoogleAdsView() {
 
     // Calculate totals & derived metrics
     let totSpent = 0, totImp = 0, totClick = 0, totConv = 0, totStore = 0;
+    let totDir = 0, totCalls = 0, totMenu = 0, totOrders = 0, totOther = 0;
+    // device totals — all lowercase keys
+    let devMob = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
+    let devDesk = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
+    let devTab = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
+
     googleAdsFilteredData.forEach(item => {
         totSpent += parseFloat(item.spent || 0);
         totImp += parseFloat(item.impression || 0);
         totClick += parseFloat(item.click || 0);
-        totConv += parseFloat(item.total_conversions || 0);
+        totConv += parseFloat(item.all_conversions || 0);
         totStore += parseFloat(item.store_visits || 0);
+        totDir += parseFloat(item.directions || 0);
+        totCalls += parseFloat(item.calls || 0);
+        totMenu += parseFloat(item.menu || 0);
+        totOrders += parseFloat(item.orders || 0);
+        totOther += parseFloat(item.other || 0);
+
+        // Parse device JSON — keys: "Impression", "Click", "All Conversions", "Store Visits", "Directions", "Calls", "Menu", "Orders"
+        const mob = _parseDeviceJson(item.mobile);
+        const desk = _parseDeviceJson(item.desktop);
+        const tab = _parseDeviceJson(item.tablet);
+        const _add = (obj, src) => {
+            obj.imp += src.Impression || 0;
+            obj.click += src.Click || 0;
+            obj.conv += src['All Conversions'] || 0;
+            obj.visits += src['Store Visits'] || 0;
+            obj.dir += src['Directions'] || 0;
+            obj.calls += src['Calls'] || 0;
+            obj.menu += src['Menu'] || 0;
+            obj.orders += src['Orders'] || 0;
+            obj.spent += src['Spent'] || src['spent'] || 0;
+        };
+        _add(devMob, mob); _add(devDesk, desk); _add(devTab, tab);
     });
 
     const avgCtr = totImp > 0 ? (totClick / totImp * 100) : 0;
@@ -210,7 +269,7 @@ function renderGoogleAdsView() {
         prevTotals.spent += parseFloat(item.spent || 0);
         prevTotals.imp += parseFloat(item.impression || 0);
         prevTotals.click += parseFloat(item.click || 0);
-        prevTotals.conv += parseFloat(item.total_conversions || 0);
+        prevTotals.conv += parseFloat(item.all_conversions || 0);
         prevTotals.store += parseFloat(item.store_visits || 0);
     });
 
@@ -282,11 +341,37 @@ function renderGoogleAdsView() {
 
     _renderBarChart(googleAdsFilteredData, barSel);
     _renderDonutChart(googleAdsFilteredData);
-    _renderFunnelChart(totImp, totClick, totConv, totStore);
-    _renderCPVisitChart(googleAdsFilteredData, groupedCampData); // Pass pre-calculated
+    _renderFunnelChart(totImp, totClick, totConv, totStore, totDir);
+    _renderCPVisitChart(googleAdsFilteredData, groupedCampData);
     _renderDualAxisChart(googleAdsFilteredData);
-    _renderTopCampaignCards(googleAdsFilteredData, sortedCampsBySpent); // Pass pre-calculated
-    _renderCampaignTable(googleAdsFilteredData, "", groupedCampData); // Pass pre-calculated
+
+    // ── Reset Campaign Insight filter khi brand/date thay đổi
+    _gHourlyCamp = '__all__';
+    _gHourlyMetric = _gHourlyMetric || 'click';
+    // Reset dropdown label UI
+    const _insightCampLbl = document.querySelector('#g_insight_camp_select .dom_selected');
+    if (_insightCampLbl) _insightCampLbl.textContent = 'All Campaigns';
+    // Reset active state in list
+    document.querySelectorAll('#g_hourly_camp_list li').forEach(li => {
+        li.classList.toggle('active', li.dataset.view === '__all__');
+        const rb = li.querySelector('.radio_box');
+        if (rb) rb.classList.toggle('active', li.dataset.view === '__all__');
+    });
+
+    _renderHourlyChart(googleAdsFilteredData, '__all__', _gHourlyMetric);
+    _renderDeviceChart(devMob, devDesk, devTab);
+    _renderTopCampaignCards(googleAdsFilteredData, sortedCampsBySpent);
+    _renderCampaignTable(googleAdsFilteredData, "", groupedCampData);
+
+    // ── Funnel stats: Menu / Calls / Orders / Other
+    const _setStatEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = _fmtNum(v); };
+    _setStatEl('g_stat_menu', totMenu);
+    _setStatEl('g_stat_calls', totCalls);
+    _setStatEl('g_stat_orders', totOrders);
+    _setStatEl('g_stat_other', totOther);
+
+    // ── Populate campaign dropdown for hourly chart (after brand filter)
+    _populateHourlyCampDropdown(googleAdsFilteredData);
 
     // ── Filter listener
     const filterInput = document.getElementById("g_campaign_filter");
@@ -310,7 +395,23 @@ function _initGoogleDropdowns() {
                 else _renderTrendChart(googleAdsFilteredData, v);
             }
         },
-        { id: 'g_bar_select', onSelect: v => _renderBarChart(googleAdsFilteredData, v) }
+        { id: 'g_bar_select', onSelect: v => _renderBarChart(googleAdsFilteredData, v) },
+        {
+            id: 'g_insight_metric_select', onSelect: v => {
+                _gHourlyMetric = v;
+                _renderHourlyChart(googleAdsFilteredData, _gHourlyCamp, v);
+                _buildDeviceChart(v);
+            }
+        },
+        {
+            id: 'g_insight_camp_select', onSelect: v => {
+                _gHourlyCamp = v;
+                _renderHourlyChart(googleAdsFilteredData, v, _gHourlyMetric);
+                // Re-aggregate device data for selected campaign
+                const { mob, desk, tab } = _aggregateDeviceData(googleAdsFilteredData, v);
+                _renderDeviceChart(mob, desk, tab);
+            }
+        },
     ].forEach(({ id, onSelect }) => {
         const wrap = document.getElementById(id);
         if (!wrap || wrap._gDropInit) return;
@@ -330,26 +431,30 @@ function _initGoogleDropdowns() {
             wrap.querySelector('.dom_select_show')?.classList.toggle('active');
         });
 
-        // Item click
-        wrap.querySelectorAll('.dom_select_show li').forEach(li => {
-            li.addEventListener('click', e => {
+        // Item click — use delegation on the ul so dynamically added items work
+        const listEl = wrap.querySelector('.dom_select_show');
+        if (listEl) {
+            listEl.addEventListener('click', e => {
                 e.stopPropagation();
+                const li = e.target.closest('li');
+                if (!li) return;
                 // Update radio state
-                wrap.querySelectorAll('.dom_select_show li').forEach(x => {
+                listEl.querySelectorAll('li').forEach(x => {
                     x.classList.remove('active');
                     x.querySelector('.radio_box')?.classList.remove('active');
                 });
                 li.classList.add('active');
                 li.querySelector('.radio_box')?.classList.add('active');
                 // Update label
-                wrap.querySelector('.dom_selected').textContent = li.querySelector('span:last-child').textContent;
+                const lbl = wrap.querySelector('.dom_selected');
+                if (lbl) lbl.textContent = li.querySelector('span:last-child')?.textContent || '';
                 // Close
                 wrap.classList.remove('active');
-                wrap.querySelector('.dom_select_show')?.classList.remove('active');
+                listEl.classList.remove('active');
                 // Trigger
-                onSelect(li.dataset.view);
+                onSelect(li.dataset.view || li.dataset.metric);
             });
-        });
+        }
     });
 
     // Close dropdowns on outside click
@@ -500,6 +605,24 @@ window.updateGoogleTrendChart = function () {
 // ─────────────────────────────────────────────
 // 2. BAR CHART (Metric by Campaign)
 // ─────────────────────────────────────────────
+/** Rút gọn tên campaign: giữ brand + loại kênh */
+function _shortCampName(name) {
+    if (!name) return '';
+    // Bỏ suffix dài sau brand: lấy 2 phần đầu trước _Google
+    // VD: "TRB_Google_Search_KW" → "TRB_Search"
+    //     "BeAn_Google_Display_EN" → "BeAn_Display"
+    const parts = name.split('_');
+    // Tìm index của "Google"
+    const gIdx = parts.findIndex(p => p.toLowerCase() === 'google');
+    if (gIdx > 0) {
+        const brand = parts.slice(0, gIdx).join('_');   // "TRB"
+        const rest = parts[gIdx + 1] ? parts[gIdx + 1] : '';  // "Search"
+        return rest ? `${brand}_${rest}` : brand;
+    }
+    // fallback: truncate
+    return name.length > 14 ? name.slice(0, 13) + '…' : name;
+}
+
 function _renderBarChart(data, metric) {
     const ctx = document.getElementById("g_bar_chart")?.getContext("2d");
     if (!ctx) return;
@@ -543,7 +666,7 @@ function _renderBarChart(data, metric) {
     G_CHARTS.bar = new Chart(ctx, {
         type: "bar",
         data: {
-            labels: sorted.map(c => _truncate(c.name, 22)),
+            labels: sorted.map(c => _shortCampName(c.name)),
             datasets: [{
                 data: values,
                 backgroundColor: bgColors,
@@ -641,7 +764,7 @@ function _renderDonutChart(data) {
     G_CHARTS.donut = new Chart(ctx, {
         type: "doughnut",
         data: {
-            labels: sorted.map(c => _truncate(c.name, 22)),
+            labels: sorted.map(c => _truncate(c.name, 10)),
             datasets: [{
                 data: sorted.map(c => c.spent),
                 backgroundColor: DONUT_COLORS.slice(0, sorted.length),
@@ -666,10 +789,11 @@ function _renderDonutChart(data) {
     // Legend list
     const legendEl = document.getElementById("g_donut_legend");
     if (legendEl) {
+        legendEl.style.cssText = '';
         legendEl.innerHTML = sorted.map((c, i) => `
             <div class="g_donut_legend_item">
                 <span class="g_donut_dot" style="background:${DONUT_COLORS[i]}"></span>
-                <span class="g_donut_name" title="${c.name}">${_truncate(c.name, 24)}</span>
+                <span class="g_donut_name" title="${c.name}">${c.name}</span>
                 <strong class="g_donut_pct">${total > 0 ? (c.spent / total * 100).toFixed(1) : 0}%</strong>
             </div>`).join("");
     }
@@ -678,14 +802,25 @@ function _renderDonutChart(data) {
 // ─────────────────────────────────────────────
 // 4. FUNNEL CHART
 // ─────────────────────────────────────────────
-function _renderFunnelChart(imp, click, conv, store) {
+function _renderFunnelChart(imp, click, conv, store, dir) {
     const container = document.getElementById("g_funnel_wrap");
     if (!container) return;
 
-    // Bỏ Impression – funnel bắt đầu từ Click
+    // Click vs Conversion — ai lớn hơn đứng trước
+    const clickFirst = click >= conv;
+    const topPair = clickFirst
+        ? [
+            { label: "Click", value: click, icon: "fa-arrow-pointer", color: "#ffa900" },
+            { label: "Conversion", value: conv, icon: "fa-bullseye", color: "#34A853" },
+        ]
+        : [
+            { label: "Conversion", value: conv, icon: "fa-bullseye", color: "#34A853" },
+            { label: "Click", value: click, icon: "fa-arrow-pointer", color: "#ffa900" },
+        ];
+
     const steps = [
-        { label: "Click", value: click, icon: "fa-arrow-pointer", color: "#ffa900" },
-        { label: "Conversion", value: conv, icon: "fa-bullseye", color: "#34A853" },
+        ...topPair,
+        { label: "Directions", value: dir, icon: "fa-map-location-dot", color: "#4285F4" },
         { label: "Store Visit", value: store, icon: "fa-store", color: "#EA4335" },
     ];
 
@@ -937,7 +1072,7 @@ function _renderDualAxisChart(data) {
         if (!daily[d]) daily[d] = { imp: 0, click: 0, conv: 0 };
         daily[d].imp += parseFloat(item.impression || 0);
         daily[d].click += parseFloat(item.click || 0);
-        daily[d].conv += parseFloat(item.total_conversions || 0);
+        daily[d].conv += parseFloat(item.all_conversions || 0);
     });
 
     const labels = Object.keys(daily).sort();
@@ -1137,14 +1272,332 @@ function _groupByCampaign(data) {
     const map = {};
     data.forEach(item => {
         const name = item.campaign || "Unknown";
-        if (!map[name]) map[name] = { name, spent: 0, imp: 0, click: 0, conv: 0, store: 0 };
+        if (!map[name]) map[name] = { name, spent: 0, imp: 0, click: 0, conv: 0, store: 0, dir: 0, calls: 0, menu: 0, orders: 0, other: 0 };
         map[name].spent += parseFloat(item.spent || 0);
         map[name].imp += parseFloat(item.impression || 0);
         map[name].click += parseFloat(item.click || 0);
-        map[name].conv += parseFloat(item.total_conversions || 0);
+        map[name].conv += parseFloat(item.all_conversions || 0);   // ← Updated
         map[name].store += parseFloat(item.store_visits || 0);
+        map[name].dir += parseFloat(item.directions || 0);
+        map[name].calls += parseFloat(item.calls || 0);
+        map[name].menu += parseFloat(item.menu || 0);
+        map[name].orders += parseFloat(item.orders || 0);
+        map[name].other += parseFloat(item.other || 0);
     });
     return map;
+}
+
+/** Parse JSON device column safely */
+function _parseDeviceJson(str) {
+    if (!str) return {};
+    if (typeof str === 'object') return str;
+    try { return JSON.parse(str); } catch (e) { return {}; }
+}
+
+/** Local Actions — exact Funnel Performance style with icon inside bar */
+function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
+    const container = document.getElementById("g_local_actions_wrap");
+    if (!container) return;
+
+    const all = [
+        { label: "Directions", value: dir, color: "#4285F4", icon: "fa-map-location-dot" },
+        { label: "Menu", value: menu, color: "#FF6D00", icon: "fa-utensils" },
+        { label: "Store Visits", value: visits, color: "#EA4335", icon: "fa-store" },
+        { label: "Calls", value: calls, color: "#34A853", icon: "fa-phone" },
+        { label: "Orders", value: orders, color: "#9C27B0", icon: "fa-bag-shopping" },
+    ].filter(i => i.value > 0).sort((a, b) => b.value - a.value);
+
+    if (!all.length) {
+        container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:2rem;">Không có Local Actions data</p>`;
+        return;
+    }
+
+    const max = Math.max(...all.map(i => i.value), 1);
+    container.innerHTML = all.map(item => {
+        const pct = Math.max((item.value / max * 100), 4);
+        return `
+        <div style="margin-bottom:1.4rem;">
+          <div style="display:flex;align-items:center;gap:1.2rem;">
+            <div style="width:${pct}%;background:${item.color};border-radius:6px;height:3.6rem;
+                        display:flex;align-items:center;padding:0 1.2rem;
+                        transition:width .6s ease;min-width:4rem;">
+              <i class="fa-solid ${item.icon}" style="color:#fff;font-size:1.3rem;"></i>
+            </div>
+            <div>
+              <div style="font-size:1.1rem;color:#64748b;">${item.label}</div>
+              <div style="font-size:1.6rem;font-weight:700;color:#1e293b;">${_fmtNum(item.value)}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+}
+
+// ── Device breakdown state ──────────────────────────────────
+let _gDevData = { mob: {}, desk: {}, tab: {} };
+let _gDevFilter = 'click';
+
+/** Device Breakdown — list left + donut right */
+function _aggregateDeviceData(data, campFilter) {
+    const rows = campFilter === '__all__' ? data : data.filter(d => d.campaign === campFilter);
+    const mk = () => ({ imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 });
+    const mob = mk(), desk = mk(), tab = mk();
+    const _add = (obj, src) => {
+        obj.imp += src.Impression || 0;
+        obj.click += src.Click || 0;
+        obj.conv += src['All Conversions'] || 0;
+        obj.visits += src['Store Visits'] || 0;
+        obj.dir += src['Directions'] || 0;
+        obj.calls += src['Calls'] || 0;
+        obj.menu += src['Menu'] || 0;
+        obj.orders += src['Orders'] || 0;
+        obj.spent += src['Spent'] || src['spent'] || 0;
+    };
+    rows.forEach(item => {
+        _add(mob, _parseDeviceJson(item.mobile));
+        _add(desk, _parseDeviceJson(item.desktop));
+        _add(tab, _parseDeviceJson(item.tablet));
+    });
+    return { mob, desk, tab };
+}
+
+function _renderDeviceChart(mob, desk, tab) {
+    _gDevData = { mob, desk, tab };
+    _buildDeviceChart(_gDevFilter);
+}
+
+window.setGDeviceFilter = function (metric, el) {
+    _gDevFilter = metric;
+    // Update dom_select radio boxes
+    const wrap = document.getElementById('g_dev_select');
+    if (wrap) {
+        wrap.querySelectorAll('li').forEach(li => {
+            const isActive = li.dataset.metric === metric;
+            li.classList.toggle('active', isActive);
+            const rb = li.querySelector('.radio_box');
+            if (rb) rb.classList.toggle('active', isActive);
+        });
+        // Update label
+        const lbl = wrap.querySelector('.dom_selected');
+        if (lbl && el) lbl.textContent = el.querySelector('span:last-child')?.textContent || '';
+        wrap.classList.remove('active'); // close dropdown
+        wrap.querySelector('.dom_select_show')?.classList.remove('active'); // Ensure dropdown content is also hidden
+    }
+    _buildDeviceChart(metric);
+};
+
+function _buildDeviceChart(metric) {
+    const { mob, desk, tab } = _gDevData;
+    const wrap = document.getElementById('g_device_card_wrap');
+    if (!wrap) return;
+
+    const COLORS = ['#FFA900', '#001ea5', '#34A853'];
+    const BG_DONUT = ['#FFA900', '#001ea5', '#E0E0E0'];
+    const ICONS = ['fa-mobile-screen', 'fa-desktop', 'fa-tablet-screen-button'];
+    const LABELS = ['Mobile', 'Desktop', 'Tablet'];
+    const devs = [mob, desk, tab];
+
+    // All keys lowercase: imp, click, conv, visits, dir, calls, menu, orders
+    const FIELD = { click: 'click', imp: 'imp', conv: 'conv', visits: 'visits', dir: 'dir', calls: 'calls', menu: 'menu', orders: 'orders' };
+    const LABELS_F = { click: 'Clicks', imp: 'Impressions', conv: 'All Conversions', visits: 'Store Visits', dir: 'Directions', calls: 'Calls', menu: 'Menu', orders: 'Orders' };
+    const key = FIELD[metric] || 'click';
+    // Sub-stat: always show spent
+
+    const values = devs.map(d => parseFloat(d[key] || 0));
+    const total = values.reduce((a, b) => a + b, 0);
+    const topPct = total > 0 ? ((values[0] / total) * 100).toFixed(1) : '0';
+
+    wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:2rem;">
+      <div id="g_dev_list" style="flex:1.4;display:flex;flex-direction:column;gap:1rem;"></div>
+      <div style="flex:0 0 160px;">
+        <div style="position:relative;width:160px;height:160px;">
+          <canvas id="g_device_chart" width="160" height="160"
+                  style="width:160px!important;height:160px!important;display:block;"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                      text-align:center;pointer-events:none;">
+            <div style="font-size:1.8rem;font-weight:800;color:#1e293b;line-height:1;">${topPct}%</div>
+            <div style="font-size:0.95rem;color:#888;margin-top:0.2rem;">${LABELS[0]}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    // List cards
+    const listEl = document.getElementById('g_dev_list');
+    if (listEl) {
+        listEl.innerHTML = devs.map((d, i) => {
+            const v = values[i];
+            const pct = total > 0 ? (v / total * 100).toFixed(1) : '0';
+            const sub = _fmtMoney(d['spent'] || 0);
+            return `
+            <div style="padding:1rem 1.2rem;border-radius:12px;border:1px solid #f0f0f0;
+                        background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+              <div style="display:flex;align-items:center;gap:0.7rem;font-weight:600;
+                          color:#555;font-size:1rem;margin-bottom:0.3rem;">
+                <i class="fa-solid ${ICONS[i]}" style="color:${COLORS[i]};font-size:1.1rem;"></i>
+                <span>${LABELS[i]}</span>
+              </div>
+              <div style="font-weight:800;font-size:1.5rem;color:#1e293b;padding-left:1.8rem;">
+                ${_fmtNum(v)}
+              </div>
+              <div style="font-size:1rem;color:#94a3b8;padding-left:1.8rem;">
+                ${pct}% &nbsp;·&nbsp; ${sub}
+              </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Draw donut — fixed 200×200 canvas, not responsive (prevents squish)
+    const ctxEl = document.getElementById('g_device_chart');
+    if (!ctxEl) return;
+    if (G_CHARTS.device) G_CHARTS.device.destroy();
+    G_CHARTS.device = new Chart(ctxEl, {
+        type: 'doughnut',
+        data: {
+            labels: LABELS,
+            datasets: [{
+                data: values,
+                backgroundColor: BG_DONUT,
+                borderWidth: 4,
+                borderColor: '#fff',
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: false,        // fixed size = perfect circle
+            maintainAspectRatio: true,
+            cutout: '70%',
+            plugins: {
+                legend: { display: false },
+                datalabels: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: c => `${c.label}: ${_fmtNum(c.raw)} (${total > 0 ? (c.raw / total * 100).toFixed(1) : 0}%)`
+                    }
+                }
+            },
+            animation: { animateScale: true, animateRotate: true }
+        }
+    });
+}
+
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// HOURLY ACTIVITY CHART
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+let _gHourlyCamp = '__all__';
+let _gHourlyMetric = 'click';
+
+/** Populate campaign dropdown from current data */
+function _populateHourlyCampDropdown(data) {
+    const listEl = document.getElementById('g_hourly_camp_list');
+    if (!listEl) return;
+    const camps = [...new Set(data.map(d => d.campaign).filter(Boolean))].sort();
+    // Reset list
+    listEl.innerHTML = `<li data-view="__all__" class="active"><span class="radio_box active"></span><span>All Campaigns</span></li>`;
+    camps.forEach(name => {
+        const li = document.createElement('li');
+        li.dataset.view = name;
+        li.innerHTML = `<span class="radio_box"></span><span>${name}</span>`;
+        li.title = name;
+        listEl.appendChild(li);
+    });
+    // Re-init shared dropdown
+    const sel = document.getElementById('g_insight_camp_select');
+    if (sel) sel._gDropInit = false;
+    _initGoogleDropdowns();
+}
+
+/** Hourly bar chart \u2014 aggregates hourly JSON from all filtered rows */
+function _renderHourlyChart(data, campFilter, metric) {
+    const ctx = document.getElementById('g_hourly_chart');
+    if (!ctx) return;
+    if (G_CHARTS.hourly) { G_CHARTS.hourly.destroy(); G_CHARTS.hourly = null; }
+
+    // 24-slot accumulator
+    const slots = Array.from({ length: 24 }, (_, h) => ({
+        h, imp: 0, click: 0, spent: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0
+    }));
+
+    const rows = campFilter === '__all__' ? data : data.filter(d => d.campaign === campFilter);
+    for (const item of rows) {
+        if (!item.hourly) continue;
+        let parsed = item.hourly;
+        if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch { continue; } }
+        if (!Array.isArray(parsed)) continue;
+        for (const h of parsed) {
+            const s = slots[h.h];
+            if (!s) continue;
+            s.imp += h.imp || 0;
+            s.click += h.click || 0;
+            s.spent += h.spent || 0;
+            s.conv += h.conv || 0;
+            s.visits += h.visits || 0;
+            s.dir += h.dir || 0;
+            s.calls += h.calls || 0;
+            s.menu += h.menu || 0;
+            s.orders += h.orders || 0;
+        }
+    }
+
+    const METRIC_LABELS = {
+        click: 'Clicks', imp: 'Impressions', spent: 'Spent', conv: 'All Conversions',
+        visits: 'Store Visits', dir: 'Directions', calls: 'Calls', menu: 'Menu', orders: 'Orders'
+    };
+    const METRIC_COLORS = {
+        click: '#ffa900', imp: '#4285F4', spent: '#EA4335',
+        conv: '#34A853', visits: '#FF6D00', dir: '#4285F4',
+        calls: '#34A853', menu: '#FF6D00', orders: '#9C27B0'
+    };
+
+    const labels = slots.map(s => `${s.h}h`);
+    const values = slots.map(s => s[metric] || 0);
+    const color = METRIC_COLORS[metric] || '#ffa900';
+    const isMoney = metric === 'spent';
+
+    G_CHARTS.hourly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: METRIC_LABELS[metric] || metric,
+                data: values,
+                backgroundColor: values.map(v => v > 0 ? color + 'cc' : '#e2e8f0'),
+                borderRadius: 4,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 500, easing: 'easeOutQuart' },
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    display: ctx2 => ctx2.dataset.data[ctx2.dataIndex] > 0,
+                    anchor: 'end', align: 'end', offset: 2,
+                    font: { size: 9, weight: '700' }, color: '#444',
+                    formatter: v => isMoney ? _fmtShort(v) : _fmtNum(v)
+                },
+                tooltip: {
+                    callbacks: {
+                        label: c => isMoney ? _fmtMoney(c.raw) : _fmtNum(c.raw) + ' ' + METRIC_LABELS[metric]
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 9 }, color: '#94a3b8' } },
+                y: {
+                    beginAtZero: true,
+                    grace: '20%',
+                    grid: { color: 'rgba(0,0,0,0.04)' },
+                    ticks: {
+                        font: { size: 9 }, color: '#94a3b8',
+                        callback: v => isMoney ? _fmtShort(v) : _fmtNum(v)
+                    }
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
 }
 
 function _fmtMoney(v) {

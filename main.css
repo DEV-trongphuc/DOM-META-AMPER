@@ -8853,6 +8853,24 @@ tbody {
   min-height: 0;
 }
 
+/* Hourly Activity card — same height as g_third cards */
+#google_ads_container .dom_inner.w65.chart {
+  min-height: 36rem;
+  display: flex !important;
+  flex-direction: column;
+}
+
+#google_ads_container .dom_inner.w65.chart .g_chart_wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: 28rem;
+}
+
+/* Device Breakdown card — same min-height */
+#google_ads_container .dom_inner.w35.chart {
+  min-height: 36rem;
+}
+
 /* Donut card: center layout so chart stays round */
 #google_ads_container .dom_inner.g_donut_card {
   align-items: center;
@@ -9294,6 +9312,50 @@ tbody {
 .g_switcher button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Device Breakdown filter tabs */
+.g_dev_filter_btn {
+  padding: 0.4rem 1.2rem;
+  border-radius: 20px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.g_dev_filter_btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.g_dev_filter_btn.active {
+  background: #fff;
+  color: #1e293b;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+}
+
+/* Hourly campaign dropdown — wide enough for full names */
+#g_hourly_camp_select .dom_select_show,
+#g_insight_camp_select .dom_select_show {
+  min-width: 340px;
+  width: max-content;
+  max-width: 480px;
+  left: 0;
+  right: auto;
+  white-space: nowrap;
+}
+
+#g_hourly_camp_select .dom_select_show li span:last-child,
+#g_insight_camp_select .dom_select_show li span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
 }
 
 .ad_copy_id {
@@ -9801,4 +9863,87 @@ tbody {
   border-color: #f59e0b !important;
   color: #f59e0b !important;
   background: #fffbeb !important;
+}
+
+.campaign_insigh_title {
+  font-weight: bold;
+  font-size: 2rem;
+}
+
+.dom_table_header.campaign_insigh {
+  margin-bottom: 2rem;
+}
+
+/* Sync info bar */
+.g_sync_bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+  padding: 0 0.4rem;
+}
+
+.g_sync_info {
+  font-size: 1.1rem;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.g_sync_btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.4rem;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+.g_sync_btn:hover {
+  background: #FFA900;
+  color: #fff;
+  border-color: #FFA900;
+}
+
+.g_sync_btn.loading i {
+  animation: g_spin 0.8s linear infinite;
+}
+
+@keyframes g_spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Donut card: không giãn cao hơn card bên ── */
+.g_donut_card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.g_donut_wrap {
+  flex-shrink: 0;
+  max-height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.g_donut_wrap canvas {
+  max-height: 200px !important;
+  width: auto !important;
+}
+
+.g_donut_legend {
+  margin-top: 0.8rem;
 }
