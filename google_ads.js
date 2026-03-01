@@ -1492,7 +1492,7 @@ function _populateHourlyCampDropdown(data) {
     const listEl = document.getElementById('g_hourly_camp_list');
     if (!listEl) return;
     const camps = [...new Set(data.map(d => d.campaign).filter(Boolean))].sort();
-    // Reset list
+    // Reset list — delegation listener on ul still works for new LIs
     listEl.innerHTML = `<li data-view="__all__" class="active"><span class="radio_box active"></span><span>All Campaigns</span></li>`;
     camps.forEach(name => {
         const li = document.createElement('li');
@@ -1501,10 +1501,8 @@ function _populateHourlyCampDropdown(data) {
         li.title = name;
         listEl.appendChild(li);
     });
-    // Re-init shared dropdown
-    const sel = document.getElementById('g_insight_camp_select');
-    if (sel) sel._gDropInit = false;
-    _initGoogleDropdowns();
+    // DO NOT reset _gDropInit or re-call _initGoogleDropdowns here —
+    // delegation on the <ul> handles new <li>s, re-init would add duplicate listeners.
 }
 
 /** Hourly bar chart \u2014 aggregates hourly JSON from all filtered rows */
