@@ -206,6 +206,20 @@ if (document.readyState === "loading") {
   updateSummaryCardHTML();
 }
 
+// 🦴 Show skeleton NGAY lập tức khi DOM ready — không chờ token hay main()
+(function () {
+  function _showSkeletonEarly() {
+    if (typeof toggleSkeletons === "function") {
+      toggleSkeletons(".dom_dashboard", true);
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", _showSkeletonEarly);
+  } else {
+    _showSkeletonEarly();
+  }
+})();
+
 let ACTIVE_COLUMNS = [];
 let CUSTOM_METRICS = [];
 
@@ -3665,7 +3679,23 @@ window.toggleSmartBadges = function (btn) {
   if (window.lastRenderData) renderCampaignTable(window.lastRenderData);
 };
 
-main();
+// ── Token-aware startup ──────────────────────────────────────────
+// Đợi _tokenReady (được set bởi token.js) trước khi gọi main()
+// Nếu token.js không set, vẫn chạy main() bình thường
+if (window._tokenReady instanceof Promise) {
+  window._tokenReady.then(() => main());
+} else {
+  main();
+}
+
+// Callback khi user nhập token mới từ modal → reload toàn bộ dữ liệu
+window._afterTokenResolved = function () {
+  // Clear cache để fetch lại tươi
+  if (typeof CACHE !== "undefined" && CACHE && typeof CACHE.clear === "function") {
+    CACHE.clear();
+  }
+  main();
+};
 const formatMoney = (v) =>
   v && !isNaN(v) ? Math.round(v).toLocaleString("vi-VN") + "đ" : "0đ";
 const formatNumber = (v) =>
