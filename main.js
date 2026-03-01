@@ -3679,14 +3679,14 @@ window.toggleSmartBadges = function (btn) {
   if (window.lastRenderData) renderCampaignTable(window.lastRenderData);
 };
 
-// ── Token-aware startup ──────────────────────────────────────────
-// Đợi _tokenReady (được set bởi token.js) trước khi gọi main()
-// Nếu token.js không set, vẫn chạy main() bình thường
-if (window._tokenReady instanceof Promise) {
-  window._tokenReady.then(() => main());
-} else {
-  main();
-}
+// ── Token + Auth aware startup ────────────────────────────────────
+// Đợi CẢ HAI: token Meta đã resolve VÀ user đã đăng nhập Google
+const _startPromises = [
+  window._tokenReady instanceof Promise ? window._tokenReady : Promise.resolve(),
+  window._authReady instanceof Promise ? window._authReady : Promise.resolve(),
+];
+Promise.all(_startPromises).then(() => main());
+
 
 // Callback khi user nhập token mới từ modal → reload toàn bộ dữ liệu
 window._afterTokenResolved = function () {
