@@ -8507,13 +8507,15 @@ tbody {
 .g_tbl_header,
 .g_tbl_row {
   display: grid !important;
-  grid-template-columns: 2.5fr 1fr 1.1fr 0.9fr 0.9fr 1fr 1fr 0.8fr 1fr !important;
+  grid-template-columns: 3fr 0.8fr 1fr 1fr 0.9fr 0.9fr 1fr 1fr 1fr 1fr !important;
   align-items: center;
   padding: 0 1.5rem !important;
   font-size: 1.25rem;
   width: 100%;
   box-sizing: border-box;
 }
+
+/* Center-aligned column (View Insight) */
 
 /* Header Cells & Row Metric Cells – Borders & Alignment */
 .g_tbl_header>div,
@@ -9859,6 +9861,7 @@ tbody {
   border: 1px solid #cbd5e1;
 }
 
+
 #smart_badges_toggle.active {
   border-color: #f59e0b !important;
   color: #f59e0b !important;
@@ -9946,4 +9949,15 @@ tbody {
 
 .g_donut_legend {
   margin-top: 0.8rem;
+}
+
+.g_tbl_header>.g_col_center,
+.g_tbl_row>.g_col_center {
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+#g_kw_date_range {
+  margin-top: 1rem;
+  transform: translateX(-2rem);
 }

@@ -1,4 +1,4 @@
-console.log("Google Ads Script Loaded v2.0 - PRO DASHBOARD");
+﻿console.log("Google Ads Script Loaded v2.0 - PRO DASHBOARD");
 
 let googleAdsRawData = [];
 let googleAdsFilteredData = [];
@@ -9,7 +9,7 @@ let isGAdsFetching = false;
 let isMonthlyFetching = false;
 let lastGAdsRange = "";
 
-// Expose để main.js có thể check cache khi switch tab
+// Expose d? main.js c� th? check cache khi switch tab
 Object.defineProperty(window, 'googleAdsRawData', { get: () => googleAdsRawData, configurable: true });
 
 // Chart instances
@@ -30,14 +30,14 @@ window.fetchGoogleAdsData = async function (force = false) {
     const containerView = document.getElementById("google_ads_container");
 
     // CSS (.dom_container.google_ads #google_ads_container) handles visibility
-    // DO NOT set inline style here — it persists when switching away from google_ads tab
+    // DO NOT set inline style here � it persists when switching away from google_ads tab
 
     const currentRange = `${startDate}_${endDate}`;
     if (isGAdsFetching) return;
 
-    // ✅ Cache guard: nếu data đã có và date range không đổi → chỉ render lại
+    // ? Cache guard: n?u data d� c� v� date range kh�ng d?i ? ch? render l?i
     if (!force && googleAdsRawData.length > 0 && lastGAdsRange === currentRange) {
-        console.log("⚡ Google Ads: Using cached data, skipping API call.");
+        console.log("? Google Ads: Using cached data, skipping API call.");
         renderGoogleAdsView();
         return;
     }
@@ -46,7 +46,7 @@ window.fetchGoogleAdsData = async function (force = false) {
     window._lastGAdsRange = currentRange; // Expose for tab-switch check in main.js
     isGAdsFetching = true;
 
-    // Chỉ show skeleton khi user đang ở tab Google Ads (không phải preload background)
+    // Ch? show skeleton khi user dang ? tab Google Ads (kh�ng ph?i preload background)
     const isOnGadsTab = document.querySelector(".dom_container")?.classList.contains("google_ads");
     if (isOnGadsTab) _showGoogleSkeletons();
 
@@ -63,7 +63,7 @@ window.fetchGoogleAdsData = async function (force = false) {
         const url = new URL(GOOGLE_SHEET_API_URL);
         url.searchParams.append("time_range", JSON.stringify({ since: ps, until: endDate }));
 
-        console.log("🔵 Google Ads API: Mega Fetching all data in one go...");
+        console.log("?? Google Ads API: Mega Fetching all data in one go...");
         const response = await fetch(url.toString());
         const compactData = response.ok ? await response.json() : { h: [], d: [] };
 
@@ -85,20 +85,20 @@ window.fetchGoogleAdsData = async function (force = false) {
             fetchGoogleAdsMonthlyData();
         }
 
-        console.log("✅ Google Ads: Mega Pipeline complete.", googleAdsRawData.length, "current /", googleAdsPrevData.length, "prev rows");
+        console.log("? Google Ads: Mega Pipeline complete.", googleAdsRawData.length, "current /", googleAdsPrevData.length, "prev rows");
 
-        // Chỉ render UI nếu user đang ở tab google_ads
+        // Ch? render UI n?u user dang ? tab google_ads
         const _isOnTab = document.querySelector(".dom_container")?.classList.contains("google_ads");
         if (_isOnTab) {
             renderGoogleAdsView();
         } else {
-            console.log("⚡ [Preload] Google Ads data cached. Will render when tab is opened.");
+            console.log("? [Preload] Google Ads data cached. Will render when tab is opened.");
         }
 
     } catch (error) {
-        console.error("❌ Google Ads pipeline error:", error);
+        console.error("? Google Ads pipeline error:", error);
         if (typeof showToast === 'function' && document.querySelector(".dom_container")?.classList.contains("google_ads")) {
-            showToast("❌ Lỗi đồng bộ dữ liệu Google Ads.");
+            showToast("? L?i d?ng b? d? li?u Google Ads.");
         }
     } finally {
         isGAdsFetching = false;
@@ -146,9 +146,9 @@ function _hideGoogleSkeletons() {
     });
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // MANUAL SYNC
-// ─────────────────────────────────────────────/** Manual sync trigger */
+// ---------------------------------------------/** Manual sync trigger */
 async function triggerGAdsSync() {
     const btn = document.getElementById('g_sync_btn');
     if (btn) { btn.classList.add('loading'); btn.disabled = true; }
@@ -162,19 +162,21 @@ async function triggerGAdsSync() {
             if (el) el.textContent = result.syncedAt;
         }
         await fetchGoogleAdsData(true);
-        if (typeof showToast === 'function') showToast('✅ Đồng bộ thành công!');
+        if (typeof showToast === 'function') showToast('? �?ng b? th�nh c�ng!');
     } catch (e) {
         console.error('Sync error:', e);
-        if (typeof showToast === 'function') showToast('❌ Sync thất bại!');
+        if (typeof showToast === 'function') showToast('? Sync th?t b?i!');
     } finally {
         if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // MAIN RENDER
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function renderGoogleAdsView() {
+    // Guard: don't re-render while keyword modal is open (avoid chart flicker)
+    if (window._kwModalOpen) return;
     // Ensure dates
     if (!window.startDate || !window.endDate) {
         const dr = (typeof getDateRange === 'function') ? getDateRange("last_7days") : { start: "", end: "" };
@@ -197,7 +199,7 @@ function renderGoogleAdsView() {
         ? filteredByDate.filter(item => item.campaign && item.campaign.toLowerCase().includes(brandLabel.toLowerCase()))
         : filteredByDate;
 
-    console.log(`📊 Google Ads filtered: ${googleAdsFilteredData.length} rows (${startDate} → ${endDate})`);
+    console.log(`?? Google Ads filtered: ${googleAdsFilteredData.length} rows (${startDate} ? ${endDate})`);
 
     // Reset to Daily if filter is active and we're currently in Monthly
     const hasActiveFilter = brandLabel && brandLabel.toUpperCase() !== "RESET" && brandLabel !== "Ampersand Group";
@@ -213,7 +215,7 @@ function renderGoogleAdsView() {
     // Calculate totals & derived metrics
     let totSpent = 0, totImp = 0, totClick = 0, totConv = 0, totStore = 0;
     let totDir = 0, totCalls = 0, totMenu = 0, totOrders = 0, totOther = 0;
-    // device totals — all lowercase keys
+    // device totals � all lowercase keys
     let devMob = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
     let devDesk = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
     let devTab = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
@@ -230,7 +232,7 @@ function renderGoogleAdsView() {
         totOrders += parseFloat(item.orders || 0);
         totOther += parseFloat(item.other || 0);
 
-        // Parse device JSON — keys: "Impression", "Click", "All Conversions", "Store Visits", "Directions", "Calls", "Menu", "Orders"
+        // Parse device JSON � keys: "Impression", "Click", "All Conversions", "Store Visits", "Directions", "Calls", "Menu", "Orders"
         const mob = _parseDeviceJson(item.mobile);
         const desk = _parseDeviceJson(item.desktop);
         const tab = _parseDeviceJson(item.tablet);
@@ -258,7 +260,7 @@ function renderGoogleAdsView() {
         fetchGoogleAdsMonthlyData();
     }
 
-    // ── Pre-filter Previous Data by Brand
+    // -- Pre-filter Previous Data by Brand
     const prevFilteredByDate = googleAdsPrevData || [];
     const prevFiltered = (brandLabel && brandLabel.toUpperCase() !== "RESET" && brandLabel !== "Ampersand Group")
         ? prevFilteredByDate.filter(item => item.campaign && item.campaign.toLowerCase().includes(brandLabel.toLowerCase()))
@@ -306,7 +308,7 @@ function renderGoogleAdsView() {
         _setHtml(m.id, m.fmt(m.cur), diffPct, prevRangeStr, m.fmt(m.prev));
     });
 
-    // ── KPI mini cards
+    // -- KPI mini cards
     const kpiEl = document.getElementById("g_kpi_cards");
     if (kpiEl) {
         kpiEl.innerHTML = `
@@ -319,13 +321,13 @@ function renderGoogleAdsView() {
             </div>`;
     }
 
-    // ── Funnel derived metric labels
+    // -- Funnel derived metric labels
     _setHtml("g_cpc", _fmtMoney(avgCpc));
     _setHtml("g_cpa", _fmtMoney(avgCpa));
     _setHtml("g_cvr", avgCvr.toFixed(2) + "%");
     _setHtml("g_ctr", avgCtr.toFixed(2) + "%");
 
-    // ── All charts
+    // -- All charts
     const trendSel = _getGSelectVal("g_trend_select") || "spent";
     const barSel = _getGSelectVal("g_bar_select") || "spent";
 
@@ -335,7 +337,7 @@ function renderGoogleAdsView() {
         _renderTrendChart(googleAdsFilteredData, trendSel);
     }
 
-    // ── Pre-calculate grouped data once for all charts
+    // -- Pre-calculate grouped data once for all charts
     const groupedCampData = _groupByCampaign(googleAdsFilteredData);
     const sortedCampsBySpent = Object.values(groupedCampData).sort((a, b) => b.spent - a.spent);
 
@@ -345,7 +347,7 @@ function renderGoogleAdsView() {
     _renderCPVisitChart(googleAdsFilteredData, groupedCampData);
     _renderDualAxisChart(googleAdsFilteredData);
 
-    // ── Reset Campaign Insight filter khi brand/date thay đổi
+    // -- Reset Campaign Insight filter khi brand/date thay d?i
     _gHourlyCamp = '__all__';
     _gHourlyMetric = _gHourlyMetric || 'click';
     // Reset dropdown label UI
@@ -363,30 +365,36 @@ function renderGoogleAdsView() {
     _renderTopCampaignCards(googleAdsFilteredData, sortedCampsBySpent);
     _renderCampaignTable(googleAdsFilteredData, "", groupedCampData);
 
-    // ── Funnel stats: Menu / Calls / Orders / Other
+    // -- NEW: Channel / Location / Distance charts
+    _renderChannelChart(googleAdsFilteredData);
+    _renderLocationChart(googleAdsFilteredData);
+    _renderDistanceChart(googleAdsFilteredData);
+
+
+    // -- Funnel stats: Menu / Calls / Orders / Other
     const _setStatEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = _fmtNum(v); };
     _setStatEl('g_stat_menu', totMenu);
     _setStatEl('g_stat_calls', totCalls);
     _setStatEl('g_stat_orders', totOrders);
     _setStatEl('g_stat_other', totOther);
 
-    // ── Populate campaign dropdown for hourly chart (after brand filter)
+    // -- Populate campaign dropdown for hourly chart (after brand filter)
     _populateHourlyCampDropdown(googleAdsFilteredData);
 
-    // ── Filter listener
+    // -- Filter listener
     const filterInput = document.getElementById("g_campaign_filter");
     if (filterInput && !filterInput._gBound) {
         filterInput._gBound = true;
         filterInput.addEventListener("input", () => _renderCampaignTable(googleAdsFilteredData, filterInput.value));
     }
 
-    // ── Wire up custom dropdowns (only once)
+    // -- Wire up custom dropdowns (only once)
     _initGoogleDropdowns();
 }
 
-// ─────────────────────────────────────────────
-// DROPDOWN INIT – wire up Meta-style dom_select
-// ─────────────────────────────────────────────
+// ---------------------------------------------
+// DROPDOWN INIT � wire up Meta-style dom_select
+// ---------------------------------------------
 function _initGoogleDropdowns() {
     [
         {
@@ -401,6 +409,12 @@ function _initGoogleDropdowns() {
                 _gHourlyMetric = v;
                 _renderHourlyChart(googleAdsFilteredData, _gHourlyCamp, v);
                 _buildDeviceChart(v);
+                // Sync 3 breakdown charts
+                _gDevFilter = v;
+                const brkData = _gHourlyCamp === '__all__' ? googleAdsFilteredData : googleAdsFilteredData.filter(d => d.campaign === _gHourlyCamp);
+                _buildChannelChart(_dimData.channel, v);
+                _buildLocationChart(_dimData.location, v);
+                _buildDistanceChart(_dimData.distance, v);
             }
         },
         {
@@ -410,6 +424,13 @@ function _initGoogleDropdowns() {
                 // Re-aggregate device data for selected campaign
                 const { mob, desk, tab } = _aggregateDeviceData(googleAdsFilteredData, v);
                 _renderDeviceChart(mob, desk, tab);
+                // Sync 3 breakdown charts � filter by campaign if specific one selected
+                const filteredForBreakdown = v === '__all__'
+                    ? googleAdsFilteredData
+                    : googleAdsFilteredData.filter(d => d.campaign === v);
+                _renderChannelChart(filteredForBreakdown);
+                _renderLocationChart(filteredForBreakdown);
+                _renderDistanceChart(filteredForBreakdown);
             }
         },
     ].forEach(({ id, onSelect }) => {
@@ -431,7 +452,7 @@ function _initGoogleDropdowns() {
             wrap.querySelector('.dom_select_show')?.classList.toggle('active');
         });
 
-        // Item click — use delegation on the ul so dynamically added items work
+        // Item click � use delegation on the ul so dynamically added items work
         const listEl = wrap.querySelector('.dom_select_show');
         if (listEl) {
             listEl.addEventListener('click', e => {
@@ -476,17 +497,19 @@ function _getGSelectVal(selectId) {
     return wrap.querySelector('.dom_select_show li.active')?.dataset.view || null;
 }
 
-// ─────────────────────────────────────────────
-// 1. TREND CHART (Daily) – matches Meta line chart style exactly
-// ─────────────────────────────────────────────
+// ---------------------------------------------
+// 1. TREND CHART (Daily) � matches Meta line chart style exactly
+// ---------------------------------------------
 function _renderTrendChart(data, metric) {
     const ctx = document.getElementById("g_trend_chart")?.getContext("2d");
     if (!ctx) return;
     if (G_CHARTS.trend) G_CHARTS.trend.destroy();
 
     const metricLabels = {
-        spent: "Spent (đ)", click: "Click", total_conversions: "Conversions",
-        impression: "Impression", store_visits: "Store Visit"
+        spent: "Spent (d)", click: "Click", total_conversions: "Conversions",
+        impression: "Impression", store_visits: "Store Visit",
+        all_conversions: "All Conversions",
+        directions: "Directions", calls: "Calls", menu: "Menu", orders: "Orders"
     };
 
     // Aggregate by date
@@ -517,7 +540,7 @@ function _renderTrendChart(data, metric) {
     }
     const displayIndices = _indicesToShow(values, 5);
 
-    // Gradient fill – Meta style: rgba(255,169,0,0.2) → rgba(255,169,0,0.05)
+    // Gradient fill � Meta style: rgba(255,169,0,0.2) ? rgba(255,169,0,0.05)
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
     gradient.addColorStop(0, "rgba(255,169,0,0.2)");
     gradient.addColorStop(1, "rgba(255,169,0,0.05)");
@@ -543,7 +566,7 @@ function _renderTrendChart(data, metric) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 600, easing: 'easeOutQuart' },
+            animation: { duration: 700, easing: 'easeOutQuart' },
             layout: { padding: { top: 26, left: 8, right: 12 } },
             plugins: {
                 legend: { display: false },
@@ -602,17 +625,17 @@ window.updateGoogleTrendChart = function () {
     _renderTrendChart(googleAdsFilteredData, sel?.value || "spent");
 };
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // 2. BAR CHART (Metric by Campaign)
-// ─────────────────────────────────────────────
-/** Rút gọn tên campaign: giữ brand + loại kênh */
+// ---------------------------------------------
+/** R�t g?n t�n campaign: gi? brand + lo?i k�nh */
 function _shortCampName(name) {
     if (!name) return '';
-    // Bỏ suffix dài sau brand: lấy 2 phần đầu trước _Google
-    // VD: "TRB_Google_Search_KW" → "TRB_Search"
-    //     "BeAn_Google_Display_EN" → "BeAn_Display"
+    // B? suffix d�i sau brand: l?y 2 ph?n d?u tru?c _Google
+    // VD: "TRB_Google_Search_KW" ? "TRB_Search"
+    //     "BeAn_Google_Display_EN" ? "BeAn_Display"
     const parts = name.split('_');
-    // Tìm index của "Google"
+    // T�m index c?a "Google"
     const gIdx = parts.findIndex(p => p.toLowerCase() === 'google');
     if (gIdx > 0) {
         const brand = parts.slice(0, gIdx).join('_');   // "TRB"
@@ -620,7 +643,7 @@ function _shortCampName(name) {
         return rest ? `${brand}_${rest}` : brand;
     }
     // fallback: truncate
-    return name.length > 14 ? name.slice(0, 13) + '…' : name;
+    return name.length > 14 ? name.slice(0, 13) + '�' : name;
 }
 
 function _renderBarChart(data, metric) {
@@ -647,7 +670,7 @@ function _renderBarChart(data, metric) {
         return +(c[metric] || 0);
     });
 
-    // ── Cùng gradient style với Meta (Top bar = vàng, còn lại = xám)
+    // -- C�ng gradient style v?i Meta (Top bar = v�ng, c�n l?i = x�m)
     const maxVal = Math.max(...values, 1);
     const maxIdx = values.indexOf(maxVal);
 
@@ -677,7 +700,7 @@ function _renderBarChart(data, metric) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            animation: { duration: 600, easing: 'easeOutQuart' },
+            animation: { duration: 700, easing: 'easeOutQuart' },
             layout: { padding: { left: 10, right: 10 } },
             plugins: {
                 legend: { display: false },
@@ -725,9 +748,9 @@ window.updateGoogleBarChart = function () {
     _renderBarChart(googleAdsFilteredData, sel?.value || "spent");
 };
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // 3. DONUT CHART (Spent by Campaign)
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function _renderDonutChart(data) {
     const ctx = document.getElementById("g_donut_chart")?.getContext("2d");
     if (!ctx) return;
@@ -737,11 +760,11 @@ function _renderDonutChart(data) {
     const sorted = Object.values(campaigns).sort((a, b) => b.spent - a.spent).slice(0, 8);
     const total = sorted.reduce((s, c) => s + c.spent, 0);
 
-    // Màu giống Meta: vàng chủ đạo, sau đó navy, xám
+    // M�u gi?ng Meta: v�ng ch? d?o, sau d� navy, x�m
     const DONUT_COLORS = ['rgba(255,169,0,1)', 'rgba(0,30,165,0.9)', 'rgba(155,155,155,0.7)',
         '#34A853', '#EA4335', '#FF6D00', '#9C27B0', '#00BCD4'];
 
-    // Plugin vẽ % ở giữa giống Meta
+    // Plugin v? % ? gi?a gi?ng Meta
     const centerPlugin = {
         id: 'centerText',
         afterDraw(chart) {
@@ -799,14 +822,14 @@ function _renderDonutChart(data) {
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // 4. FUNNEL CHART
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function _renderFunnelChart(imp, click, conv, store, dir) {
     const container = document.getElementById("g_funnel_wrap");
     if (!container) return;
 
-    // Click vs Conversion — ai lớn hơn đứng trước
+    // Click vs Conversion � ai l?n hon d?ng tru?c
     const clickFirst = click >= conv;
     const topPair = clickFirst
         ? [
@@ -834,7 +857,7 @@ function _renderFunnelChart(imp, click, conv, store, dir) {
 
         return `
             <div style="margin-bottom:1.4rem;">
-                ${dropPct !== null ? `<div style="text-align:center;font-size:1.1rem;color:#94a3b8;margin-bottom:0.4rem;">▼ Drop ${dropPct}%</div>` : ''}
+                ${dropPct !== null ? `<div style="text-align:center;font-size:1.1rem;color:#94a3b8;margin-bottom:0.4rem;">? Drop ${dropPct}%</div>` : ''}
                 <div style="display:flex;align-items:center;gap:1.2rem;">
                     <div style="width:${pct}%;background:${step.color};border-radius:6px;height:3.6rem;display:flex;align-items:center;padding:0 1.2rem;transition:width .5s;min-width:3rem;">
                         <i class="fa-solid ${step.icon}" style="color:#fff;font-size:1.3rem;"></i>
@@ -862,7 +885,7 @@ function _renderCPVisitChart(data, precalculatedGroup = null) {
         .sort((a, b) => a.cpv - b.cpv);
 
     if (!sorted.length) {
-        container.innerHTML = `<p style="text-align:center;color:#999;padding-top:2rem;">Không có dữ liệu Store Visit</p>`;
+        container.innerHTML = `<p style="text-align:center;color:#999;padding-top:2rem;">Kh�ng c� d? li?u Store Visit</p>`;
         return;
     }
 
@@ -887,9 +910,9 @@ function _renderCPVisitChart(data, precalculatedGroup = null) {
     }).join("");
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // MONTHLY SWITCHER LOGIC
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 window.setGoogleTrendMode = async function (mode) {
     if (gTrendMode === mode) return;
 
@@ -956,12 +979,12 @@ async function fetchGoogleAdsMonthlyData() {
     try {
         const url = new URL(GOOGLE_SHEET_API_URL);
         url.searchParams.append("time_range", JSON.stringify({ since: startOfYear, until: todayStr }));
-        console.log("🔵 Google Ads: Fetching Monthly Data in background...");
+        console.log("?? Google Ads: Fetching Monthly Data in background...");
         const response = await fetch(url.toString());
         if (response.ok) {
             const compactData = await response.json();
             googleAdsMonthlyData = _fromCompact(compactData);
-            console.log("✅ Google Ads: Monthly Data cached.", googleAdsMonthlyData.length, "rows");
+            console.log("? Google Ads: Monthly Data cached.", googleAdsMonthlyData.length, "rows");
 
             // Only re-render if user is currently looking at the monthly chart
             if (gTrendMode === 'monthly') {
@@ -970,7 +993,7 @@ async function fetchGoogleAdsMonthlyData() {
             }
         }
     } catch (e) {
-        console.error("❌ Monthly fetch failed:", e);
+        console.error("? Monthly fetch failed:", e);
     } finally {
         isMonthlyFetching = false;
         // Optimization: remove any specific monthly skeletons if any
@@ -1026,7 +1049,7 @@ function _renderMonthlyChart(data, metric) {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: bgColors,
+                backgroundColor: values.map((_, i) => `rgba(255,169,0,${(1 - i / sorted.length * 0.6).toFixed(2)})`),
                 borderRadius: 6
             }]
         },
@@ -1057,9 +1080,9 @@ function _renderMonthlyChart(data, metric) {
     });
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // 6. DUAL AXIS CHART (CTR & Conversion by Day)
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function _renderDualAxisChart(data) {
     const ctx = document.getElementById("g_dual_chart")?.getContext("2d");
     if (!ctx) return;
@@ -1079,7 +1102,7 @@ function _renderDualAxisChart(data) {
     const ctrData = labels.map(l => daily[l].imp > 0 ? +(daily[l].click / daily[l].imp * 100).toFixed(3) : 0);
     const convData = labels.map(l => daily[l].conv);
 
-    // Gradient CTR = vàng, Conv = navy (giống Meta)
+    // Gradient CTR = v�ng, Conv = navy (gi?ng Meta)
     const ctxEl = ctx.canvas;
     const gradCtr = ctxEl.getContext('2d').createLinearGradient(0, 0, 0, 250);
     gradCtr.addColorStop(0, 'rgba(255,169,0,0.25)');
@@ -1120,7 +1143,7 @@ function _renderDualAxisChart(data) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            animation: { duration: 600, easing: 'easeOutQuart' },
+            animation: { duration: 700, easing: 'easeOutQuart' },
             plugins: {
                 datalabels: { display: false },
                 legend: { position: "top", labels: { font: { size: 11, weight: '600' }, usePointStyle: true, pointStyleWidth: 10 } },
@@ -1147,9 +1170,9 @@ function _renderDualAxisChart(data) {
     });
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // 7. TOP / WORST CAMPAIGN INSIGHTS CARDS
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function _renderTopCampaignCards(data, precalculatedList = null) {
     const el = document.getElementById("g_top_campaigns");
     if (!el) return;
@@ -1157,7 +1180,7 @@ function _renderTopCampaignCards(data, precalculatedList = null) {
     const list = precalculatedList || Object.values(_groupByCampaign(data));
 
     if (list.length === 0) {
-        el.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:2rem;font-size:1.3rem;">Không có dữ liệu</div>`;
+        el.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:2rem;font-size:1.3rem;">Kh�ng c� d? li?u</div>`;
         return;
     }
 
@@ -1174,25 +1197,25 @@ function _renderTopCampaignCards(data, precalculatedList = null) {
             <span style="background:${badgeColor}22;color:${badgeColor};font-size:1rem;font-weight:700;padding:0.3rem 0.8rem;border-radius:6px;white-space:nowrap;">${badge}</span>
         </div>`;
 
-    let html = `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin-bottom:0.6rem;">🏆 Top Conversion</div>`;
+    let html = `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin-bottom:0.6rem;">?? Top Conversion</div>`;
     html += byConv.map(c => renderCard(c, "TOP CONV", "#34A853", "Conv", _fmtNum(c.conv))).join("");
 
     if (byCpa.length > 0) {
-        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">✅ Scale được (CPA thấp)</div>`;
+        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">? Scale du?c (CPA th?p)</div>`;
         html += byCpa.map(c => renderCard(c, "SCALE", "#4285F4", "CPA", _fmtMoney(c.cpa))).join("");
     }
 
     if (worstCpa.length > 0) {
-        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">⚠️ Lỗ (CPA cao)</div>`;
+        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">?? L? (CPA cao)</div>`;
         html += worstCpa.map(c => renderCard(c, "HIGH CPA", "#EA4335", "CPA", _fmtMoney(c.cpa))).join("");
     }
 
     el.innerHTML = html;
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // 8. DETAIL TABLE (like Meta Campaign Details)
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function _renderCampaignTable(data, filterText = "", precalculatedGroup = null) {
     const wrap = document.getElementById("g_campaign_table");
     if (!wrap) return;
@@ -1206,17 +1229,19 @@ function _renderCampaignTable(data, filterText = "", precalculatedGroup = null) 
     }
 
     if (list.length === 0) {
-        wrap.innerHTML = `<div style="text-align:center;padding:4rem;color:#94a3b8;font-size:1.4rem;"><i class="fa-solid fa-folder-open" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>Không tìm thấy campaign nào.</div>`;
+        wrap.innerHTML = `<div style="text-align:center;padding:4rem;color:#94a3b8;font-size:1.4rem;"><i class="fa-solid fa-folder-open" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>Kh�ng t�m th?y campaign n�o.</div>`;
         return;
     }
 
-    // Each row – pure Google Ads classes, matching Meta row style
+    // Each row � pure Google Ads classes, matching Meta row style
     const GOOGLE_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/3840px-Google_%22G%22_logo.svg.png';
 
     const rowsHtml = list.map(c => {
         const ctr = c.imp > 0 ? (c.click / c.imp * 100) : 0;
         const cpc = c.click > 0 ? c.spent / c.click : 0;
         const cpa = c.conv > 0 ? c.spent / c.conv : 0;
+        const safeId = String(c.id || '').replace(/'/g, '');
+        const safeName = (c.name || '').replace(/\\/g, '\\\\').replace(/'/g, '\\\'').replace(/"/g, '&quot;');
 
         return `
         <div class="g_tbl_row">
@@ -1225,6 +1250,14 @@ function _renderCampaignTable(data, filterText = "", precalculatedGroup = null) 
               <img src="${GOOGLE_LOGO}" alt="G" class="g_logo_img" />
             </div>
             <p class="g_camp_name" title="${c.name}">${_truncate(c.name, 50)}</p>
+          </div>
+          <div class="ad_metric g_col_center">
+            <button onclick="event.stopPropagation();window._openKeywordPopup('${safeId}','${safeName}')" title="Xem Keywords &amp; Search Terms"
+              style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:3.2rem;height:3.2rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#4285F4;font-size:1.1rem;transition:all .15s;"
+              onmouseover="this.style.background='#4285F4';this.style.color='#fff';this.style.borderColor='#4285F4'"
+              onmouseout="this.style.background='#f1f5f9';this.style.color='#4285F4';this.style.borderColor='#e2e8f0'">
+              <i class="fa-solid fa-key"></i>
+            </button>
           </div>
           <div class="ad_metric g_bold_val">${_fmtMoney(c.spent)}</div>
           <div class="ad_metric">${_fmtNum(c.imp)}</div>
@@ -1241,9 +1274,156 @@ function _renderCampaignTable(data, filterText = "", precalculatedGroup = null) 
         <div class="g_tbl_count">${list.length} campaign${list.length !== 1 ? 's' : ''}</div>`;
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
+// KEYWORD POPUP
+// ---------------------------------------------
+window._openKeywordPopup = function (campaignId, campaignName) {
+    const modal = document.getElementById('g_keyword_modal');
+    if (!modal) return;
+    window._kwModalOpen = true;  // guard: prevent background re-render
+    const sd = window.startDate || startDate || '';
+    const ed = window.endDate || endDate || '';
+    document.getElementById('g_kw_camp_name').textContent = campaignName;
+    document.getElementById('g_kw_date_range').innerHTML = sd
+        ? '<span style="display:inline-flex;align-items:center;gap:0.6rem;padding:0.45rem 1.2rem;background:#fffbeb;border:1.5px solid #fde68a;border-radius:20px;font-size:1.15rem;font-weight:600;color:#92400e;"><i class="fa-regular fa-calendar" style="color:#f59e0b;"></i>&nbsp;' + sd + '&nbsp;\u2192&nbsp;' + ed + '</span>'
+        + '<span style="font-size:1.05rem;color:#94a3b8;font-style:italic;margin-left:0.8rem;">Top 50 keyword theo Impressions</span>'
+        : '';
+    modal.classList.add('active');
+    // Do NOT set body overflow:hidden — it changes viewport width and triggers Chart.js resize
+    // Reset to Keywords tab
+    window._switchKwTab('keywords', modal.querySelector('[data-tab="keywords"]'));
+    _loadKeywords(campaignId);
+};
+
+window._closeKeywordModal = function () {
+    const modal = document.getElementById('g_keyword_modal');
+    if (modal) modal.classList.remove('active');
+    window._kwModalOpen = false;  // allow re-render again
+};
+
+
+
+let _kwActiveTab = 'keywords';
+window._switchKwTab = function (tab, el) {
+    _kwActiveTab = tab;
+    document.querySelectorAll('.g_kw_tab').forEach(t => {
+        const isActive = t.dataset.tab === tab;
+        t.classList.toggle('active', isActive);
+        t.style.color = isActive ? '#1e293b' : '#94a3b8';
+        t.style.fontWeight = isActive ? '700' : '600';
+        t.style.borderBottomColor = isActive ? 'var(--mainClr)' : 'transparent';
+    });
+    document.getElementById('g_kw_tab_keywords').style.display = tab === 'keywords' ? '' : 'none';
+    document.getElementById('g_kw_tab_terms').style.display = tab === 'terms' ? '' : 'none';
+};
+
+function _loadKeywords(campaignId) {
+    const kwBody = document.getElementById('g_kw_body');
+    const stBody = document.getElementById('g_st_body');
+    if (!kwBody) return;
+
+    const since = (typeof startDate !== 'undefined' && startDate) || window.startDate || '';
+    const until = (typeof endDate !== 'undefined' && endDate) || window.endDate || '';
+
+    // Skeleton shimmer rows while loading
+    const shimCSS = '<style>@keyframes g_kw_shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}</style>';
+    const skCell = '<td style="padding:0.85rem 1rem;"><div style="height:13px;border-radius:6px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:400px 100%;animation:g_kw_shimmer 1.3s ease-in-out infinite;"></div></td>';
+    const skRow8 = '<tr>' + skCell.repeat(8) + '</tr>';
+    const skRow7 = '<tr>' + skCell.repeat(7) + '</tr>';
+    kwBody.innerHTML = shimCSS + skRow8.repeat(6);
+    if (stBody) stBody.innerHTML = skRow7.repeat(4);
+
+    if (!GOOGLE_SHEET_API_URL) {
+        kwBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ea4335;padding:2rem;">GOOGLE_SHEET_API_URL ch&#432;a &#273;&#432;&#7907;c c&#7845;u h&#236;nh</td></tr>';
+        return;
+    }
+
+    const url = GOOGLE_SHEET_API_URL + '?type=keywords&campaignId=' + encodeURIComponent(campaignId) + '&since=' + since + '&until=' + until;
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) throw new Error(data.error || 'API error');
+            _renderKeywordsTable(data.keywords || [], data.searchTerms || []);
+        })
+        .catch(err => {
+            kwBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ea4335;padding:2rem;">' + err.message + '</td></tr>';
+        });
+}
+
+function _renderKeywordsTable(keywords, searchTerms) {
+    const kwBody = document.getElementById('g_kw_body');
+    const stBody = document.getElementById('g_st_body');
+    if (!kwBody) return;
+
+    const MATCH_BADGE = { EXACT: '#4285F4', PHRASE: '#34A853', BROAD: '#ffa900', BROAD_MATCH: '#ffa900' };
+    const MATCH_LABEL = { EXACT: 'Exact', PHRASE: 'Phrase', BROAD: 'Broad', BROAD_MATCH: 'Broad' };
+
+    const hasKw = keywords.length > 0;
+    const hasSt = searchTerms.length > 0;
+
+    // Show/hide tabs based on data availability
+    const tabKw = document.querySelector('.g_kw_tab[data-tab="keywords"]');
+    const tabSt = document.querySelector('.g_kw_tab[data-tab="terms"]');
+    if (tabKw) tabKw.style.display = hasKw ? '' : 'none';
+    if (tabSt) tabSt.style.display = hasSt ? '' : 'none';
+
+    // Auto-switch to the tab that has data
+    if (!hasKw && hasSt) window._switchKwTab('terms', tabSt);
+    else if (hasKw) window._switchKwTab('keywords', tabKw);
+
+    // --- Keywords table ---
+    if (!hasKw) {
+        kwBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:#94a3b8;">Không có dữ liệu keyword</td></tr>';
+    } else {
+        const totImp = keywords.reduce((a, k) => a + k.imp, 0);
+        kwBody.innerHTML = keywords.map(k => {
+            const ctr = k.imp > 0 ? (k.click / k.imp * 100).toFixed(2) : '0.00';
+            const impPct = totImp > 0 ? (k.imp / totImp * 100).toFixed(1) : 0;
+            const badge = MATCH_BADGE[k.matchType] || '#9e9e9e';
+            const bLabel = MATCH_LABEL[k.matchType] || (k.matchType || '-');
+            return `<tr class="g_kw_row" style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;color:#1e293b;">${k.keyword}</div>
+                <div style="font-size:1rem;color:#94a3b8;margin-top:2px;">${k.adGroup || ''}</div>
+              </td>
+              <td style="padding:0.85rem 1rem;text-align:center;"><span style="padding:3px 10px;border-radius:10px;background:${badge}22;color:${badge};font-size:1rem;font-weight:700;">${bLabel}</span></td>
+              <td style="padding:0.85rem 1rem;text-align:right;">
+                <div>${k.imp.toLocaleString('vi-VN')}</div>
+                <div style="font-size:0.9rem;color:#94a3b8;">${impPct}%</div>
+              </td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${k.click.toLocaleString('vi-VN')}</td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${ctr}%</td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${k.conv ? k.conv.toLocaleString('vi-VN') : '-'}</td>
+              <td style="padding:0.85rem 1rem;text-align:right;font-weight:600;">${_fmtMoney(k.cost)}</td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${k.impShare != null && k.impShare !== '' ? k.impShare + '%' : '-'}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // --- Search Terms table ---
+    if (!hasSt) {
+        stBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2.5rem;color:#94a3b8;">Không có dữ liệu search term</td></tr>';
+    } else {
+        stBody.innerHTML = searchTerms.map(s => {
+            const ctr = s.imp > 0 ? (s.click / s.imp * 100).toFixed(2) : '0.00';
+            const cpc = s.click > 0 ? _fmtMoney(s.cost / s.click) : '-';
+            const statusColor = s.status === 'ADDED' ? '#34A853' : (s.status === 'EXCLUDED' ? '#ea4335' : (s.status === 'SMART' ? '#4285F4' : '#94a3b8'));
+            return `<tr class="g_kw_row" style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:0.85rem 1rem;font-weight:500;color:#1e293b;">${s.term}</td>
+              <td style="padding:0.85rem 1rem;text-align:center;"><span style="padding:3px 10px;border-radius:10px;background:${statusColor}22;color:${statusColor};font-size:1rem;font-weight:600;">${s.status || '-'}</span></td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${s.imp.toLocaleString('vi-VN')}</td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${s.click.toLocaleString('vi-VN')}</td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${ctr}%</td>
+              <td style="padding:0.85rem 1rem;text-align:right;">${cpc}</td>
+              <td style="padding:0.85rem 1rem;text-align:right;font-weight:600;">${_fmtMoney(s.cost)}</td>
+            </tr>`;
+        }).join('');
+    }
+}
+
+// ---------------------------------------------
 // EXPORT CSV
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 window.exportGoogleCsv = function () {
     const campaigns = _groupByCampaign(googleAdsFilteredData);
     const list = Object.values(campaigns).sort((a, b) => b.spent - a.spent);
@@ -1262,21 +1442,26 @@ window.exportGoogleCsv = function () {
     a.href = URL.createObjectURL(blob);
     a.download = `google_ads_${startDate}_${endDate}.csv`;
     a.click();
-    if (typeof showToast === 'function') showToast("✅ Đã xuất CSV thành công!");
+    if (typeof showToast === 'function') showToast("Xuất CSV thành công!");
 };
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // HELPERS
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 function _groupByCampaign(data) {
     const map = {};
     data.forEach(item => {
         const name = item.campaign || "Unknown";
-        if (!map[name]) map[name] = { name, spent: 0, imp: 0, click: 0, conv: 0, store: 0, dir: 0, calls: 0, menu: 0, orders: 0, other: 0 };
+        if (!map[name]) map[name] = {
+            name, id: item.campaign_id || '',
+            spent: 0, imp: 0, click: 0, conv: 0, store: 0, dir: 0, calls: 0, menu: 0, orders: 0, other: 0
+        };
+        // Keep first non-empty campaign_id found
+        if (!map[name].id && item.campaign_id) map[name].id = item.campaign_id;
         map[name].spent += parseFloat(item.spent || 0);
         map[name].imp += parseFloat(item.impression || 0);
         map[name].click += parseFloat(item.click || 0);
-        map[name].conv += parseFloat(item.all_conversions || 0);   // ← Updated
+        map[name].conv += parseFloat(item.all_conversions || 0);
         map[name].store += parseFloat(item.store_visits || 0);
         map[name].dir += parseFloat(item.directions || 0);
         map[name].calls += parseFloat(item.calls || 0);
@@ -1294,7 +1479,7 @@ function _parseDeviceJson(str) {
     try { return JSON.parse(str); } catch (e) { return {}; }
 }
 
-/** Local Actions — exact Funnel Performance style with icon inside bar */
+/** Local Actions � exact Funnel Performance style with icon inside bar */
 function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
     const container = document.getElementById("g_local_actions_wrap");
     if (!container) return;
@@ -1308,7 +1493,7 @@ function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
     ].filter(i => i.value > 0).sort((a, b) => b.value - a.value);
 
     if (!all.length) {
-        container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:2rem;">Không có Local Actions data</p>`;
+        container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:2rem;">Kh�ng c� Local Actions data</p>`;
         return;
     }
 
@@ -1332,11 +1517,11 @@ function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
     }).join("");
 }
 
-// ── Device breakdown state ──────────────────────────────────
+// -- Device breakdown state ----------------------------------
 let _gDevData = { mob: {}, desk: {}, tab: {} };
 let _gDevFilter = 'click';
 
-/** Device Breakdown — list left + donut right */
+/** Device Breakdown � list left + donut right */
 function _aggregateDeviceData(data, campFilter) {
     const rows = campFilter === '__all__' ? data : data.filter(d => d.campaign === campFilter);
     const mk = () => ({ imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 });
@@ -1379,10 +1564,14 @@ window.setGDeviceFilter = function (metric, el) {
         // Update label
         const lbl = wrap.querySelector('.dom_selected');
         if (lbl && el) lbl.textContent = el.querySelector('span:last-child')?.textContent || '';
-        wrap.classList.remove('active'); // close dropdown
-        wrap.querySelector('.dom_select_show')?.classList.remove('active'); // Ensure dropdown content is also hidden
+        wrap.classList.remove('active');
+        wrap.querySelector('.dom_select_show')?.classList.remove('active');
     }
     _buildDeviceChart(metric);
+    // Sync 3 breakdown charts with same metric
+    _buildChannelChart(_dimData.channel, metric);
+    _buildLocationChart(_dimData.location, metric);
+    _buildDistanceChart(_dimData.distance, metric);
 };
 
 function _buildDeviceChart(metric) {
@@ -1441,13 +1630,13 @@ function _buildDeviceChart(metric) {
                 ${_fmtNum(v)}
               </div>
               <div style="font-size:1rem;color:#94a3b8;padding-left:1.8rem;">
-                ${pct}% &nbsp;·&nbsp; ${sub}
+                ${pct}% — ${sub}
               </div>
             </div>`;
         }).join('');
     }
 
-    // Draw donut — fixed 200×200 canvas, not responsive (prevents squish)
+    // Draw donut � fixed 200�200 canvas, not responsive (prevents squish)
     const ctxEl = document.getElementById('g_device_chart');
     if (!ctxEl) return;
     if (G_CHARTS.device) G_CHARTS.device.destroy();
@@ -1492,7 +1681,7 @@ function _populateHourlyCampDropdown(data) {
     const listEl = document.getElementById('g_hourly_camp_list');
     if (!listEl) return;
     const camps = [...new Set(data.map(d => d.campaign).filter(Boolean))].sort();
-    // Reset list — delegation listener on ul still works for new LIs
+    // Reset list � delegation listener on ul still works for new LIs
     listEl.innerHTML = `<li data-view="__all__" class="active"><span class="radio_box active"></span><span>All Campaigns</span></li>`;
     camps.forEach(name => {
         const li = document.createElement('li');
@@ -1501,7 +1690,7 @@ function _populateHourlyCampDropdown(data) {
         li.title = name;
         listEl.appendChild(li);
     });
-    // DO NOT reset _gDropInit or re-call _initGoogleDropdowns here —
+    // DO NOT reset _gDropInit or re-call _initGoogleDropdowns here �
     // delegation on the <ul> handles new <li>s, re-init would add duplicate listeners.
 }
 
@@ -1552,6 +1741,20 @@ function _renderHourlyChart(data, campFilter, metric) {
     const color = METRIC_COLORS[metric] || '#ffa900';
     const isMoney = metric === 'spent';
 
+    // â”€â”€ Update in-place for smooth animation, create on first load â”€â”€
+    if (G_CHARTS.hourly && G_CHARTS.hourly.canvas === ctx) {
+        const c = G_CHARTS.hourly;
+        c.data.datasets[0].data = values;
+        c.data.datasets[0].backgroundColor = values.map(v => v > 0 ? color + 'cc' : '#e2e8f0');
+        c.data.datasets[0].label = METRIC_LABELS[metric] || metric;
+        c.options.plugins.datalabels.formatter = v => isMoney ? _fmtShort(v) : _fmtNum(v);
+        c.options.plugins.tooltip.callbacks.label = ctx2 => isMoney ? _fmtMoney(ctx2.raw) : _fmtNum(ctx2.raw) + ' ' + METRIC_LABELS[metric];
+        c.options.scales.y.ticks.callback = v => isMoney ? _fmtShort(v) : _fmtNum(v);
+        c.options.animation = { duration: 500, easing: 'easeOutQuart' };
+        c.update();
+        return;
+    }
+    _destroyChart('g_hourly_chart', 'hourly');
     G_CHARTS.hourly = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1567,6 +1770,7 @@ function _renderHourlyChart(data, campFilter, metric) {
         options: {
             responsive: true, maintainAspectRatio: false,
             animation: { duration: 500, easing: 'easeOutQuart' },
+            animations: { y: { from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), duration: 500, easing: 'easeOutQuart' } },
             plugins: {
                 legend: { display: false },
                 datalabels: {
@@ -1599,8 +1803,8 @@ function _renderHourlyChart(data, campFilter, metric) {
 }
 
 function _fmtMoney(v) {
-    if (!v || isNaN(v)) return "0đ";
-    return Math.round(v).toLocaleString("vi-VN") + "đ";
+    if (!v || isNaN(v)) return "0d";
+    return Math.round(v).toLocaleString("vi-VN") + "d";
 }
 
 function _fmtNum(v) {
@@ -1616,7 +1820,7 @@ function _fmtShort(v) {
 }
 
 function _truncate(str, n) {
-    return str && str.length > n ? str.slice(0, n) + "…" : (str || "");
+    return str && str.length > n ? str.slice(0, n) + "�" : (str || "");
 }
 
 function _setHtml(id, val, diffPct = null, prevRange = "", prevVal = null) {
@@ -1646,12 +1850,368 @@ function _setHtml(id, val, diffPct = null, prevRange = "", prevVal = null) {
         diffSpan.className = isUp ? "increase" : (isDown ? "decrease" : "");
 
         let tooltipText = "";
-        if (prevRange) tooltipText += `Kỳ trước: ${prevRange}`;
+        if (prevRange) tooltipText += `K? tru?c: ${prevRange}`;
         if (prevVal !== null) {
-            tooltipText += (tooltipText ? ` (${prevVal})` : `Kỳ trước: ${prevVal}`);
+            tooltipText += (tooltipText ? ` (${prevVal})` : `K? tru?c: ${prevVal}`);
         }
         if (tooltipText) diffSpan.setAttribute("data-tooltip", tooltipText);
     }
 }
 
 window.refreshGoogleAds = renderGoogleAdsView;
+
+// -------------------------------------------------------------
+// SHARED HELPERS cho Channel / Location / Distance breakdowns
+// Metric d�ng chung _gDevFilter (c�ng selector v?i Device chart)
+// -------------------------------------------------------------
+const DIM_METRICS = {
+    imp: { label: 'Impressions', fmt: v => (v ?? 0).toLocaleString() },
+    click: { label: 'Clicks', fmt: v => (v ?? 0).toLocaleString() },
+    conv: { label: 'All Conv.', fmt: v => (v ?? 0).toLocaleString() },
+    cost: { label: 'Spent', fmt: v => _fmtShort(v ?? 0) },
+    visits: { label: 'Store Visits', fmt: v => (v ?? 0).toLocaleString() },
+    dir: { label: 'Directions', fmt: v => (v ?? 0).toLocaleString() },
+    calls: { label: 'Calls', fmt: v => (v ?? 0).toLocaleString() },
+    menu: { label: 'Menu', fmt: v => (v ?? 0).toLocaleString() },
+    orders: { label: 'Orders', fmt: v => (v ?? 0).toLocaleString() },
+};
+const DIM_METRIC_KEYS = Object.keys(DIM_METRICS);
+
+/** Safely destroy any Chart.js instance tied to a canvas, even if our G_CHARTS ref is stale */
+function _destroyChart(canvasId, storeKey) {
+    const canvas = document.getElementById(canvasId);
+    if (canvas) {
+        const existing = Chart.getChart(canvas);
+        if (existing) { try { existing.destroy(); } catch (_) { } }
+    }
+    if (storeKey && G_CHARTS[storeKey]) {
+        try { G_CHARTS[storeKey].destroy(); } catch (_) { }
+        G_CHARTS[storeKey] = null;
+    }
+}
+
+/** Parse JSON column safely */
+function _parseJsonCol(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    try { return JSON.parse(val) || []; } catch { return []; }
+}
+
+/** Aggregate dimension data across filtered rows */
+function _aggDim(data, colKey, idFn) {
+    const agg = {};
+    for (const item of data) {
+        const arr = _parseJsonCol(item[colKey]);
+        for (const entry of arr) {
+            const id = idFn(entry);
+            if (!agg[id]) agg[id] = { imp: 0, click: 0, conv: 0, cost: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0 };
+            DIM_METRIC_KEYS.forEach(k => { agg[id][k] += (entry[k] || 0); });
+        }
+    }
+    return agg;
+}
+
+// Cached aggregated data � rebuilt on campaign/date filter change
+let _dimData = { channel: null, location: null, distance: null };
+
+// -------------------------------------------------------------
+// CHANNEL BREAKDOWN � card list + donut, d�ng _gDevFilter
+// -------------------------------------------------------------
+function _renderChannelChart(data) {
+    const wrap = document.getElementById('g_channel_chart')?.closest('.dom_inner');
+    if (!wrap) return;
+    const agg = _aggDim(data, 'channels', e => e.ch);
+    _dimData.channel = agg;
+    _buildChannelChart(agg, _gDevFilter || 'cost');
+}
+
+function _buildChannelChart(agg, metric) {
+    if (!agg) return;
+    const CH_COLORS = { 'Search': '#4285F4', 'Display': '#34A853', 'YouTube': '#EA4335', 'PMAX': '#ffa900', 'Search Partners': '#00BCD4', 'TV': '#9C27B0', 'Unknown': '#9e9e9e' };
+    const CH_ICONS = { 'Search': 'fa-magnifying-glass', 'Display': 'fa-display', 'YouTube': 'fa-youtube', 'PMAX': 'fa-rocket', 'Search Partners': 'fa-handshake', 'TV': 'fa-tv', 'Unknown': 'fa-circle-question' };
+    const metInfo = DIM_METRICS[metric] || DIM_METRICS.cost;
+    const fmt = metInfo.fmt;
+
+    const entries = Object.entries(agg).sort((a, b) => b[1][metric] - a[1][metric]);
+    if (!entries.length) return;
+
+    const labels = entries.map(([k]) => k);
+    const values = entries.map(([, v]) => v[metric]);
+    const colors = labels.map(l => CH_COLORS[l] || '#607D8B');
+    const total = values.reduce((a, b) => a + b, 0);
+    const topPct = total > 0 ? (values[0] / total * 100).toFixed(1) : '0';
+
+    const wrap = document.getElementById('g_channel_chart')?.closest('.dom_inner');
+    const body = wrap?.querySelector('.g_channel_body');
+    if (!body) return;
+
+    body.innerHTML = `
+    <div style="font-size:0.82rem;color:#94a3b8;margin:-0.2rem 0 1rem;font-weight:500;">Theo: <strong style="color:#475569;">${metInfo.label}</strong></div>
+    <div style="display:flex;align-items:flex-start;gap:1.2rem;">
+      <div id="g_ch_list" style="flex:1.4;display:flex;flex-direction:column;gap:1rem;"></div>
+      <div style="flex:0 0 160px;">
+        <div style="position:relative;width:160px;height:160px;">
+          <canvas id="g_channel_donut" width="160" height="160"
+                  style="width:160px!important;height:160px!important;display:block;"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;">
+            <div style="font-size:1.8rem;font-weight:800;color:#1e293b;line-height:1;">${topPct}%</div>
+            <div style="font-size:0.95rem;color:#888;margin-top:0.2rem;">${labels[0] || ''}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    // Match Device Breakdown card sizes exactly
+    document.getElementById('g_ch_list').innerHTML = entries.map(([k, v], i) => {
+        const pct = total > 0 ? (v[metric] / total * 100).toFixed(1) : '0';
+        const sub = metric === 'cost' ? _fmtShort(v.cost) : _fmtShort(v.cost);
+        return `
+        <div style="padding:1rem 1.2rem;border-radius:12px;border:1px solid #f0f0f0;
+                    background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:center;gap:0.7rem;font-weight:600;
+                      color:#555;font-size:1rem;margin-bottom:0.3rem;">
+            <i class="fa-solid ${CH_ICONS[k] || 'fa-circle'}" style="color:${colors[i]};font-size:1.1rem;"></i>
+            <span>${k}</span>
+          </div>
+          <div style="font-weight:800;font-size:1.5rem;color:#1e293b;padding-left:1.8rem;">
+            ${fmt(v[metric])}
+          </div>
+          <div style="font-size:1rem;color:#94a3b8;padding-left:1.8rem;">
+            ${pct}% — ${_fmtShort(v.cost)}
+          </div>
+        </div>`;
+    }).join('');
+
+    if (G_CHARTS.channel) G_CHARTS.channel.destroy();
+    _destroyChart('g_channel_donut', 'channel');
+    const ctxEl = document.getElementById('g_channel_donut');
+    if (!ctxEl) return;
+    G_CHARTS.channel = new Chart(ctxEl, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 4, borderColor: '#fff', hoverOffset: 6 }] },
+        options: {
+            responsive: false, maintainAspectRatio: true, cutout: '70%',
+            plugins: {
+                legend: { display: false }, datalabels: { display: false },
+                tooltip: { backgroundColor: '#1e293b', callbacks: { label: c => `${c.label}: ${total > 0 ? (c.raw / total * 100).toFixed(1) : 0}% (${fmt(c.raw)})` } }
+            },
+            animation: { animateScale: true, animateRotate: true }
+        }
+    });
+}
+
+// -------------------------------------------------------------
+// LOCATION PERFORMANCE � horizontal bar, d?ng b? _gDevFilter
+// -------------------------------------------------------------
+function _renderLocationChart(data) {
+    const ctx = document.getElementById('g_location_chart');
+    if (!ctx) return;
+    const agg = _aggDim(data, 'locations', e => e.name || `Loc_${e.id}`);
+    const hasProv = Object.keys(agg).some(k => k !== 'Vi?t Nam (T?ng)');
+    if (hasProv) delete agg['Vi?t Nam (T?ng)'];
+    _dimData.location = agg;
+    _buildLocationChart(agg, _gDevFilter || 'imp');
+}
+
+function _buildLocationChart(agg, metric) {
+    if (!agg) return;
+    const ctx = document.getElementById('g_location_chart');
+    if (!ctx) return;
+    if (G_CHARTS.location) { G_CHARTS.location.destroy(); G_CHARTS.location = null; }
+    _destroyChart('g_location_chart', 'location');
+    const metInfo = DIM_METRICS[metric] || DIM_METRICS.imp;
+
+    // Update metric subtitle in the card
+    const locCard = ctx.closest('.dom_inner');
+    if (locCard) {
+        let subEl = locCard.querySelector('.g_loc_metric_sub');
+        if (!subEl) {
+            subEl = document.createElement('p');
+            subEl.className = 'g_loc_metric_sub';
+            subEl.style.cssText = 'font-size:0.82rem;color:#94a3b8;margin:-0.3rem 0 0.8rem;font-weight:500;';
+            const fixedP = locCard.querySelector('p:not(.g_loc_metric_sub)');
+            const h2 = locCard.querySelector('h2');
+            if (fixedP) fixedP.after(subEl); else if (h2) h2.after(subEl);
+        }
+        subEl.innerHTML = `Theo: <strong style="color:#475569;">${metInfo.label}</strong>`;
+    }
+
+    const sorted = Object.entries(agg).sort((a, b) => b[1][metric] - a[1][metric]).slice(0, 10);
+    if (!sorted.length) return;
+    const labels = sorted.map(([k]) => k);
+    const values = sorted.map(([, v]) => v[metric]);
+    const maxVal = Math.max(...values, 1);
+    const maxIdx = values.indexOf(maxVal);
+    const ctxObj = ctx.getContext('2d');
+    const gradGold = ctxObj.createLinearGradient(300, 0, 0, 0);
+    gradGold.addColorStop(0, 'rgba(255,169,0,1)');
+    gradGold.addColorStop(1, 'rgba(255,169,0,0.4)');
+    const gradGray = ctxObj.createLinearGradient(300, 0, 0, 0);
+    gradGray.addColorStop(0, 'rgba(210,210,210,0.9)');
+    gradGray.addColorStop(1, 'rgba(160,160,160,0.4)');
+    const bgColors = values.map((_, i) => i === maxIdx ? gradGold : gradGray);
+    ctx.parentElement.style.height = Math.max(200, sorted.length * 40 + 40) + 'px';
+    // â”€â”€ Update in-place for smooth animation â”€â”€
+    if (G_CHARTS.location && G_CHARTS.location.canvas === ctx) {
+        const c = G_CHARTS.location;
+        c.data.labels = labels;
+        c.data.datasets[0].data = values;
+        c.data.datasets[0].backgroundColor = bgColors;
+        c.options.scales.x.suggestedMax = maxVal * 1.3;
+        c.options.plugins.datalabels.formatter = v => metInfo.fmt(v);
+        c.options.plugins.tooltip.callbacks.label = ci => ` ${metInfo.label}: ${metInfo.fmt(ci.parsed.x)}`;
+        c.options.animation = { duration: 600, easing: 'easeOutQuart' };
+        c.update();
+        return;
+    }
+    G_CHARTS.location = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderRadius: 8, borderWidth: 0, barPercentage: 0.65, categoryPercentage: 0.8 }] },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            animation: { duration: 600, easing: 'easeOutQuart' },
+            animations: { x: { from: 0, duration: 600, easing: 'easeOutQuart' } },
+            layout: { padding: { left: 0, right: 28 } },
+            plugins: {
+                legend: { display: false },
+                datalabels: { anchor: 'end', align: 'end', offset: 4, font: { size: 10, weight: '700' }, color: '#444', formatter: v => metInfo.fmt(v) },
+                tooltip: { backgroundColor: '#1e293b', padding: 10, cornerRadius: 8, callbacks: { title: items => items[0].label, label: c => ` ${metInfo.label}: ${metInfo.fmt(c.parsed.x)}` } }
+            },
+            scales: {
+                x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { display: false }, suggestedMax: maxVal * 1.3 },
+                y: { grid: { display: false }, ticks: { color: '#555', font: { weight: '600', size: 11 }, maxRotation: 0 } }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+}
+
+const _DIST_ORDER = ['WITHIN_700M', 'WITHIN_1KM', 'WITHIN_5KM', 'WITHIN_10KM', 'WITHIN_15KM', 'WITHIN_20KM', 'WITHIN_25KM', 'WITHIN_30KM', 'WITHIN_35KM', 'WITHIN_40KM', 'WITHIN_45KM', 'WITHIN_50KM', 'WITHIN_55KM', 'WITHIN_60KM', 'WITHIN_65KM', 'BEYOND_65KM'];
+const _DIST_LABEL = { 'WITHIN_700M': '0-700m', 'WITHIN_1KM': '700m-1km', 'WITHIN_5KM': '1-5km', 'WITHIN_10KM': '5-10km', 'WITHIN_15KM': '10-15km', 'WITHIN_20KM': '15-20km', 'WITHIN_25KM': '20-25km', 'WITHIN_30KM': '25-30km', 'WITHIN_35KM': '30-35km', 'WITHIN_40KM': '35-40km', 'WITHIN_45KM': '40-45km', 'WITHIN_50KM': '45-50km', 'WITHIN_55KM': '50-55km', 'WITHIN_60KM': '55-60km', 'WITHIN_65KM': '60-65km', 'BEYOND_65KM': '> 65km' };
+// -------------------------------------------------------------
+// DISTANCE RADIUS
+// -------------------------------------------------------------
+function _renderDistanceChart(data) {
+    const ctx = document.getElementById('g_distance_chart');
+    if (!ctx) return;
+    const cumAgg = _aggDim(data, 'distances', e => e.d);
+    _dimData.distance = cumAgg;
+    _buildDistanceChart(cumAgg, _gDevFilter || 'conv');
+}
+function _buildDistanceChart(cumAgg, metric) {
+    if (!cumAgg) return;
+    const ctx = document.getElementById('g_distance_chart');
+    if (!ctx) return;
+    if (G_CHARTS.distance) { G_CHARTS.distance.destroy(); G_CHARTS.distance = null; }
+    _destroyChart('g_distance_chart', 'distance');
+    const metInfo = DIM_METRICS[metric] || DIM_METRICS.conv;
+
+    // Update metric subtitle in the card
+    const distCard = ctx.closest('.dom_inner');
+    if (distCard) {
+        let subEl = distCard.querySelector('.g_dist_metric_sub');
+        if (!subEl) {
+            subEl = document.createElement('p');
+            subEl.className = 'g_dist_metric_sub';
+            subEl.style.cssText = 'font-size:0.82rem;color:#94a3b8;margin:-0.3rem 0 0.8rem;font-weight:500;';
+            const h2 = distCard.querySelector('h2');
+            const fixedP = distCard.querySelector('p:not(.g_dist_metric_sub)');
+            if (fixedP) fixedP.after(subEl); else if (h2) h2.after(subEl);
+        }
+        subEl.innerHTML = `Theo: <strong style="color:#475569;">${metInfo.label}</strong>`;
+    }
+
+    const buckets = _DIST_ORDER.filter(d => cumAgg[d]);
+    const allIncr = buckets.map((b, i) => {
+        const cur = cumAgg[b];
+        const prev = i > 0 ? cumAgg[buckets[i - 1]] : null;
+        return { label: _DIST_LABEL[b] || b, val: Math.max(0, cur[metric] - (prev ? prev[metric] : 0)) };
+    }).filter(d => d.val > 0);
+    if (!allIncr.length) return;
+
+    // Sort descending, keep top 7 highest
+    const top7 = [...allIncr].sort((a, b) => b.val - a.val).slice(0, 7);
+    // Re-sort by natural distance order for display
+    const orderMap = {};
+    allIncr.forEach((d, i) => { orderMap[d.label] = i; });
+    top7.sort((a, b) => (orderMap[a.label] ?? 99) - (orderMap[b.label] ?? 99));
+
+    const labels = top7.map(d => d.label);
+    const values = top7.map(d => d.val);
+    const maxVal = Math.max(...values, 1);
+    const maxIdx = values.indexOf(maxVal);
+
+    // Vertical gradient (top-to-bottom) — same direction as Campaign bar chart
+    const ctxObj = ctx.getContext('2d');
+    const gradGold = ctxObj.createLinearGradient(0, 0, 0, 300);
+    gradGold.addColorStop(0, 'rgba(255,169,0,1)');
+    gradGold.addColorStop(1, 'rgba(255,169,0,0.4)');
+    const gradGray = ctxObj.createLinearGradient(0, 0, 0, 300);
+    gradGray.addColorStop(0, 'rgba(210,210,210,0.9)');
+    gradGray.addColorStop(1, 'rgba(160,160,160,0.4)');
+    const bgColors = values.map((_, i) => i === maxIdx ? gradGold : gradGray);
+
+    const isMoney = metric === 'cost';
+    const isFew = labels.length < 3;
+
+    // â”€â”€ Update in-place for smooth animation â”€â”€
+    if (G_CHARTS.distance && G_CHARTS.distance.canvas === ctx) {
+        const c = G_CHARTS.distance;
+        c.data.labels = labels;
+        c.data.datasets[0].data = values;
+        c.data.datasets[0].backgroundColor = bgColors;
+        c.options.scales.y.suggestedMax = maxVal * 1.3;
+        c.options.plugins.datalabels.formatter = v => metInfo.fmt(v);
+        c.options.plugins.tooltip.callbacks.label = ci => ` ${metInfo.label}: ${metInfo.fmt(ci.parsed.y)}`;
+        c.options.animation = { duration: 600, easing: 'easeOutQuart' };
+        c.update();
+        return;
+    }
+    G_CHARTS.distance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: bgColors,
+                borderRadius: 8,
+                borderWidth: 0,
+                ...(isFew && { barPercentage: 0.35, categoryPercentage: 0.65 })
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 600, easing: 'easeOutQuart' },
+            animations: { y: { from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), duration: 600, easing: 'easeOutQuart' } },
+            layout: { padding: { left: 10, right: 10, top: 24 } },
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    anchor: 'end', align: 'end', offset: 2,
+                    font: { size: 10, weight: '700' }, color: '#444',
+                    formatter: v => isMoney ? _fmtShort(v) : _fmtNum(v)
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b', padding: 10, cornerRadius: 8,
+                    callbacks: {
+                        title: items => items[0].label,
+                        label: c => ` ${metInfo.label}: ${metInfo.fmt(c.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(0,0,0,0.03)', drawBorder: true, borderColor: 'rgba(0,0,0,0.05)' },
+                    ticks: { color: '#666', font: { weight: '600', size: 9 }, maxRotation: 0, minRotation: 0, autoSkip: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.03)', drawBorder: true, borderColor: 'rgba(0,0,0,0.05)' },
+                    ticks: { display: false },
+                    suggestedMax: maxVal * 1.25
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+}

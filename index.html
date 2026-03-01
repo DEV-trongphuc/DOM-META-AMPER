@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1314,7 +1314,7 @@
 
           <!-- ROW 1: Summary + Daily Chart + Bar Chart (3-up) -->
           <div class="dom_row flex">
-            <div class="dom_inner w25 box_shadow chart">
+            <div class="dom_inner w20 box_shadow chart">
               <div class="dom_total_report">
                 <ul>
                   <li class="total_spent">
@@ -1359,7 +1359,7 @@
             </div>
 
             <!-- Daily Trend Chart -->
-            <div class="dom_inner w40 box_shadow chart trendline">
+            <div class="dom_inner w33 box_shadow chart trendline">
               <div class="dom_table_filter" style="justify-content: space-between;">
                 <div style="display:flex; align-items:center; gap:1.2rem;">
                   <h2 style="margin:0;"><i class="fa-solid fa-chart-line main_clr"></i> <span id="g_trend_title">Daily
@@ -1378,9 +1378,13 @@
                   <ul class="dom_select_show">
                     <li data-view="spent" class="active"><span class="radio_box active"></span><span>Spent</span></li>
                     <li data-view="click"><span class="radio_box"></span><span>Click</span></li>
+                    <li data-view="impression"><span class="radio_box"></span><span>Impression</span></li>
                     <li data-view="all_conversions"><span class="radio_box"></span><span>All Conversions</span></li>
                     <li data-view="store_visits"><span class="radio_box"></span><span>Store Visit</span></li>
-                    <li data-view="impression"><span class="radio_box"></span><span>Impression</span></li>
+                    <li data-view="directions"><span class="radio_box"></span><span>Directions</span></li>
+                    <li data-view="calls"><span class="radio_box"></span><span>Calls</span></li>
+                    <li data-view="menu"><span class="radio_box"></span><span>Menu</span></li>
+                    <li data-view="orders"><span class="radio_box"></span><span>Orders</span></li>
                   </ul>
                 </div>
               </div>
@@ -1526,8 +1530,46 @@
 
           </div>
 
+          <!-- ROW 4: Channel Breakdown + Location + Distance Radius -->
+          <div class="dom_row flex" style="gap:1.5rem; align-items:stretch;">
 
-          <!-- ROW 4: Detail Campaign Table -->
+
+
+            <!-- Card: Location Performance -->
+            <div class="dom_inner box_shadow chart"
+              style="flex:1.2; min-width:0; display:flex; flex-direction:column; background-color: white;">
+              <h2><i class="fa-solid fa-location-dot main_clr"></i> Location Performance</h2>
+              <p style="font-size:0.8rem;color:#94a3b8;margin:-0.3rem 0 0.6rem;">Top tỉnh/thành theo metric đã chọn</p>
+              <div id="g_location_chart_wrap" style="position:relative; flex:1; min-height:220px;">
+                <canvas id="g_location_chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Card: Distance Radius -->
+            <div class="dom_inner box_shadow chart"
+              style="flex:1.4; min-width:0; display:flex; flex-direction:column; background-color: white;">
+              <h2><i class="fa-solid fa-circle-dot main_clr"></i> Distance Radius</h2>
+              <p style="font-size:0.8rem;color:#94a3b8;margin:-0.3rem 0 0.6rem;">Bán kính từ cửa hàng — metric đã chọn
+              </p>
+              <div style="position:relative; flex:1; min-height:220px;">
+                <canvas id="g_distance_chart"></canvas>
+              </div>
+            </div>
+            <!-- Card: Channel Breakdown -->
+
+            <div class="dom_inner box_shadow chart"
+              style="flex:1; min-width:0; display:flex; flex-direction:column; background-color: white;">
+              <h2><i class="fa-solid fa-chart-pie main_clr"></i> Channel Breakdown</h2>
+              <p style="font-size:0.8rem;color:#94a3b8;margin:-0.3rem 0 0.6rem;">Phân bổ chi tiêu theo kênh</p>
+              <span id="g_channel_chart" style="display:none;"></span>
+              <div class="g_channel_body" style="flex:1;"></div>
+            </div>
+
+          </div>
+
+
+          <!-- ROW 5: Detail Campaign Table -->
+
           <div class="dom_row flex">
             <div class="dom_inner view_campaign g_campaign_wrap" style="margin-top: 3rem;">
               <div class="dom_table_header">
@@ -1550,6 +1592,7 @@
               <div class="view_campaign_header">
                 <div class="g_tbl_header">
                   <div class="ads_name">Campaign Name</div>
+                  <div class="ad_metric g_col_center">Keywords</div>
                   <div class="ad_metric">Spent</div>
                   <div class="ad_metric">Impression</div>
                   <div class="ad_metric">Click</div>
@@ -2011,6 +2054,95 @@
       transform: scale(1) translateY(0);
     }
   </style>
+  <!-- ========== GOOGLE ADS KEYWORD MODAL ========== -->
+  <div id="g_keyword_modal" class="ai_modal_overlay" style="z-index:2100;">
+    <div class="ai_modal_box" style="width:min(960px,96vw);max-height:90vh;display:flex;flex-direction:column;">
+      <!-- Header -->
+      <div class="ai_modal_header">
+        <div class="ai_modal_header_left" style="flex-direction:column;align-items:flex-start;gap:0.2rem;">
+          <div style="display:flex;align-items:center;gap:0.8rem;">
+            <i class="fa-solid fa-key" style="color:var(--mainClr);font-size:1.8rem;"></i>
+            <span style="font-size:1.7rem;font-weight:800;color:#1e293b;" id="g_kw_camp_name">Campaign</span>
+          </div>
+          <div style="font-size:1.1rem;color:#94a3b8;margin-left:2.6rem;" id="g_kw_date_range">--</div>
+        </div>
+        <button class="ai_close_btn" onclick="window._closeKeywordModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;padding:0 2rem;flex-shrink:0;">
+        <button class="g_kw_tab active" data-tab="keywords" onclick="window._switchKwTab('keywords',this)"
+          style="padding:1rem 1.6rem;border:none;background:none;font-size:1.25rem;font-weight:700;color:#1e293b;border-bottom:3px solid var(--mainClr);margin-bottom:-2px;cursor:pointer;">
+          <i class="fa-solid fa-key" style="margin-right:0.5rem;"></i>Keywords
+        </button>
+        <button class="g_kw_tab" data-tab="terms" onclick="window._switchKwTab('terms',this)"
+          style="padding:1rem 1.6rem;border:none;background:none;font-size:1.25rem;font-weight:600;color:#94a3b8;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">
+          <i class="fa-solid fa-magnifying-glass" style="margin-right:0.5rem;"></i>Search Terms
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="ai_modal_body" style="padding:0;overflow-y:auto;flex:1;">
+
+        <!-- Keywords Tab -->
+        <div id="g_kw_tab_keywords" style="padding:1.6rem 2rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:1.2rem;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="padding:1rem;text-align:left;font-weight:700;color:#475569;">Keyword / Ad Group</th>
+                <th style="padding:1rem;text-align:center;font-weight:700;color:#475569;">Match</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Impressions</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Clicks</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">CTR</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Conv</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Spent</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Imp Share</th>
+              </tr>
+            </thead>
+            <tbody id="g_kw_body">
+              <tr>
+                <td colspan="8" style="text-align:center;padding:3rem;color:#94a3b8;">
+                  <i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;"></i>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Search Terms Tab -->
+        <div id="g_kw_tab_terms" style="display:none;padding:1.6rem 2rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:1.2rem;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="padding:1rem;text-align:left;font-weight:700;color:#475569;">Search Term</th>
+                <th style="padding:1rem;text-align:center;font-weight:700;color:#475569;">Status</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Impressions</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Clicks</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">CTR</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">CPC</th>
+                <th style="padding:1rem;text-align:right;font-weight:700;color:#475569;">Spent</th>
+              </tr>
+            </thead>
+            <tbody id="g_st_body">
+              <tr>
+                <td colspan="7" style="text-align:center;padding:3rem;color:#94a3b8;">
+                  <i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;"></i>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="ai_modal_footer" style="justify-content:flex-end;">
+        <button class="ai_back_btn" onclick="window._closeKeywordModal()">
+          <i class="fa-solid fa-xmark"></i> Đóng
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 <script src="./token.js"></script>
 <script src="./settings.js"></script>
