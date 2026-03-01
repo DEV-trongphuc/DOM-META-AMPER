@@ -170,7 +170,15 @@
         if (!found) { _showDenied(email, name, picture); return; }
         if (found.status === "request") { _showPending(email); return; }
         if (found.status === "rejected") { _showDenied(email, name, picture); return; }
-        if (found.status === "active") { _grantAccess({ email, name, picture, role: found.role, status: "active" }); }
+        if (found.status === "active") {
+            _grantAccess({ email, name, picture, role: found.role, status: "active" });
+            // 🔄 Sync ngầm: tên nếu khác, ảnh nếu sheet chưa có
+            const updates = {};
+            if (name && name !== found.name) updates.name = name;
+            if (picture && !found.picture) updates.picture = picture;
+            if (Object.keys(updates).length) _api({ action: "update", email, ...updates }).catch(() => { });
+        }
+
     }
 
     function _grantAccess(user) {
@@ -179,8 +187,18 @@
         _hide();
         _authResolve();
         setTimeout(_renderChip, 600);
-        // 🔄 Prefetch users list ngầm sau khi đăng nhập
         setTimeout(_bgFetchUsers, 1200);
+        // 🕒 Cập nhật lastLogin mỗi lần truy cập
+        _updateLastLogin(user.email);
+    }
+
+    function _updateLastLogin(email) {
+        if (!SHEET_URL) return;
+        const now = new Date().toLocaleString("vi-VN");
+        console.log("[auth] _updateLastLogin →", email, now);
+        _api({ action: "update", email, lastLogin: now })
+            .then(r => console.log("[auth] lastLogin response:", r))
+            .catch(e => console.warn("[auth] lastLogin error:", e));
     }
 
     // Background fetch — cập nhật cache không block UI
@@ -192,18 +210,24 @@
             window._usersCache = users;
             _updateShareBadge(users);
 
-            // 🔒 Kiểm tra user hiện tại còn hợp lệ không
             const me = window._currentUser;
             if (me && SHEET_URL) {
-                // Default admins luôn được vào
                 const isDefaultAdmin = DEFAULT_ADMINS.some(a => a.toLowerCase() === me.email.toLowerCase());
-                if (!isDefaultAdmin) {
-                    const found = users.find(u => (u.email || "").toLowerCase() === me.email.toLowerCase());
-                    if (!found || found.status !== "active") {
-                        // Bị xóa hoặc bị thu quyền → force logout
-                        _clearSession();
-                        location.reload();
-                    }
+                const found = users.find(u => (u.email || "").toLowerCase() === me.email.toLowerCase());
+
+                // 🔒 Kiểm tra quyền (bỏ qua default admin)
+                if (!isDefaultAdmin && (!found || found.status !== "active")) {
+                    _clearSession();
+                    location.reload();
+                    return;
+                }
+
+                // 🖼️ Sync avatar nếu session có hình mà sheet chưa có
+                if (found && me.picture && !found.picture) {
+                    console.log("[auth] Syncing picture for", me.email);
+                    _api({ action: "update", email: me.email, picture: me.picture })
+                        .then(r => console.log("[auth] picture sync:", r))
+                        .catch(() => { });
                 }
             }
         } catch (_) { }
@@ -446,12 +470,22 @@
         const sc = u.status === "active" ? "#10b981" : "#ef4444";
         const sb = u.status === "active" ? "#ecfdf5" : "#fef2f2";
         const isSelf = (u.email || "").toLowerCase() === (window._currentUser?.email || "").toLowerCase();
+        const initials = (u.name || u.email || "?")[0].toUpperCase();
+        const avatarHtml = u.picture
+            ? `<img src="${u.picture}" alt="" style="width:3.4rem;height:3.4rem;border-radius:50%;object-fit:cover;border:2px solid #f1f5f9;flex-shrink:0;" onerror="this.style.display='none'">`
+            : `<div style="width:3.4rem;height:3.4rem;border-radius:50%;background:linear-gradient(135deg,#ffa900,#d88200);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#fff;font-weight:800;font-size:1.3rem;">${initials}</span></div>`;
+        const loginInfo = u.lastLogin
+            ? `<span style="font-size:1rem;color:#94a3b8;white-space:nowrap;"><i class="fa-solid fa-clock" style="font-size:.9rem;"></i> ${u.lastLogin}</span>`
+            : `<span style="font-size:1rem;color:#cbd5e1;">Chưa đăng nhập</span>`;
         return `<div style="display:flex;align-items:center;gap:1rem;padding:1.1rem 0;border-bottom:1px solid #f1f5f9;">
-          <div style="width:3.4rem;height:3.4rem;border-radius:50%;background:linear-gradient(135deg,#ffa900,#d88200);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span style="color:#fff;font-weight:800;font-size:1.3rem;">${(u.name || u.email || "?")[0].toUpperCase()}</span></div>
+          ${avatarHtml}
           <div style="flex:1;min-width:0;">
             <p style="font-size:1.25rem;font-weight:600;color:#1e293b;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.name || u.email}${isSelf ? ' <span style="background:#f1f5f9;color:#94a3b8;font-size:1rem;padding:.1rem .6rem;border-radius:3rem;font-weight:500;">Bạn</span>' : ""}</p>
-            <p style="font-size:1.1rem;color:#64748b;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.email}</p></div>
+            <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;">
+              <p style="font-size:1.1rem;color:#64748b;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.email}</p>
+              ${isAdmin ? loginInfo : ""}
+            </div>
+          </div>
           <span style="background:${rb};color:${rc};padding:.25rem .8rem;border-radius:3rem;font-size:1.05rem;font-weight:700;flex-shrink:0;">${u.role}</span>
           <span style="background:${sb};color:${sc};padding:.25rem .8rem;border-radius:3rem;font-size:1.05rem;font-weight:600;flex-shrink:0;">${u.status === "active" ? "Active" : "Rejected"}</span>
           ${isAdmin ? `<div style="display:flex;gap:.3rem;">
@@ -460,7 +494,7 @@
               onmouseover="this.style.borderColor='#ffa900';this.style.color='#ffa900'"
               onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#64748b'">
               <i class="fa-solid fa-arrows-rotate"></i></button>` : ""}
-            <button onclick="window._removeUser('${u.email}')" title="Xóa"
+            <button onclick="window._removeUser('${u.email}',this)" title="Xóa"
               style="width:3rem;height:3rem;border-radius:.6rem;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;color:#ef4444;font-size:1.1rem;"
               onmouseover="this.style.borderColor='#ef4444';this.style.background='#fef2f2'"
               onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
@@ -665,6 +699,8 @@
             _authResolve();
             setTimeout(_renderChip, 600);
             setTimeout(_bgFetchUsers, 1500);
+            // 🕒 lastLogin = mỗi lần load trang (kể cả session cache)
+            setTimeout(() => _updateLastLogin(cached.email), 2000);
             return;
         }
 
