@@ -12,7 +12,7 @@ const META_TOKEN_STATIC = "EAAUbzkTFG4sBQ5tk49sg92xjuHQxaTP7P4zTNk4XJW0bd6IVPENn
 // 🔐 Google OAuth Client ID — Lấy tại: https://console.cloud.google.com/apis/credentials
 // Tạo OAuth 2.0 Client ID → Web Application → thêm domain vào Authorized JavaScript origins
 // Để trống "" nếu muốn bỏ qua xác thực (dev mode)
-window.GOOGLE_CLIENT_ID = "641158233158-nsg8a8tdsj3fdgb34dc9tugm8god7tho.apps.googleusercontent.com";
+// window.GOOGLE_CLIENT_ID = "641158233158-nsg8a8tdsj3fdgb34dc9tugm8god7tho.apps.googleusercontent.com";
 
 
 // 🌐 Expose toàn cục (sẽ được ghi đè sau khi resolve)
@@ -21,7 +21,7 @@ let META_TOKEN = META_TOKEN_STATIC;
 let ACCOUNT_ID = "676599667843841";
 // 📝 Define allowed account IDs here. Leave empty or comment out to show all.
 window.ALLOWED_ACCOUNTS = [
-    "676599667843841", // MBA 577
+  "676599667843841", // MBA 577
 ];
 
 // ⚙️ Google Sheets Settings Sync
@@ -36,71 +36,73 @@ window.GOOGLE_ADS_SETUP = true;
 
 const _TOKEN_LS_KEY = "meta_access_token";
 const _GRAPH_VERIFY = "https://graph.facebook.com/v19.0/me?fields=id&access_token=";
+const _TOKEN_VERIFIED_KEY = "_meta_token_ok_v1"; // localStorage cache
+const _TOKEN_VERIFY_TTL = 24 * 60 * 60 * 1000; // 1 ngày
 
 /** Kiểm tra token có hợp lệ không (gọi /me) */
 async function _verifyToken(token) {
-    if (!token || token.length < 20) return false;
-    try {
-        const r = await fetch(_GRAPH_VERIFY + encodeURIComponent(token));
-        const j = await r.json();
-        return !j.error;
-    } catch {
-        return false;
-    }
+  if (!token || token.length < 20) return false;
+  try {
+    const r = await fetch(_GRAPH_VERIFY + encodeURIComponent(token));
+    const j = await r.json();
+    return !j.error;
+  } catch {
+    return false;
+  }
 }
 
 /** Lấy token từ Google Sheets settings */
 async function _fetchTokenFromSheets() {
-    const url = window.SETTINGS_SHEET_URL;
-    if (!url) return null;
-    try {
-        const r = await fetch(`${url}?sheet=settings`, { method: "GET" });
-        if (!r.ok) return null;
-        const j = await r.json();
-        const token = j?.settings?.meta_access_token || null;
-        return token || null;
-    } catch {
-        return null;
-    }
+  const url = window.SETTINGS_SHEET_URL;
+  if (!url) return null;
+  try {
+    const r = await fetch(`${url}?sheet=settings`, { method: "GET" });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const token = j?.settings?.meta_access_token || null;
+    return token || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Đồng bộ token lên Google Sheets */
 async function _saveTokenToSheets(token) {
-    const url = window.SETTINGS_SHEET_URL;
-    if (!url) return;
-    try {
-        await fetch(url, {
-            method: "POST",
-            body: JSON.stringify({ key: "meta_access_token", value: token }),
-        });
-    } catch (e) {
-        console.warn("[token] Không thể lưu token lên Sheets:", e.message);
-    }
+  const url = window.SETTINGS_SHEET_URL;
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({ key: "meta_access_token", value: token }),
+    });
+  } catch (e) {
+    console.warn("[token] Không thể lưu token lên Sheets:", e.message);
+  }
 }
 
 /** Mở modal nhập token mới */
 function _openTokenModal() {
-    const overlay = document.getElementById("token_input_modal");
-    if (overlay) overlay.style.display = "flex";
+  const overlay = document.getElementById("token_input_modal");
+  if (overlay) overlay.style.display = "flex";
 }
 
 function _closeTokenModal() {
-    const overlay = document.getElementById("token_input_modal");
-    if (overlay) overlay.style.display = "none";
+  const overlay = document.getElementById("token_input_modal");
+  if (overlay) overlay.style.display = "none";
 }
 
 /** Inject modal vào DOM (chỉ 1 lần) */
 function _injectTokenModal() {
-    if (document.getElementById("token_input_modal")) return;
+  if (document.getElementById("token_input_modal")) return;
 
-    const modal = document.createElement("div");
-    modal.id = "token_input_modal";
-    modal.style.cssText = `
+  const modal = document.createElement("div");
+  modal.id = "token_input_modal";
+  modal.style.cssText = `
         position:fixed; inset:0; z-index:99999;
         background:rgba(0,0,0,0.65); backdrop-filter:blur(6px);
         display:none; align-items:center; justify-content:center;
     `;
-    modal.innerHTML = `
+  modal.innerHTML = `
       <div style="
         background:#fff; border-radius:2rem; box-shadow:0 32px 80px rgba(0,0,0,0.28);
         width:min(96vw,580px); overflow:hidden; font-family:'Roboto',sans-serif;
@@ -273,46 +275,46 @@ function _injectTokenModal() {
       </div>
     `;
 
-    document.body.appendChild(modal);
+  document.body.appendChild(modal);
 
-    // Bind events — KHÔNG có nút cancel, modal chỉ đóng được sau khi token hợp lệ
-    // Chặn click ra ngoài overlay để đóng modal
-    modal.addEventListener("click", (e) => { e.stopPropagation(); });
+  // Bind events — KHÔNG có nút cancel, modal chỉ đóng được sau khi token hợp lệ
+  // Chặn click ra ngoài overlay để đóng modal
+  modal.addEventListener("click", (e) => { e.stopPropagation(); });
 
 
-    document.getElementById("token_modal_save").addEventListener("click", async () => {
-        const input = document.getElementById("token_modal_input").value.trim();
-        const errEl = document.getElementById("token_modal_error");
-        const errMsg = document.getElementById("token_modal_error_msg");
-        const loading = document.getElementById("token_modal_loading");
+  document.getElementById("token_modal_save").addEventListener("click", async () => {
+    const input = document.getElementById("token_modal_input").value.trim();
+    const errEl = document.getElementById("token_modal_error");
+    const errMsg = document.getElementById("token_modal_error_msg");
+    const loading = document.getElementById("token_modal_loading");
 
-        if (!input) {
-            errEl.style.display = "flex";
-            errMsg.textContent = "Vui lòng nhập Access Token.";
-            return;
-        }
+    if (!input) {
+      errEl.style.display = "flex";
+      errMsg.textContent = "Vui lòng nhập Access Token.";
+      return;
+    }
 
-        errEl.style.display = "none";
-        loading.style.display = "flex";
+    errEl.style.display = "none";
+    loading.style.display = "flex";
 
-        const valid = await _verifyToken(input);
+    const valid = await _verifyToken(input);
 
-        loading.style.display = "none";
+    loading.style.display = "none";
 
-        if (!valid) {
-            errEl.style.display = "flex";
-            errMsg.textContent = "Token không hợp lệ hoặc đã hết hạn. Vui lòng lấy token mới.";
-            return;
-        }
+    if (!valid) {
+      errEl.style.display = "flex";
+      errMsg.textContent = "Token không hợp lệ hoặc đã hết hạn. Vui lòng lấy token mới.";
+      return;
+    }
 
-        // Token hợp lệ → lưu
-        localStorage.setItem(_TOKEN_LS_KEY, input);
-        await _saveTokenToSheets(input);
-        _applyToken(input);
+    // Token hợp lệ → lưu
+    localStorage.setItem(_TOKEN_LS_KEY, input);
+    await _saveTokenToSheets(input);
+    _applyToken(input);
 
-        // ── Chuyển loading overlay sang trạng thái "Đang tải dữ liệu..." ──
-        // Không đóng modal ngay — giữ overlay để user thấy transition liên tục
-        loading.innerHTML = `
+    // ── Chuyển loading overlay sang trạng thái "Đang tải dữ liệu..." ──
+    // Không đóng modal ngay — giữ overlay để user thấy transition liên tục
+    loading.innerHTML = `
           <div style="
             width:5.6rem; height:5.6rem; border-radius:50%;
             background:linear-gradient(135deg,#ffa900,#d88200);
@@ -336,44 +338,44 @@ function _injectTokenModal() {
             }
           </style>
         `;
-        loading.style.display = "flex";
+    loading.style.display = "flex";
 
-        // Trigger main() ngay — skeleton sẽ hiện ra phía sau modal
-        if (typeof window._afterTokenResolved === "function") {
-            window._afterTokenResolved();
-        }
+    // Trigger main() ngay — skeleton sẽ hiện ra phía sau modal
+    if (typeof window._afterTokenResolved === "function") {
+      window._afterTokenResolved();
+    }
 
-        // Fade modal ra sau 900ms (đủ để skeleton render xong)
+    // Fade modal ra sau 900ms (đủ để skeleton render xong)
+    setTimeout(() => {
+      const overlay = document.getElementById("token_input_modal");
+      if (overlay) {
+        overlay.style.transition = "opacity .45s ease";
+        overlay.style.opacity = "0";
         setTimeout(() => {
-            const overlay = document.getElementById("token_input_modal");
-            if (overlay) {
-                overlay.style.transition = "opacity .45s ease";
-                overlay.style.opacity = "0";
-                setTimeout(() => {
-                    overlay.style.display = "none";
-                    overlay.style.opacity = "";
-                    overlay.style.transition = "";
-                }, 460);
-            }
-            _showTokenToast("✅ Đã kết nối Meta API thành công!", "#10b981");
-        }, 900);
+          overlay.style.display = "none";
+          overlay.style.opacity = "";
+          overlay.style.transition = "";
+        }, 460);
+      }
+      _showTokenToast("✅ Đã kết nối Meta API thành công!", "#10b981");
+    }, 900);
 
-    });
+  });
 }
 
 /** Áp dụng token vào biến toàn cục META_TOKEN */
 function _applyToken(token) {
-    META_TOKEN = token || "";
-    window.META_TOKEN = META_TOKEN;      // expose to window for other scripts
+  META_TOKEN = token || "";
+  window.META_TOKEN = META_TOKEN;      // expose to window for other scripts
 }
 
 /** Toast notification nhỏ */
 function _showTokenToast(msg, color = "#f59e0b") {
-    let t = document.getElementById("_token_toast");
-    if (!t) {
-        t = document.createElement("div");
-        t.id = "_token_toast";
-        t.style.cssText = `
+  let t = document.getElementById("_token_toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "_token_toast";
+    t.style.cssText = `
             position:fixed; bottom:2.4rem; left:50%; transform:translateX(-50%);
             padding:1.1rem 2.2rem; border-radius:3rem;
             font-size:1.35rem; font-weight:700; color:#fff;
@@ -381,17 +383,17 @@ function _showTokenToast(msg, color = "#f59e0b") {
             z-index:999999; transition:all .3s; opacity:0; pointer-events:none;
             display:flex; align-items:center; gap:.7rem;
         `;
-        document.body.appendChild(t);
-    }
-    t.style.background = color;
-    t.textContent = msg;
-    t.style.opacity = "1";
-    t.style.transform = "translateX(-50%) translateY(0)";
-    clearTimeout(t._to);
-    t._to = setTimeout(() => {
-        t.style.opacity = "0";
-        t.style.transform = "translateX(-50%) translateY(8px)";
-    }, 3500);
+    document.body.appendChild(t);
+  }
+  t.style.background = color;
+  t.textContent = msg;
+  t.style.opacity = "1";
+  t.style.transform = "translateX(-50%) translateY(0)";
+  clearTimeout(t._to);
+  t._to = setTimeout(() => {
+    t.style.opacity = "0";
+    t.style.transform = "translateX(-50%) translateY(8px)";
+  }, 3500);
 }
 
 // ============================================================
@@ -399,71 +401,84 @@ function _showTokenToast(msg, color = "#f59e0b") {
 // ============================================================
 
 window._resolveMetaToken = async function () {
-    // Inject modal trước (ẩn)
-    if (document.body) {
-        _injectTokenModal();
-    } else {
-        document.addEventListener("DOMContentLoaded", _injectTokenModal);
+  // Inject modal trước (ẩn)
+  if (document.body) {
+    _injectTokenModal();
+  } else {
+    document.addEventListener("DOMContentLoaded", _injectTokenModal);
+  }
+
+  // --- Bước 0: Thử cache sessionStorage (tránh verify lại trong cùng session) ---
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(_TOKEN_VERIFIED_KEY) || "null");
+    if (cached && cached.token && Date.now() - cached.ts < _TOKEN_VERIFY_TTL) {
+      console.log("[token] ✅ Dùng token từ sessionStorage cache");
+      _applyToken(cached.token);
+      return;
     }
+  } catch (_) { }
 
-    // --- Bước 1: Thử token cứng từ token.js ---
-    if (META_TOKEN_STATIC && META_TOKEN_STATIC.length > 20) {
-        const ok = await _verifyToken(META_TOKEN_STATIC);
-        if (ok) {
-            console.log("[token] ✅ Dùng token từ token.js (static)");
-            _applyToken(META_TOKEN_STATIC);
-            return;
-        }
-        console.warn("[token] ⚠️ Token static đã hết hạn/không hợp lệ.");
+  // --- Bước 1: Thử token cứng từ token.js ---
+  if (META_TOKEN_STATIC && META_TOKEN_STATIC.length > 20) {
+    const ok = await _verifyToken(META_TOKEN_STATIC);
+    if (ok) {
+      console.log("[token] ✅ Dùng token từ token.js (static)");
+      _applyToken(META_TOKEN_STATIC);
+      try { sessionStorage.setItem(_TOKEN_VERIFIED_KEY, JSON.stringify({ token: META_TOKEN_STATIC, ts: Date.now() })); } catch (_) { }
+      return;
     }
+    console.warn("[token] ⚠️ Token static đã hết hạn/không hợp lệ.");
+  }
 
-    // --- Bước 2: Thử token từ Google Sheets ---
-    const sheetToken = await _fetchTokenFromSheets();
-    if (sheetToken) {
-        const ok = await _verifyToken(sheetToken);
-        if (ok) {
-            console.log("[token] ✅ Dùng token từ Google Sheets");
-            _applyToken(sheetToken);
-            localStorage.setItem(_TOKEN_LS_KEY, sheetToken);
-            return;
-        }
-        console.warn("[token] ⚠️ Token từ Sheets đã hết hạn/không hợp lệ.");
+  // --- Bước 2: Thử token từ Google Sheets ---
+  const sheetToken = await _fetchTokenFromSheets();
+  if (sheetToken) {
+    const ok = await _verifyToken(sheetToken);
+    if (ok) {
+      console.log("[token] ✅ Dùng token từ Google Sheets");
+      _applyToken(sheetToken);
+      localStorage.setItem(_TOKEN_LS_KEY, sheetToken);
+      try { sessionStorage.setItem(_TOKEN_VERIFIED_KEY, JSON.stringify({ token: sheetToken, ts: Date.now() })); } catch (_) { }
+      return;
     }
+    console.warn("[token] ⚠️ Token từ Sheets đã hết hạn/không hợp lệ.");
+  }
 
-    // --- Bước 2b: Thử token từ localStorage (cache) ---
-    try {
-        const lsToken = localStorage.getItem(_TOKEN_LS_KEY);
-        if (lsToken) {
-            const ok = await _verifyToken(lsToken);
-            if (ok) {
-                console.log("[token] ✅ Dùng token từ localStorage cache");
-                _applyToken(lsToken);
-                return;
-            }
-        }
-    } catch (_) { }
-
-    // --- Bước 3: Mở modal nhập token mới ---
-    console.log("[token] ℹ️ Không có token hợp lệ → mở modal nhập token.");
-    _applyToken(null);
-
-    // Đảm bảo DOM ready rồi mới mở modal
-    const openModal = () => {
-        _injectTokenModal();
-        _openTokenModal();
-    };
-
-    if (document.body) {
-        openModal();
-    } else {
-        document.addEventListener("DOMContentLoaded", openModal);
+  // --- Bước 2b: Thử token từ localStorage (cache) ---
+  try {
+    const lsToken = localStorage.getItem(_TOKEN_LS_KEY);
+    if (lsToken) {
+      const ok = await _verifyToken(lsToken);
+      if (ok) {
+        console.log("[token] ✅ Dùng token từ localStorage cache");
+        _applyToken(lsToken);
+        try { sessionStorage.setItem(_TOKEN_VERIFIED_KEY, JSON.stringify({ token: lsToken, ts: Date.now() })); } catch (_) { }
+        return;
+      }
     }
+  } catch (_) { }
+
+  // --- Bước 3: Mở modal nhập token mới ---
+  console.log("[token] ℹ️ Không có token hợp lệ → mở modal nhập token.");
+  _applyToken(null);
+
+  // Đảm bảo DOM ready rồi mới mở modal
+  const openModal = () => {
+    _injectTokenModal();
+    _openTokenModal();
+  };
+
+  if (document.body) {
+    openModal();
+  } else {
+    document.addEventListener("DOMContentLoaded", openModal);
+  }
 };
 
 // ── Token-aware startup ──────────────────────────────────────────
 // Expose _tokenReady: a Promise that resolves after token resolution.
 // main.js reads window._tokenReady to know when to start fetching data.
 window._tokenReady = (async () => {
-    await window._resolveMetaToken();
+  await window._resolveMetaToken();
 })();
 

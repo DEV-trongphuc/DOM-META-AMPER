@@ -11,7 +11,7 @@
     const SHEET_URL = window.SETTINGS_SHEET_URL || "";
     const SESSION_KEY = "dom_auth_v1";
     const PENDING_KEY = "dom_pending_v1";   // lưu user đã xin quyền
-    const SESSION_TTL = 8 * 60 * 60 * 1000;
+    const SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 ngày
 
     // 👑 Admin mặc định — luôn được vào với role admin dù sheet chưa có dữ liệu
     const DEFAULT_ADMINS = [
