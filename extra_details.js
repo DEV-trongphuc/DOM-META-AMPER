@@ -3,12 +3,14 @@
 function setupShowAllDetails() {
     const btn = document.getElementById("show_all_btn");
     const container = document.getElementById("extra_details_container");
+    const chartsRow = document.getElementById("extra_charts_row");
 
     if (!btn || !container) return;
 
     // Default to open
     container.style.display = "flex";
     container.style.paddingBottom = "1rem";
+    if (chartsRow) chartsRow.style.display = "flex";
     btn.classList.add("open");
     btn.innerHTML = 'Extra Details <i class="fa-solid fa-angle-up"></i>';
 
@@ -17,11 +19,13 @@ function setupShowAllDetails() {
         if (isHidden) {
             container.style.display = "flex";
             container.style.paddingBottom = "2rem";
+            if (chartsRow) chartsRow.style.display = "flex";
             btn.classList.add("open");
             btn.innerHTML = 'Extra Details <i class="fa-solid fa-angle-up"></i>';
             loadExtraCharts();
         } else {
             container.style.display = "none";
+            if (chartsRow) chartsRow.style.display = "none";
             btn.classList.remove("open");
             btn.innerHTML = 'Extra Details <i class="fa-solid fa-angle-down"></i>';
         }

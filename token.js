@@ -12,7 +12,7 @@ const META_TOKEN_STATIC = "EAAUbzkTFG4sBQ5tk49sg92xjuHQxaTP7P4zTNk4XJW0bd6IVPENn
 // 🔐 Google OAuth Client ID — Lấy tại: https://console.cloud.google.com/apis/credentials
 // Tạo OAuth 2.0 Client ID → Web Application → thêm domain vào Authorized JavaScript origins
 // Để trống "" nếu muốn bỏ qua xác thực (dev mode)
-// window.GOOGLE_CLIENT_ID = "641158233158-nsg8a8tdsj3fdgb34dc9tugm8god7tho.apps.googleusercontent.com";
+window.GOOGLE_CLIENT_ID = "641158233158-nsg8a8tdsj3fdgb34dc9tugm8god7tho.apps.googleusercontent.com";
 
 
 // 🌐 Expose toàn cục (sẽ được ghi đè sau khi resolve)
