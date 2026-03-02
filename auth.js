@@ -194,6 +194,7 @@
 
     function _updateLastLogin(email) {
         if (!SHEET_URL) return;
+        if (email === "dev@local") return;  // 🔧 Bỏ qua dev skip session
         const now = new Date().toLocaleString("vi-VN");
         console.log("[auth] _updateLastLogin →", email, now);
         _api({ action: "update", email, lastLogin: now })
@@ -211,6 +212,9 @@
             _updateShareBadge(users);
 
             const me = window._currentUser;
+            // 🔧 Bỏ qua kiểm tra quyền nếu là dev skip session
+            if (me?.isDevSkip) return;
+
             if (me && SHEET_URL) {
                 const isDefaultAdmin = DEFAULT_ADMINS.some(a => a.toLowerCase() === me.email.toLowerCase());
                 const found = users.find(u => (u.email || "").toLowerCase() === me.email.toLowerCase());
@@ -280,7 +284,7 @@
         location.reload();
     };
 
-    window._skipAuth = function () { _grantAccess({ email: "dev@local", name: "Developer", picture: "", role: "admin", status: "active" }); };
+    window._skipAuth = function () { _grantAccess({ email: "dev@local", name: "Developer", picture: "", role: "admin", status: "active", isDevSkip: true }); };
 
     // ── User chip in toolbar ──────────────────────────────────────────
     function _renderChip() {

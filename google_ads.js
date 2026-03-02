@@ -1049,7 +1049,7 @@ function _renderMonthlyChart(data, metric) {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: values.map((_, i) => `rgba(255,169,0,${(1 - i / sorted.length * 0.6).toFixed(2)})`),
+                backgroundColor: bgColors,
                 borderRadius: 6
             }]
         },
