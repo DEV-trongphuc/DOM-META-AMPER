@@ -1304,6 +1304,8 @@ window._closeKeywordModal = function () {
 
 
 let _kwActiveTab = 'keywords';
+// ── In-memory keyword cache (session-scoped, key = campaignId|since|until) ──
+const _kwCache = {};
 window._switchKwTab = function (tab, el) {
     _kwActiveTab = tab;
     document.querySelectorAll('.g_kw_tab').forEach(t => {
@@ -1325,7 +1327,16 @@ function _loadKeywords(campaignId) {
     const since = (typeof startDate !== 'undefined' && startDate) || window.startDate || '';
     const until = (typeof endDate !== 'undefined' && endDate) || window.endDate || '';
 
-    // Skeleton shimmer rows while loading
+    // ── Check in-memory cache first ──────────────────────────────────────────
+    const cacheKey = `${campaignId}|${since}|${until}`;
+    if (_kwCache[cacheKey]) {
+        const cached = _kwCache[cacheKey];
+        _renderKeywordsTable(cached.keywords, cached.searchTerms);
+        if (typeof showToast === 'function') showToast('⚡ Từ khóa từ cache – không cần tải lại', 'success');
+        return;
+    }
+
+    // ── Show skeleton shimmer while fetching ─────────────────────────────────
     const shimCSS = '<style>@keyframes g_kw_shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}</style>';
     const skCell = '<td style="padding:0.85rem 1rem;"><div style="height:13px;border-radius:6px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:400px 100%;animation:g_kw_shimmer 1.3s ease-in-out infinite;"></div></td>';
     const skRow8 = '<tr>' + skCell.repeat(8) + '</tr>';
@@ -1343,7 +1354,11 @@ function _loadKeywords(campaignId) {
         .then(r => r.json())
         .then(data => {
             if (!data.ok) throw new Error(data.error || 'API error');
-            _renderKeywordsTable(data.keywords || [], data.searchTerms || []);
+            const kws = data.keywords || [];
+            const sts = data.searchTerms || [];
+            // Store in in-memory cache (top 50 already enforced server-side)
+            _kwCache[cacheKey] = { keywords: kws, searchTerms: sts };
+            _renderKeywordsTable(kws, sts);
         })
         .catch(err => {
             kwBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ea4335;padding:2rem;">' + err.message + '</td></tr>';
