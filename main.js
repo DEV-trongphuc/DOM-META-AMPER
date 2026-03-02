@@ -394,7 +394,7 @@ function renderColumnSettingsModal(filter = "") {
       </div>
     `).join("");
 
-  // Render Active
+  // Render Active (with Drag & Drop)
   activeList.innerHTML = ACTIVE_COLUMNS.map((id, idx) => {
     const meta = METRIC_REGISTRY[id];
     const custom = CUSTOM_METRICS.find(m => m.id === id);
@@ -402,9 +402,11 @@ function renderColumnSettingsModal(filter = "") {
     let isCustom = !meta;
 
     return `
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:1.2rem 1.5rem; background:#fff; border:1px solid #eee; border-radius:1rem; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+      <div draggable="true" data-col-id="${id}" data-col-idx="${idx}"
+        style="display:flex; align-items:center; justify-content:space-between; padding:1.2rem 1.5rem; background:#fff; border:1px solid #eee; border-radius:1rem; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:grab; transition:opacity .15s, transform .15s;"
+        ondragstart="window._colDragStart(event)" ondragover="window._colDragOver(event)" ondrop="window._colDrop(event)" ondragend="window._colDragEnd(event)">
         <div style="display:flex; align-items:center; gap:1.2rem;">
-          <i class="fa-solid fa-grip-vertical" style="color:#ccc; cursor:move;"></i>
+          <i class="fa-solid fa-grip-vertical" style="color:#ccc; cursor:grab;"></i>
           <div style="display:flex; flex-direction:column; gap:0.2rem; line-height:1.2;">
             <span style="font-size:1.35rem; font-weight:700; color:#333; display:flex; align-items:center; gap:0.6rem;">
               ${label} 
@@ -415,13 +417,61 @@ function renderColumnSettingsModal(filter = "") {
         </div>
         <div style="display:flex; gap:0.5rem; align-items:center;">
            ${isCustom ? `<i class="fa-solid fa-pen-to-square" onclick="window.editCustomMetric('${id}')" style="cursor:pointer; color:#6366f1; padding:0.5rem; font-size:1.4rem;" title="Sửa công thức"></i>` : ''}
-           ${idx > 0 ? `<i class="fa-solid fa-chevron-up" onclick="window.moveColumn(${idx}, -1)" style="cursor:pointer; color:#999; padding:0.5rem;"></i>` : ''}
-           ${idx < ACTIVE_COLUMNS.length - 1 ? `<i class="fa-solid fa-chevron-down" onclick="window.moveColumn(${idx}, 1)" style="cursor:pointer; color:#999; padding:0.5rem;"></i>` : ''}
            <i class="fa-solid fa-trash-can" onclick="window.removeColumnFromActive('${id}')" style="cursor:pointer; color:#ef4444; padding:0.5rem; margin-left:0.5rem;"></i>
         </div>
       </div>
     `;
   }).join("");
+
+  // Wire up drag-and-drop sau khi render
+  _initColDnD();
+}
+
+// ── Drag & Drop cột (HTML5 native) ─────────────────────────
+let _dragSrcIdx = null;
+
+window._colDragStart = function (e) {
+  _dragSrcIdx = +e.currentTarget.dataset.colIdx;
+  e.currentTarget.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+};
+
+window._colDragOver = function (e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const target = e.currentTarget;
+  target.style.transform = 'scale(1.02)';
+  target.style.borderColor = '#f59e0b';
+};
+
+window._colDragEnd = function (e) {
+  // Reset visual trên tất cả items
+  document.querySelectorAll('#active_columns_list [draggable]').forEach(el => {
+    el.style.opacity = '';
+    el.style.transform = '';
+    el.style.borderColor = '';
+  });
+  _dragSrcIdx = null;
+};
+
+window._colDrop = function (e) {
+  e.stopPropagation();
+  const destIdx = +e.currentTarget.dataset.colIdx;
+  if (_dragSrcIdx === null || _dragSrcIdx === destIdx) return;
+  // Hoán đổi vị trí trong ACTIVE_COLUMNS
+  const moved = ACTIVE_COLUMNS.splice(_dragSrcIdx, 1)[0];
+  ACTIVE_COLUMNS.splice(destIdx, 0, moved);
+  renderColumnSettingsModal();
+};
+
+function _initColDnD() {
+  // Đưa dragover reset ra mouseout khi rời khỏi item
+  document.querySelectorAll('#active_columns_list [draggable]').forEach(el => {
+    el.addEventListener('dragleave', () => {
+      el.style.transform = '';
+      el.style.borderColor = '';
+    });
+  });
 }
 
 window.addColumnToActive = (id) => {
@@ -729,31 +779,6 @@ window._cancelEditPreset = function () {
   renderColumnSettingsModal();
 };
 
-/** Update preset when in edit mode — called from the main save flow */
-function _savePresetEditIfActive() {
-  if (!_editingPresetId) return;
-  const presets = loadViewPresets();
-  const idx = presets.findIndex(p => String(p.id) === String(_editingPresetId));
-  if (idx < 0) { _exitPresetEditMode(); return; }
-
-  // Get name from input
-  const nameInput = document.getElementById("preset_edit_name_input");
-  const name = nameInput?.value?.trim() || presets[idx].name;
-  presets[idx] = {
-    ...presets[idx], name,
-    columns: [...ACTIVE_COLUMNS],
-    customMetrics: [...CUSTOM_METRICS],
-  };
-  _saveViewPresets(presets);
-  renderPresetDropdown();
-  _renderPresetPanel();
-  _exitPresetEditMode();
-  showToast(`✅ Đã cập nhật preset "${name}"`);
-}
-
-window._confirmRenamePreset = _savePresetEditIfActive; // legacy compat
-
-
 
 // ── Save new preset — opens Column Settings Modal in "new" mode ──
 
@@ -967,8 +992,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!text) return;
     tooltip.textContent = text;
     tooltip.classList.add("show");
-    const rect = target.getBoundingClientRect();
-    const updatePosition = () => {
+    // Chỉ gọi getBoundingClientRect 1 lần trong RAF — tránh force layout
+    requestAnimationFrame(() => {
+      const rect = target.getBoundingClientRect();
       const tooltipRect = tooltip.getBoundingClientRect();
       let top = rect.top - tooltipRect.height - 12;
       let left = rect.left + rect.width / 2;
@@ -985,9 +1011,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tooltip.style.top = top + "px";
       tooltip.style.left = left + "px";
       tooltip.style.transform = "translate(-50%, 0)";
-    };
-    updatePosition();
-    requestAnimationFrame(updatePosition);
+    });
   });
 
   document.addEventListener("mouseout", (e) => {
@@ -1003,6 +1027,10 @@ let tempStartDate = null;
 let tempEndDate = null;
 let VIEW_GOAL; // Dùng cho chart breakdown
 const CACHE = new Map();
+const CACHE_TTL = new Map(); // { url_key → timestamp }
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 phút
+/** Xóa cache khi đổi date range — gọi từ main() */
+function clearFetchCache() { CACHE.clear(); CACHE_TTL.clear(); }
 let DAILY_DATA = [];
 let CURRENT_CAMPAIGN_FILTER = ""; // 👈 Lưu bộ lọc hiện tại (dùng cho Brand filter)
 let GOAL_CHART_MODE = "keyword"; // "keyword" or "brand"
@@ -1090,31 +1118,29 @@ function getCampaignIcon(optimizationGoal) {
 }
 /**
  * 🦴 Skeleton Loader Helper
- * Tự động tạo và điều khiển skeletons dựa trên cấu trúc card
+ * Toggle display (không remove/recreate — tránh layout thrash)
  */
 function toggleSkeletons(scopeSelector, isLoading) {
   const scope = document.querySelector(scopeSelector);
   if (!scope) return;
 
+  let cards = scope.querySelectorAll(".dom_inner");
+  if (scopeSelector === ".dom_dashboard" || scopeSelector === ".dom_container") {
+    cards = Array.from(cards).filter(c => !c.closest("#google_ads_container"));
+  }
+
   if (isLoading) {
     scope.classList.add("is-loading");
-    // Tìm các thẻ card/chart chính
-    let cards = scope.querySelectorAll(".dom_inner");
-
-    // 💡 Nếu đang load Dashboard tổng (Meta), đừng động vào Google Ads container cards
-    if (scopeSelector === ".dom_dashboard" || scopeSelector === ".dom_container") {
-      cards = Array.from(cards).filter(c => !c.closest("#google_ads_container"));
-    }
-
     cards.forEach((card) => {
-      card.classList.add("is-loading"); // Thêm cho từng card để bắt CSS absolute
+      card.classList.add("is-loading");
+
+      // Tạo skeleton 1 lần, sau đó chỉ toggle display
       let skeleton = card.querySelector(".skeleton-container");
       if (!skeleton) {
         skeleton = document.createElement("div");
         skeleton.className = "skeleton-container";
         const isChart = card.querySelector("canvas");
         const isList = card.querySelector("ul.dom_toplist");
-
         if (isChart) {
           skeleton.innerHTML = `
             <div class="skeleton skeleton-title" style="margin-bottom:2rem"></div>
@@ -1136,8 +1162,8 @@ function toggleSkeletons(scopeSelector, isLoading) {
         }
         card.prepend(skeleton);
       }
+      skeleton.style.display = ""; // hiện
 
-      // Ẩn các con trực tiếp trừ skeleton
       Array.from(card.children).forEach((child) => {
         if (!child.classList.contains("skeleton-container")) {
           child.classList.add("hide-on-load");
@@ -1146,17 +1172,10 @@ function toggleSkeletons(scopeSelector, isLoading) {
     });
   } else {
     scope.classList.remove("is-loading");
-    let cards = scope.querySelectorAll(".dom_inner");
-
-    // 💡 Nếu đang dừng load Dashboard tổng (Meta), đừng động vào Google Ads container cards
-    if (scopeSelector === ".dom_dashboard" || scopeSelector === ".dom_container") {
-      cards = Array.from(cards).filter(c => !c.closest("#google_ads_container"));
-    }
-
     cards.forEach((card) => {
       card.classList.remove("is-loading");
-      const skeletons = card.querySelectorAll(".skeleton-container");
-      skeletons.forEach((s) => s.remove()); // Xóa hẳn khỏi DOM
+      const skeleton = card.querySelector(".skeleton-container");
+      if (skeleton) skeleton.style.display = "none"; // ẩn thay vì remove
       card.querySelectorAll(".hide-on-load").forEach((el) => el.classList.remove("hide-on-load"));
     });
   }
@@ -1280,7 +1299,10 @@ function getResults(item, goal) {
 // ===================== UTILS =====================
 async function fetchJSON(url, options = {}) {
   const key = url + JSON.stringify(options);
-  if (CACHE.has(key)) return CACHE.get(key); // Trả về cache nếu có
+  // Kiểm tra cache còn TTL không
+  if (CACHE.has(key) && Date.now() - (CACHE_TTL.get(key) || 0) < CACHE_TTL_MS) {
+    return CACHE.get(key);
+  }
 
   try {
     const res = await fetch(url, options);
@@ -1302,7 +1324,8 @@ async function fetchJSON(url, options = {}) {
       throw new Error(msg);
     }
     const data = JSON.parse(text);
-    CACHE.set(key, data); // Lưu vào cache sau khi lấy dữ liệu
+    CACHE.set(key, data);
+    CACHE_TTL.set(key, Date.now()); // Lưu timestamp
     return data;
   } catch (err) {
     console.error(`❌ Fetch failed: ${url}`, err);
@@ -1416,12 +1439,9 @@ async function fetchAdsets() {
   // Tiến hành lặp lại việc gọi API cho đến khi không còn cursor tiếp theo
   while (nextPageUrl) {
     const data = await fetchJSON(nextPageUrl);
-    console.log(data);
-
     if (data.data) {
       allData = allData.concat(data.data); // Thêm dữ liệu vào mảng allData
     }
-
     nextPageUrl = data.paging && data.paging.next ? data.paging.next : null;
   }
 

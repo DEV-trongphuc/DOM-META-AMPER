@@ -121,11 +121,87 @@
         }, 120);
     }
 
-    function _showPending(email) {
-        _html(_card(`${_icon("fa-solid fa-clock", "linear-gradient(135deg,#ffa900,#d88200)")}
-            ${_title("Đang chờ phê duyệt", `Yêu cầu của <b style="color:#ffa900;">${email}</b> đang chờ Admin xét duyệt.`)}
-            ${_outBtn()}`));
+    function _maskedAdmin() {
+        // Lấy email admin đầu tiên, che phần trước @ : 3 ký tự + "..." + phần còn lại
+        const adminEmail = DEFAULT_ADMINS[0] || "";
+        if (!adminEmail) return "Admin";
+        const [local, domain] = adminEmail.split("@");
+        const masked = local.slice(0, 3) + "..." + (domain ? "@" + domain : "");
+        return masked;
     }
+
+    let _pendingRefreshTimer = null; // timer auto-refresh pending screen
+
+    function _showPending(email) {
+        const adminLabel = _maskedAdmin();
+
+        // Hiển thị thời gian đã chờ dựa vào requestAt (nếu có)
+        const pendingData = _loadPending();
+        let waitHtml = '';
+        if (pendingData?.requestAt) {
+            try {
+                // requestAt dạng vi-VN: "02/03/2026, 20:00:00"
+                const reqTime = new Date(pendingData.requestAt.replace(/(\.\d+)?$/, ''));
+                if (!isNaN(reqTime)) {
+                    const diffMs = Date.now() - reqTime.getTime();
+                    const diffMin = Math.round(diffMs / 60000);
+                    const diffText = diffMin < 1 ? 'vừa xong' :
+                        diffMin < 60 ? `${diffMin} phút trước` :
+                            `${Math.round(diffMin / 60)} giờ trước`;
+                    waitHtml = `<p style="font-size:1.1rem;color:#94a3b8;margin-top:.8rem;">Yêu cầu gửi lúc ${pendingData.requestAt} (${diffText})</p>`;
+                }
+            } catch (_) { }
+        }
+
+        _html(_card(`${_icon("fa-solid fa-clock", "linear-gradient(135deg,#ffa900,#d88200)")}
+            ${_title("Đang chờ phê duyệt", `Yêu cầu của <b style="color:#ffa900;">${email}</b> đang chờ Admin xét duyệt.<br><span style="font-size:1.1rem;color:#94a3b8;margin-top:.5rem;display:block;">Vui lòng chờ phản hồi từ <b style="color:#64748b;">${adminLabel}</b></span>`)}
+            ${waitHtml}
+            <button onclick="window._checkPendingNow()" style="width:100%;background:#f1f5f9;color:#475569;border:none;padding:1rem;border-radius:1rem;font-size:1.3rem;cursor:pointer;margin-bottom:.5rem;transition:background .15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+              <i class="fa-solid fa-rotate-right"></i> Kiểm tra lại ngay
+            </button>
+            ${_outBtn()}`));
+
+        // Auto-refresh mỗi 30 giây
+        clearInterval(_pendingRefreshTimer);
+        _pendingRefreshTimer = setInterval(async () => {
+            if (document.visibilityState !== 'visible') return;
+            const users = await _api();
+            const found = (users || []).find(u => (u.email || '').toLowerCase() === email.toLowerCase());
+            if (found?.status === 'active') {
+                clearInterval(_pendingRefreshTimer);
+                const pic = _loadPending()?.picture || ''; // capture trước khi clear
+                _clearPending();
+                _grantAccess({ email: found.email, name: found.name || email, picture: pic, role: found.role, status: 'active' });
+            } else if (!found || found.status === 'rejected') {
+                clearInterval(_pendingRefreshTimer);
+                const p = _loadPending() || { email, name: '', picture: '' }; // capture trước khi clear
+                _clearPending();
+                _showDenied(p.email, p.name, p.picture);
+            }
+        }, 30000);
+    }
+
+    window._checkPendingNow = async function () {
+        const pending = _loadPending();
+        if (!pending?.email) return;
+        const btn = document.querySelector('[onclick="window._checkPendingNow()"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang kiểm tra...'; }
+        const users = await _api();
+        const found = (users || []).find(u => (u.email || '').toLowerCase() === pending.email.toLowerCase());
+        if (found?.status === 'active') {
+            clearInterval(_pendingRefreshTimer);
+            _clearPending();
+            _grantAccess({ email: found.email, name: found.name || pending.email, picture: pending.picture || '', role: found.role, status: 'active' });
+        } else if (found?.status === 'request') {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Kiểm tra lại ngay'; }
+            if (typeof showToast === 'function') showToast('⏳ Vẫn đang chờ admin duyệt...');
+        } else {
+            clearInterval(_pendingRefreshTimer);
+            _clearPending();
+            _showDenied(pending.email, pending.name, pending.picture);
+        }
+    };
+
 
     function _showDenied(email, name, pic) {
         const esc = (s) => (s || "").replace(/'/g, "\\'");
@@ -204,6 +280,7 @@
 
     // Background fetch — cập nhật cache không block UI
     window._usersCache = null;
+    let _autoModalShown = false;  // chỉ auto mở 1 lần sau khi admin load trang
     async function _bgFetchUsers() {
         try {
             const users = await _api();
@@ -232,6 +309,24 @@
                     _api({ action: "update", email: me.email, picture: me.picture })
                         .then(r => console.log("[auth] picture sync:", r))
                         .catch(() => { });
+                }
+
+                // 🔔 Tự động mở modal tab Yêu cầu nếu admin vừa load trang và có người xin quyền
+                const isAdmin = me.role === "admin" || isDefaultAdmin;
+                if (isAdmin && !_autoModalShown) {
+                    const reqs = users.filter(u => u.status === "request");
+                    if (reqs.length > 0) {
+                        _autoModalShown = true;
+                        // Đợi UI sẵn sàng rồi mới mở modal
+                        setTimeout(async () => {
+                            await window.openShareModal();
+                            // Chuyển sang tab Yêu cầu
+                            if (typeof window._stab === "function") window._stab("requests");
+                        }, 800);
+                    } else {
+                        // Không có request → đánh dấu đã check để interval sau không mở nữa
+                        _autoModalShown = true;
+                    }
                 }
             }
         } catch (_) { }
@@ -267,7 +362,8 @@
     }
 
     // Tự động refresh mỗi 60 giây để cập nhật badge request
-    setInterval(_bgFetchUsers, 60000);
+    // Pause khi tab ẩn — tiết kiệm network + quota Google Sheets
+    setInterval(() => { if (document.visibilityState === 'visible') _bgFetchUsers(); }, 60000);
 
     window._requestAccess = async function (email, name, pic) {
         const btn = document.getElementById("_reqBtn");
@@ -464,7 +560,11 @@
         const rl = document.getElementById("_rlist");
         if (rl) {
             rl.innerHTML = reqs.length ? reqs.map(_rowReq).join("") :
-                `<p style="text-align:center;color:#94a3b8;padding:2rem;font-size:1.3rem;">Không có yêu cầu nào</p>`;
+                `<div style="text-align:center;padding:3rem;">
+                  <div style="font-size:3.5rem;margin-bottom:1rem;">\u2705</div>
+                  <p style="font-size:1.4rem;font-weight:700;color:#10b981;margin:0;">Không còn yêu cầu nào!</p>
+                  <p style="font-size:1.2rem;color:#94a3b8;margin:.4rem 0 0;">Tất cả yêu cầu đã được xử lý.</p>
+                </div>`;
         }
     }
 

@@ -9961,3 +9961,22 @@ tbody {
   margin-top: 1rem;
   transform: translateX(-2rem);
 }
+/* Extra Details: hide scrollbar */
+#extra_top_campaigns_list,
+#extra_engagement_list {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#extra_top_campaigns_list::-webkit-scrollbar,
+#extra_engagement_list::-webkit-scrollbar {
+  display: none;
+}
+.dom_inner.chart:has(#extra_top_campaigns_list),
+.dom_inner.chart:has(#extra_engagement_list) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.dom_inner.chart:has(#extra_top_campaigns_list)::-webkit-scrollbar,
+.dom_inner.chart:has(#extra_engagement_list)::-webkit-scrollbar {
+  display: none;
+}
