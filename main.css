@@ -1116,13 +1116,22 @@ html {
   }
 }
 
-.empty_card i {
+.empty_card > i:first-child {
   font-size: 8rem;
   background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 1rem;
+}
+
+.empty_card button i {
+  font-size: inherit !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: unset !important;
+  background-clip: unset !important;
+  margin-bottom: 0 !important;
 }
 
 .empty_card h3 {

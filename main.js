@@ -2608,6 +2608,23 @@ async function main() {
     const gadsItem = document.getElementById("gads_menu_item");
     if (gadsTitle) gadsTitle.style.display = "none";
     if (gadsItem) gadsItem.style.display = "none";
+
+    // 📌 Đẩy nút Share ra ngoài cùng bên phải trong pill toolbar
+    const shareBtn = document.getElementById("share_url_btn");
+    const actionsGroup = document.querySelector(".toolbar_actions_group");
+    if (shareBtn && actionsGroup) actionsGroup.appendChild(shareBtn);
+  }
+
+  // 🚩 Xử lý ẩn Brand Filter nếu BRAND_FILTER_SETUP là false
+  if (window.BRAND_FILTER_SETUP === false) {
+    const brandFilter = document.querySelector(".dom_filter");
+    const brandSettingsBtn = document.getElementById("open_filter_settings");
+    const brandDivider = document.querySelector(".toolbar_divider");
+    const perfBrandWrapper = document.querySelector(".perf_brand_filter_wrapper");
+    if (brandFilter) brandFilter.style.display = "none";
+    if (brandSettingsBtn) brandSettingsBtn.style.display = "none";
+    if (brandDivider) brandDivider.style.display = "none";
+    if (perfBrandWrapper) perfBrandWrapper.style.display = "none";
   }
 
   // 🦴 Skeleton start - Hiện khung xương ngay lập tức khi load app
