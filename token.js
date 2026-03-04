@@ -39,15 +39,25 @@ const _GRAPH_VERIFY = "https://graph.facebook.com/v19.0/me?fields=id&access_toke
 const _TOKEN_VERIFIED_KEY = "_meta_token_ok_v1"; // localStorage cache
 const _TOKEN_VERIFY_TTL = 24 * 60 * 60 * 1000; // 1 ngày
 
-/** Kiểm tra token có hợp lệ không (gọi /me) */
+/**
+ * Kiểm tra token có hợp lệ không (gọi /me)
+ * @returns {{ ok: boolean, reason: string|null, code: number|null, subcode: number|null }}
+ *   reason: null | 'password_changed' | 'expired' | 'network'
+ */
 async function _verifyToken(token) {
-  if (!token || token.length < 20) return false;
+  if (!token || token.length < 20)
+    return { ok: false, reason: 'invalid', code: null, subcode: null };
   try {
     const r = await fetch(_GRAPH_VERIFY + encodeURIComponent(token));
     const j = await r.json();
-    return !j.error;
+    if (!j.error) return { ok: true, reason: null, code: null, subcode: null };
+    const code = j.error?.code ?? null;
+    const subcode = j.error?.error_subcode ?? null;
+    // subcode 460 = session bị thu hồi do đổi mật khẩu hoặc Facebook reset session
+    const reason = subcode === 460 ? 'password_changed' : 'expired';
+    return { ok: false, reason, code, subcode };
   } catch {
-    return false;
+    return { ok: false, reason: 'network', code: null, subcode: null };
   }
 }
 
@@ -236,6 +246,27 @@ function _injectTokenModal() {
           </label>
           <textarea id="token_modal_input" class="tim-input" rows="3"
             placeholder="EAAxxxx..."></textarea>
+          <!-- Banner cảnh báo đổi mật khẩu (ẩn mặc định) -->
+          <div id="token_modal_pw_banner" style="
+            display:none; align-items:flex-start; gap:1rem;
+            background:#fff1f2; border:2px solid #fca5a5; border-radius:1.2rem;
+            padding:1.4rem 1.6rem; margin-bottom:1.2rem;
+          ">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;font-size:1.8rem;flex-shrink:0;margin-top:.1rem;"></i>
+            <div>
+              <p style="margin:0 0 .35rem;font-weight:800;font-size:1.3rem;color:#b91c1c;">
+                User Token bị thu hồi do đổi mật khẩu Facebook
+              </p>
+              <p style="margin:0;font-size:1.2rem;color:#7f1d1d;line-height:1.55;">
+                Tài khoản Facebook liên kết vừa <b>đổi mật khẩu</b>.
+                Tất cả token cũ bị vô hiệu hóa. Hãy lấy token mới và dán vào ô.
+              </p>
+              <p style="margin:.6rem 0 0;font-size:1.1rem;color:#991b1b;font-family:monospace;">
+                ⚠ OAuthException · code <b>190</b> · subcode <b>460</b>
+              </p>
+            </div>
+          </div>
+
           <div id="token_modal_error" class="tim-error">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span id="token_modal_error_msg">Token không hợp lệ hoặc đã hết hạn.</span>
@@ -297,13 +328,17 @@ function _injectTokenModal() {
     errEl.style.display = "none";
     loading.style.display = "flex";
 
-    const valid = await _verifyToken(input);
+    const result = await _verifyToken(input);
 
     loading.style.display = "none";
 
-    if (!valid) {
+    if (!result.ok) {
       errEl.style.display = "flex";
-      errMsg.textContent = "Token không hợp lệ hoặc đã hết hạn. Vui lòng lấy token mới.";
+      if (result.reason === 'password_changed') {
+        errMsg.textContent = "Token mới cũng không hợp lệ. Kiểm tra lại token từ Facebook Developer.";
+      } else {
+        errMsg.textContent = "Token không hợp lệ hoặc đã hết hạn. Vui lòng lấy token mới.";
+      }
       return;
     }
 
@@ -420,40 +455,53 @@ window._resolveMetaToken = async function () {
 
   // --- Bước 1: Thử token cứng từ token.js ---
   if (META_TOKEN_STATIC && META_TOKEN_STATIC.length > 20) {
-    const ok = await _verifyToken(META_TOKEN_STATIC);
-    if (ok) {
+    const res1 = await _verifyToken(META_TOKEN_STATIC);
+    if (res1.ok) {
       console.log("[token] ✅ Dùng token từ token.js (static)");
       _applyToken(META_TOKEN_STATIC);
       try { sessionStorage.setItem(_TOKEN_VERIFIED_KEY, JSON.stringify({ token: META_TOKEN_STATIC, ts: Date.now() })); } catch (_) { }
       return;
     }
-    console.warn("[token] ⚠️ Token static đã hết hạn/không hợp lệ.");
+    if (res1.reason === 'password_changed') {
+      console.warn("[token] 🔴 Token static bị thu hồi do đổi mật khẩu Facebook (subcode 460).");
+      window._tokenFailReason = 'password_changed';
+    } else {
+      console.warn("[token] ⚠️ Token static đã hết hạn/không hợp lệ.");
+    }
   }
 
   // --- Bước 2: Thử token từ Google Sheets ---
   const sheetToken = await _fetchTokenFromSheets();
   if (sheetToken) {
-    const ok = await _verifyToken(sheetToken);
-    if (ok) {
+    const res2 = await _verifyToken(sheetToken);
+    if (res2.ok) {
       console.log("[token] ✅ Dùng token từ Google Sheets");
       _applyToken(sheetToken);
       localStorage.setItem(_TOKEN_LS_KEY, sheetToken);
       try { sessionStorage.setItem(_TOKEN_VERIFIED_KEY, JSON.stringify({ token: sheetToken, ts: Date.now() })); } catch (_) { }
       return;
     }
-    console.warn("[token] ⚠️ Token từ Sheets đã hết hạn/không hợp lệ.");
+    if (res2.reason === 'password_changed') {
+      console.warn("[token] 🔴 Token Sheets bị thu hồi do đổi mật khẩu Facebook (subcode 460).");
+      window._tokenFailReason = 'password_changed';
+    } else {
+      console.warn("[token] ⚠️ Token từ Sheets đã hết hạn/không hợp lệ.");
+    }
   }
 
   // --- Bước 2b: Thử token từ localStorage (cache) ---
   try {
     const lsToken = localStorage.getItem(_TOKEN_LS_KEY);
     if (lsToken) {
-      const ok = await _verifyToken(lsToken);
-      if (ok) {
+      const res2b = await _verifyToken(lsToken);
+      if (res2b.ok) {
         console.log("[token] ✅ Dùng token từ localStorage cache");
         _applyToken(lsToken);
         try { sessionStorage.setItem(_TOKEN_VERIFIED_KEY, JSON.stringify({ token: lsToken, ts: Date.now() })); } catch (_) { }
         return;
+      }
+      if (res2b.reason === 'password_changed') {
+        window._tokenFailReason = 'password_changed';
       }
     }
   } catch (_) { }
@@ -466,6 +514,11 @@ window._resolveMetaToken = async function () {
   const openModal = () => {
     _injectTokenModal();
     _openTokenModal();
+    // Nếu lý do là đổi mật khẩu → hiện banner cảnh báo đỏ ngay
+    if (window._tokenFailReason === 'password_changed') {
+      const banner = document.getElementById('token_modal_pw_banner');
+      if (banner) banner.style.display = 'flex';
+    }
   };
 
   if (document.body) {
