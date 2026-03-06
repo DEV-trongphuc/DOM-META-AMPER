@@ -885,7 +885,7 @@ function _renderCPVisitChart(data, precalculatedGroup = null) {
         .sort((a, b) => a.cpv - b.cpv);
 
     if (!sorted.length) {
-        container.innerHTML = `<p style="text-align:center;color:#999;padding-top:2rem;">Kh�ng c� d? li?u Store Visit</p>`;
+        container.innerHTML = `<p style="text-align:center;color:#999;padding-top:2rem;">Không có dữ liệu Store Visit</p>`;
         return;
     }
 
@@ -2230,3 +2230,4 @@ function _buildDistanceChart(cumAgg, metric) {
         plugins: [ChartDataLabels]
     });
 }
+
