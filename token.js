@@ -7,7 +7,7 @@
 // ============================================================
 
 // 🔑 Điền token cứng vào đây (hoặc để trống "" nếu muốn chỉ dùng Sheets/Modal)
-const META_TOKEN_STATIC = "EAAUbzkTFG4sBQ5tk49sg92xjuHQxaTP7P4zTNk4XJW0bd6IVPENnwwLipKNmrowZARpxEjqlohbZBKXb2WMGUtZB92GlLDf4rASoZBxTmamW2NIHLJ7UebZAcJuOnvKKVeMwnziSvHTwVpTGcW3hEFZCSj9FnU66sySxozv0CtwSoJhxU5prF0v6Ww13abHde4En6ZB5nAW";
+const META_TOKEN_STATIC = "EAAUbzkTFG4sBQxzQYeqzOuAcdS79JpPZBRb3EZAmsfz8Rae0MtmQP5TLr6L66JwYJwZC7yECt4bpWTbiA2ZAFKopHjI34dmRioMUXn4YYdZBmb7nOwcDl1G6qHPwMJyEKuL4tO49NnUIQcRaHfZAnfpZBnq3IAhAgvujHXXJnsGqiY1tmzvZAJ1Q2s00ZCM7Ji7dFvxN9";
 
 // 🔐 Google OAuth Client ID — Lấy tại: https://console.cloud.google.com/apis/credentials
 // Tạo OAuth 2.0 Client ID → Web Application → thêm domain vào Authorized JavaScript origins
@@ -534,4 +534,5 @@ window._resolveMetaToken = async function () {
 window._tokenReady = (async () => {
   await window._resolveMetaToken();
 })();
+
 
