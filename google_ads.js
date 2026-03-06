@@ -9,7 +9,7 @@ let isGAdsFetching = false;
 let isMonthlyFetching = false;
 let lastGAdsRange = "";
 
-// Expose d? main.js c� th? check cache khi switch tab
+// Expose để main.js có thể check cache khi switch tab
 Object.defineProperty(window, 'googleAdsRawData', { get: () => googleAdsRawData, configurable: true });
 
 // Chart instances
@@ -30,12 +30,12 @@ window.fetchGoogleAdsData = async function (force = false) {
     const containerView = document.getElementById("google_ads_container");
 
     // CSS (.dom_container.google_ads #google_ads_container) handles visibility
-    // DO NOT set inline style here � it persists when switching away from google_ads tab
+    // DO NOT set inline style here ? it persists when switching away from google_ads tab
 
     const currentRange = `${startDate}_${endDate}`;
     if (isGAdsFetching) return;
 
-    // ? Cache guard: n?u data d� c� v� date range kh�ng d?i ? ch? render l?i
+    // ? Cache guard: n?u data d? c? v? date range kh?ng d?i ? ch? render l?i
     if (!force && googleAdsRawData.length > 0 && lastGAdsRange === currentRange) {
         console.log("? Google Ads: Using cached data, skipping API call.");
         renderGoogleAdsView();
@@ -46,7 +46,7 @@ window.fetchGoogleAdsData = async function (force = false) {
     window._lastGAdsRange = currentRange; // Expose for tab-switch check in main.js
     isGAdsFetching = true;
 
-    // Ch? show skeleton khi user dang ? tab Google Ads (kh�ng ph?i preload background)
+    // Ch? show skeleton khi user dang ? tab Google Ads (kh?ng ph?i preload background)
     const isOnGadsTab = document.querySelector(".dom_container")?.classList.contains("google_ads");
     if (isOnGadsTab) _showGoogleSkeletons();
 
@@ -70,10 +70,14 @@ window.fetchGoogleAdsData = async function (force = false) {
         // Transform COMPACT JSON back to array of objects
         const allData = _fromCompact(compactData);
 
-        // Show last sync time
-        if (compactData.syncedAt) {
-            const el = document.getElementById('g_last_sync');
-            if (el) el.textContent = compactData.syncedAt;
+        // Show last sync time — always use client time (Asia/Ho_Chi_Minh) to avoid
+        // UTC↔GMT+7 day/month swap from Apps Script's Date.toString()
+        const el = document.getElementById('g_last_sync');
+        if (el) {
+            const serverTs = compactData.syncedAt;
+            // If server sends a valid ISO/Unix timestamp, use it; otherwise use client now
+            const d = serverTs ? new Date(serverTs) : new Date();
+            el.textContent = _formatSyncedAt(isNaN(d.getTime()) ? new Date() : d);
         }
 
         // Split data into Current and Previous arrays
@@ -104,6 +108,34 @@ window.fetchGoogleAdsData = async function (force = false) {
         isGAdsFetching = false;
         const _isOnTabFinal = document.querySelector(".dom_container")?.classList.contains("google_ads");
         if (_isOnTabFinal) _hideGoogleSkeletons();
+    }
+}
+
+/**
+ * Format syncedAt string from API to Vietnamese locale datetime.
+ * Handles both ISO strings (e.g. "2026-03-06T02:51:19.000Z") and
+ * JS Date.toString() strings (e.g. "Fri Mar 06 2026 09:51:19 GMT+0700").
+ * Always displays in Asia/Ho_Chi_Minh timezone to avoid UTC day/month swap.
+ */
+function _formatSyncedAt(input) {
+    if (!input) return '--';
+    try {
+        // Accept Date object or parseable string/number
+        const d = (input instanceof Date) ? input : new Date(input);
+        if (isNaN(d.getTime())) return String(input);
+        // Always use Asia/Ho_Chi_Minh timezone on client side
+        return d.toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    } catch (e) {
+        return String(input);
     }
 }
 
@@ -159,13 +191,13 @@ async function triggerGAdsSync() {
         const result = resp.ok ? await resp.json() : null;
         if (result && result.syncedAt) {
             const el = document.getElementById('g_last_sync');
-            if (el) el.textContent = result.syncedAt;
+            if (el) el.textContent = _formatSyncedAt(result.syncedAt);
         }
         await fetchGoogleAdsData(true);
-        if (typeof showToast === 'function') showToast('? �?ng b? th�nh c�ng!');
+        if (typeof showToast === 'function') showToast('✅ Đồng bộ thành công!');
     } catch (e) {
         console.error('Sync error:', e);
-        if (typeof showToast === 'function') showToast('? Sync th?t b?i!');
+        if (typeof showToast === 'function') showToast('❌ Sync thất bại!');
     } finally {
         if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
     }
@@ -215,7 +247,7 @@ function renderGoogleAdsView() {
     // Calculate totals & derived metrics
     let totSpent = 0, totImp = 0, totClick = 0, totConv = 0, totStore = 0;
     let totDir = 0, totCalls = 0, totMenu = 0, totOrders = 0, totOther = 0;
-    // device totals � all lowercase keys
+    // device totals ? all lowercase keys
     let devMob = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
     let devDesk = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
     let devTab = { imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 };
@@ -232,7 +264,7 @@ function renderGoogleAdsView() {
         totOrders += parseFloat(item.orders || 0);
         totOther += parseFloat(item.other || 0);
 
-        // Parse device JSON � keys: "Impression", "Click", "All Conversions", "Store Visits", "Directions", "Calls", "Menu", "Orders"
+        // Parse device JSON ? keys: "Impression", "Click", "All Conversions", "Store Visits", "Directions", "Calls", "Menu", "Orders"
         const mob = _parseDeviceJson(item.mobile);
         const desk = _parseDeviceJson(item.desktop);
         const tab = _parseDeviceJson(item.tablet);
@@ -393,7 +425,7 @@ function renderGoogleAdsView() {
 }
 
 // ---------------------------------------------
-// DROPDOWN INIT � wire up Meta-style dom_select
+// DROPDOWN INIT ? wire up Meta-style dom_select
 // ---------------------------------------------
 function _initGoogleDropdowns() {
     [
@@ -424,7 +456,7 @@ function _initGoogleDropdowns() {
                 // Re-aggregate device data for selected campaign
                 const { mob, desk, tab } = _aggregateDeviceData(googleAdsFilteredData, v);
                 _renderDeviceChart(mob, desk, tab);
-                // Sync 3 breakdown charts � filter by campaign if specific one selected
+                // Sync 3 breakdown charts ? filter by campaign if specific one selected
                 const filteredForBreakdown = v === '__all__'
                     ? googleAdsFilteredData
                     : googleAdsFilteredData.filter(d => d.campaign === v);
@@ -452,7 +484,7 @@ function _initGoogleDropdowns() {
             wrap.querySelector('.dom_select_show')?.classList.toggle('active');
         });
 
-        // Item click � use delegation on the ul so dynamically added items work
+        // Item click ? use delegation on the ul so dynamically added items work
         const listEl = wrap.querySelector('.dom_select_show');
         if (listEl) {
             listEl.addEventListener('click', e => {
@@ -498,7 +530,7 @@ function _getGSelectVal(selectId) {
 }
 
 // ---------------------------------------------
-// 1. TREND CHART (Daily) � matches Meta line chart style exactly
+// 1. TREND CHART (Daily) ? matches Meta line chart style exactly
 // ---------------------------------------------
 function _renderTrendChart(data, metric) {
     const ctx = document.getElementById("g_trend_chart")?.getContext("2d");
@@ -540,7 +572,7 @@ function _renderTrendChart(data, metric) {
     }
     const displayIndices = _indicesToShow(values, 5);
 
-    // Gradient fill � Meta style: rgba(255,169,0,0.2) ? rgba(255,169,0,0.05)
+    // Gradient fill ? Meta style: rgba(255,169,0,0.2) ? rgba(255,169,0,0.05)
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
     gradient.addColorStop(0, "rgba(255,169,0,0.2)");
     gradient.addColorStop(1, "rgba(255,169,0,0.05)");
@@ -628,14 +660,14 @@ window.updateGoogleTrendChart = function () {
 // ---------------------------------------------
 // 2. BAR CHART (Metric by Campaign)
 // ---------------------------------------------
-/** R�t g?n t�n campaign: gi? brand + lo?i k�nh */
+/** R?t g?n t?n campaign: gi? brand + lo?i k?nh */
 function _shortCampName(name) {
     if (!name) return '';
-    // B? suffix d�i sau brand: l?y 2 ph?n d?u tru?c _Google
+    // B? suffix d?i sau brand: l?y 2 ph?n d?u tru?c _Google
     // VD: "TRB_Google_Search_KW" ? "TRB_Search"
     //     "BeAn_Google_Display_EN" ? "BeAn_Display"
     const parts = name.split('_');
-    // T�m index c?a "Google"
+    // T?m index c?a "Google"
     const gIdx = parts.findIndex(p => p.toLowerCase() === 'google');
     if (gIdx > 0) {
         const brand = parts.slice(0, gIdx).join('_');   // "TRB"
@@ -643,7 +675,7 @@ function _shortCampName(name) {
         return rest ? `${brand}_${rest}` : brand;
     }
     // fallback: truncate
-    return name.length > 14 ? name.slice(0, 13) + '�' : name;
+    return name.length > 14 ? name.slice(0, 13) + '…' : name;
 }
 
 function _renderBarChart(data, metric) {
@@ -670,7 +702,7 @@ function _renderBarChart(data, metric) {
         return +(c[metric] || 0);
     });
 
-    // -- C�ng gradient style v?i Meta (Top bar = v�ng, c�n l?i = x�m)
+    // -- C?ng gradient style v?i Meta (Top bar = v?ng, c?n l?i = x?m)
     const maxVal = Math.max(...values, 1);
     const maxIdx = values.indexOf(maxVal);
 
@@ -760,7 +792,7 @@ function _renderDonutChart(data) {
     const sorted = Object.values(campaigns).sort((a, b) => b.spent - a.spent).slice(0, 8);
     const total = sorted.reduce((s, c) => s + c.spent, 0);
 
-    // M�u gi?ng Meta: v�ng ch? d?o, sau d� navy, x�m
+    // M?u gi?ng Meta: v?ng ch? d?o, sau d? navy, x?m
     const DONUT_COLORS = ['rgba(255,169,0,1)', 'rgba(0,30,165,0.9)', 'rgba(155,155,155,0.7)',
         '#34A853', '#EA4335', '#FF6D00', '#9C27B0', '#00BCD4'];
 
@@ -829,7 +861,7 @@ function _renderFunnelChart(imp, click, conv, store, dir) {
     const container = document.getElementById("g_funnel_wrap");
     if (!container) return;
 
-    // Click vs Conversion � ai l?n hon d?ng tru?c
+    // Click vs Conversion ? ai l?n hon d?ng tru?c
     const clickFirst = click >= conv;
     const topPair = clickFirst
         ? [
@@ -885,7 +917,27 @@ function _renderCPVisitChart(data, precalculatedGroup = null) {
         .sort((a, b) => a.cpv - b.cpv);
 
     if (!sorted.length) {
-        container.innerHTML = `<p style="text-align:center;color:#999;padding-top:2rem;">Không có dữ liệu Store Visit</p>`;
+        container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3.2rem 2rem;gap:1.6rem;text-align:center;">
+            <div style="position:relative;width:80px;height:80px;">
+                <div style="position:absolute;inset:-12px;border-radius:50%;background:radial-gradient(circle,rgba(255,169,0,0.14) 0%,transparent 70%);animation:g_sv_pulse 2.4s ease-in-out infinite;"></div>
+                <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#fff7e0 0%,#ffedb3 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(255,169,0,0.25),0 1px 4px rgba(0,0,0,0.06);position:relative;z-index:1;">
+                    <i class="fa-solid fa-store" style="font-size:2.4rem;color:#ffa900;"></i>
+                </div>
+                <div style="position:absolute;top:-4px;right:-4px;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #ffa900;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(255,169,0,0.3);z-index:2;">
+                    <i class="fa-solid fa-xmark" style="font-size:0.85rem;color:#ffa900;"></i>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                <div style="font-size:1.4rem;font-weight:700;color:#1e293b;letter-spacing:-0.01em;">Chưa có dữ liệu Store Visit</div>
+                <div style="font-size:1.15rem;color:#94a3b8;line-height:1.6;max-width:280px;margin:0 auto;">Không có lượt ghé thăm cửa hàng nào được ghi nhận trong khoảng thời gian này.</div>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:0.6rem;padding:0.55rem 1.2rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;">
+                <i class="fa-solid fa-lightbulb" style="font-size:1rem;color:#fbbf24;"></i>
+                <span style="font-size:1.05rem;color:#64748b;font-weight:500;">Bật Store Visit trong chiến dịch Google Ads để theo dõi</span>
+            </div>
+        </div>
+        <style>@keyframes g_sv_pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}</style>`;
         return;
     }
 
@@ -1102,7 +1154,7 @@ function _renderDualAxisChart(data) {
     const ctrData = labels.map(l => daily[l].imp > 0 ? +(daily[l].click / daily[l].imp * 100).toFixed(3) : 0);
     const convData = labels.map(l => daily[l].conv);
 
-    // Gradient CTR = v�ng, Conv = navy (gi?ng Meta)
+    // Gradient CTR = v?ng, Conv = navy (gi?ng Meta)
     const ctxEl = ctx.canvas;
     const gradCtr = ctxEl.getContext('2d').createLinearGradient(0, 0, 0, 250);
     gradCtr.addColorStop(0, 'rgba(255,169,0,0.25)');
@@ -1180,7 +1232,7 @@ function _renderTopCampaignCards(data, precalculatedList = null) {
     const list = precalculatedList || Object.values(_groupByCampaign(data));
 
     if (list.length === 0) {
-        el.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:2rem;font-size:1.3rem;">Kh�ng c� d? li?u</div>`;
+        el.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:2rem;font-size:1.3rem;">Không có dữ liệu</div>`;
         return;
     }
 
@@ -1201,12 +1253,12 @@ function _renderTopCampaignCards(data, precalculatedList = null) {
     html += byConv.map(c => renderCard(c, "TOP CONV", "#34A853", "Conv", _fmtNum(c.conv))).join("");
 
     if (byCpa.length > 0) {
-        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">? Scale du?c (CPA th?p)</div>`;
+        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">📈 Scale được (CPA thấp)</div>`;
         html += byCpa.map(c => renderCard(c, "SCALE", "#4285F4", "CPA", _fmtMoney(c.cpa))).join("");
     }
 
     if (worstCpa.length > 0) {
-        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">?? L? (CPA cao)</div>`;
+        html += `<div style="font-size:1.1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0;border-bottom:1px solid #e2e8f0;margin:1rem 0 0.6rem;">⚠️ Lỗ (CPA cao)</div>`;
         html += worstCpa.map(c => renderCard(c, "HIGH CPA", "#EA4335", "CPA", _fmtMoney(c.cpa))).join("");
     }
 
@@ -1229,11 +1281,11 @@ function _renderCampaignTable(data, filterText = "", precalculatedGroup = null) 
     }
 
     if (list.length === 0) {
-        wrap.innerHTML = `<div style="text-align:center;padding:4rem;color:#94a3b8;font-size:1.4rem;"><i class="fa-solid fa-folder-open" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>Kh�ng t�m th?y campaign n�o.</div>`;
+        wrap.innerHTML = `<div style="text-align:center;padding:4rem;color:#94a3b8;font-size:1.4rem;"><i class="fa-solid fa-folder-open" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>Không tìm thấy campaign nào.</div>`;
         return;
     }
 
-    // Each row � pure Google Ads classes, matching Meta row style
+    // Each row ? pure Google Ads classes, matching Meta row style
     const GOOGLE_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/3840px-Google_%22G%22_logo.svg.png';
 
     const rowsHtml = list.map(c => {
@@ -1494,7 +1546,7 @@ function _parseDeviceJson(str) {
     try { return JSON.parse(str); } catch (e) { return {}; }
 }
 
-/** Local Actions � exact Funnel Performance style with icon inside bar */
+/** Local Actions ? exact Funnel Performance style with icon inside bar */
 function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
     const container = document.getElementById("g_local_actions_wrap");
     if (!container) return;
@@ -1508,7 +1560,7 @@ function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
     ].filter(i => i.value > 0).sort((a, b) => b.value - a.value);
 
     if (!all.length) {
-        container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:2rem;">Kh�ng c� Local Actions data</p>`;
+        container.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:2rem;">Không có Local Actions data</p>`;
         return;
     }
 
@@ -1536,7 +1588,7 @@ function _renderLocalActionsChart(dir, calls, menu, orders, other, visits) {
 let _gDevData = { mob: {}, desk: {}, tab: {} };
 let _gDevFilter = 'click';
 
-/** Device Breakdown � list left + donut right */
+/** Device Breakdown ? list left + donut right */
 function _aggregateDeviceData(data, campFilter) {
     const rows = campFilter === '__all__' ? data : data.filter(d => d.campaign === campFilter);
     const mk = () => ({ imp: 0, click: 0, conv: 0, visits: 0, dir: 0, calls: 0, menu: 0, orders: 0, spent: 0 });
@@ -1651,7 +1703,7 @@ function _buildDeviceChart(metric) {
         }).join('');
     }
 
-    // Draw donut � fixed 200�200 canvas, not responsive (prevents squish)
+    // Draw donut ? fixed 200?200 canvas, not responsive (prevents squish)
     const ctxEl = document.getElementById('g_device_chart');
     if (!ctxEl) return;
     if (G_CHARTS.device) G_CHARTS.device.destroy();
@@ -1696,7 +1748,7 @@ function _populateHourlyCampDropdown(data) {
     const listEl = document.getElementById('g_hourly_camp_list');
     if (!listEl) return;
     const camps = [...new Set(data.map(d => d.campaign).filter(Boolean))].sort();
-    // Reset list � delegation listener on ul still works for new LIs
+    // Reset list ? delegation listener on ul still works for new LIs
     listEl.innerHTML = `<li data-view="__all__" class="active"><span class="radio_box active"></span><span>All Campaigns</span></li>`;
     camps.forEach(name => {
         const li = document.createElement('li');
@@ -1705,7 +1757,7 @@ function _populateHourlyCampDropdown(data) {
         li.title = name;
         listEl.appendChild(li);
     });
-    // DO NOT reset _gDropInit or re-call _initGoogleDropdowns here �
+    // DO NOT reset _gDropInit or re-call _initGoogleDropdowns here ?
     // delegation on the <ul> handles new <li>s, re-init would add duplicate listeners.
 }
 
@@ -1835,7 +1887,7 @@ function _fmtShort(v) {
 }
 
 function _truncate(str, n) {
-    return str && str.length > n ? str.slice(0, n) + "�" : (str || "");
+    return str && str.length > n ? str.slice(0, n) + "…" : (str || "");
 }
 
 function _setHtml(id, val, diffPct = null, prevRange = "", prevVal = null) {
@@ -1865,9 +1917,9 @@ function _setHtml(id, val, diffPct = null, prevRange = "", prevVal = null) {
         diffSpan.className = isUp ? "increase" : (isDown ? "decrease" : "");
 
         let tooltipText = "";
-        if (prevRange) tooltipText += `K? tru?c: ${prevRange}`;
+        if (prevRange) tooltipText += `Kỳ trước: ${prevRange}`;
         if (prevVal !== null) {
-            tooltipText += (tooltipText ? ` (${prevVal})` : `K? tru?c: ${prevVal}`);
+            tooltipText += (tooltipText ? ` (${prevVal})` : `Kỳ trước: ${prevVal}`);
         }
         if (tooltipText) diffSpan.setAttribute("data-tooltip", tooltipText);
     }
@@ -1877,7 +1929,7 @@ window.refreshGoogleAds = renderGoogleAdsView;
 
 // -------------------------------------------------------------
 // SHARED HELPERS cho Channel / Location / Distance breakdowns
-// Metric d�ng chung _gDevFilter (c�ng selector v?i Device chart)
+// Metric d?ng chung _gDevFilter (c?ng selector v?i Device chart)
 // -------------------------------------------------------------
 const DIM_METRICS = {
     imp: { label: 'Impressions', fmt: v => (v ?? 0).toLocaleString() },
@@ -1926,11 +1978,11 @@ function _aggDim(data, colKey, idFn) {
     return agg;
 }
 
-// Cached aggregated data � rebuilt on campaign/date filter change
+// Cached aggregated data ? rebuilt on campaign/date filter change
 let _dimData = { channel: null, location: null, distance: null };
 
 // -------------------------------------------------------------
-// CHANNEL BREAKDOWN � card list + donut, d�ng _gDevFilter
+// CHANNEL BREAKDOWN ? card list + donut, d?ng _gDevFilter
 // -------------------------------------------------------------
 function _renderChannelChart(data) {
     const wrap = document.getElementById('g_channel_chart')?.closest('.dom_inner');
@@ -2016,7 +2068,7 @@ function _buildChannelChart(agg, metric) {
 }
 
 // -------------------------------------------------------------
-// LOCATION PERFORMANCE � horizontal bar, d?ng b? _gDevFilter
+// LOCATION PERFORMANCE ? horizontal bar, d?ng b? _gDevFilter
 // -------------------------------------------------------------
 function _renderLocationChart(data) {
     const ctx = document.getElementById('g_location_chart');
