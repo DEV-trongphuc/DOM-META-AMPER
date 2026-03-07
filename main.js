@@ -353,6 +353,7 @@ function evaluateFormula(item, formula) {
     return 0;
   }
 }
+
 function formatMetric(value, format) {
   if (value === "-" || value === null || value === undefined) return "-";
   if (isNaN(value) || !isFinite(value)) return "-";
@@ -366,8 +367,6 @@ function formatMetric(value, format) {
     default: return value.toLocaleString("vi-VN");
   }
 }
-
-
 
 loadColumnConfig();
 
@@ -13599,7 +13598,5 @@ function renderPerformanceTable(manualCompareData = null) {
 }
 
 // Xóa listener cũ không còn sử dụng
-
-
 
 
