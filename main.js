@@ -353,34 +353,21 @@ function evaluateFormula(item, formula) {
     return 0;
   }
 }
-
-function formatMetric(value, format, metricId) { // Thêm tham số metricId
+function formatMetric(value, format) {
   if (value === "-" || value === null || value === undefined) return "-";
   if (isNaN(value) || !isFinite(value)) return "-";
   if (value === 0) return "0";
-
-  // Tự động nhận diện các chỉ số cần hiển thị % 
-  // (CTR, Conversion Rate, hoặc các Custom Metrics bạn đặt tên có chữ 'rate' hoặc 'percent')
-  const isPercentageMetric = 
-    metricId.toLowerCase().includes("rate") || 
-    metricId.toLowerCase().includes("ctr") || 
-    metricId.toLowerCase().includes("percent") ||
-    format === "percent";
-
-  if (isPercentageMetric) {
-    // Nếu giá trị là số thập phân nhỏ (ví dụ 0.05), nhân 100. 
-    // Nếu giá trị đã được nhân 100 ở evaluateFormula (ví dụ 5.0), thì chỉ thêm dấu %
-    const displayVal = value <= 1 && value > 0 ? (value * 100).toFixed(2) : value.toFixed(2);
-    return displayVal + "%";
-  }
 
   switch (format) {
     case "money": return formatMoney(value);
     case "number": return formatNumber(value);
     case "decimal": return value.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    case "percent": return (value * 100).toFixed(2) + "%";
     default: return value.toLocaleString("vi-VN");
   }
 }
+
+
 
 loadColumnConfig();
 
@@ -13612,6 +13599,7 @@ function renderPerformanceTable(manualCompareData = null) {
 }
 
 // Xóa listener cũ không còn sử dụng
+
 
 
 
