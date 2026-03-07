@@ -340,16 +340,22 @@ function getMetricValue(item, metricId) {
   return 0;
 }
 
+
+
 function evaluateFormula(item, formula) {
   try {
-    // Replace {{metric}} with values
     let processed = formula.replace(/\{\{([^}]+)\}\}/g, (match, id) => {
-      return getMetricValue(item, id.trim());
+      // Ép kiểu số ngay tại đây để đảm bảo an toàn toán học
+      const val = parseFloat(getMetricValue(item, id.trim()));
+      return isNaN(val) ? 0 : val; 
     });
-    // Basic math evaluation
-    return Function(`"use strict"; return (${processed})`)();
+
+    // Thực thi tính toán
+    const result = Function(`"use strict"; return (${processed})`)();
+    
+    // Nếu kết quả là Infinity (chia cho 0) hoặc NaN, trả về 0
+    return isFinite(result) ? result : 0;
   } catch (e) {
-    console.warn("Formula evaluation error:", formula, e);
     return 0;
   }
 }
@@ -13619,6 +13625,7 @@ function renderPerformanceTable(manualCompareData = null) {
 }
 
 // Xóa listener cũ không còn sử dụng
+
 
 
 
