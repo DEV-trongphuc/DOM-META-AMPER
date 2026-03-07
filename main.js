@@ -353,18 +353,39 @@ function evaluateFormula(item, formula) {
     return 0;
   }
 }
-
-function formatMetric(value, format) {
+function formatMetric(value, format, metricId = "") {
+  // 1. Kiểm tra giá trị hợp lệ
   if (value === "-" || value === null || value === undefined) return "-";
-  if (isNaN(value) || !isFinite(value)) return "-";
-  if (value === 0) return "0";
+  const numValue = parseFloat(value);
+  if (isNaN(numValue) || !isFinite(numValue)) return "-";
+  if (numValue === 0) return "0";
 
+  const id = metricId.toLowerCase();
+
+  // 2. Tự động nhận diện các cột cần hiển thị %
+  // Bao gồm: CTR, các cột có chữ "rate", "percent", hoặc Custom Metrics bạn đặt tên có "rate"
+  const isPercent = 
+    format === "percent" || 
+    id.includes("ctr") || 
+    id.includes("rate") || 
+    id.includes("percent");
+
+  if (isPercent) {
+    // Nếu giá trị nhỏ (VD: 0.05) -> x100. Nếu giá trị lớn (VD: 5.0) -> giữ nguyên
+    let displayVal = (numValue <= 1 && numValue > 0) ? numValue * 100 : numValue;
+    return displayVal.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
+  }
+
+  // 3. Các định dạng thông thường
   switch (format) {
-    case "money": return formatMoney(value);
-    case "number": return formatNumber(value);
-    case "decimal": return value.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    case "percent": return (value * 100).toFixed(2) + "%";
-    default: return value.toLocaleString("vi-VN");
+    case "money": 
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numValue);
+    case "number": 
+      return Math.floor(numValue).toLocaleString("vi-VN");
+    case "decimal": 
+      return numValue.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    default: 
+      return numValue.toLocaleString("vi-VN");
   }
 }
 
@@ -13598,5 +13619,6 @@ function renderPerformanceTable(manualCompareData = null) {
 }
 
 // Xóa listener cũ không còn sử dụng
+
 
 
