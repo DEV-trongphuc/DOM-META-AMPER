@@ -528,7 +528,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Remove old view classes from container
       container.classList.forEach((cls) => {
-        if (["dashboard", "ad_detail", "account", "google_ads"].includes(cls)) {
+        if (["dashboard", "ad_detail", "ad_library", "account", "google_ads"].includes(cls)) {
           container.classList.remove(cls);
         }
       });
@@ -539,6 +539,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear any leftover inline style on the Google Ads container so CSS rule takes over
       const gAdsEl = document.getElementById("google_ads_container");
       if (gAdsEl) gAdsEl.style.removeProperty('display');
+
+      if (view === "ad_library" && typeof renderAdLibrary === "function") {
+        renderAdLibrary();
+      }
 
       if (view === "google_ads") {
         // Nếu data đã được load ngầm từ trước và date range không đổi → chỉ render lại, không fetch

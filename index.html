@@ -310,6 +310,10 @@
           <i class="fa-solid fa-list"></i>
           <span>Campaign details</span>
         </li>
+        <li class="" data-view="ad_library">
+          <i class="fa-solid fa-images"></i>
+          <span>Ads Library</span>
+        </li>
         <li class="" data-view="account">
           <i class="fa-solid fa-money-check"></i>
           <span>Ad Account</span>
@@ -704,23 +708,47 @@
                 <span class="dom_title_button" id="age_only_toggle_btn" onclick="toggleAgeOnlyView()" title="Gộp theo Age">
                   <i class="fa-solid fa-venus-mars"></i> Age Only
                 </span>
-                <span class="dom_title_button region" onclick="toggleRegionView()"><i class="fa-solid fa-repeat"></i>
-                  Region Chart</span>
               </div>
             </h2>
             <div>
               <canvas id="age_gender_total"></canvas>
             </div>
-            <div class="dom_platform_abs">
-              <h2 class="">
-                <span>
-                  <i class="fa-solid fa-chart-simple main_clr"></i> Region Spent</span>
-                <span class="dom_title_button region" onclick="toggleRegionView()"><i class="fa-solid fa-repeat"></i>
-                  Age &amp; Gender</span>
-              </h2>
-              <div id="region_chart_wrap">
-                <canvas id="region_chart"></canvas>
+          </div>
+        </div>
+        <div class="dom_row flex">
+          <!-- 8. Heatmap Dayparting (66%) -->
+          <div class="dom_inner dom_fade_item w66 box_shadow chart" style="background-color: white;">
+            <div class="dom_table_filter">
+              <h2><i class="fa-solid fa-clock main_clr"></i> Dayparting Heatmap</h2>
+              <div class="dom_select daily_total heatmap_metric">
+                <i class="fa-solid fa-layer-group"></i>
+                <div class="flex">
+                  <p class="dom_selected">Spend</p>
+                </div>
+                <i class="fa-solid fa-angle-down"></i>
+                <ul class="dom_select_show">
+                  <li data-view="spend" class="active"><span class="radio_box active"></span> <span>Spend</span></li>
+                  <li data-view="messages" class=""><span class="radio_box"></span> <span>Messages</span></li>
+                  <li data-view="purchases" class=""><span class="radio_box"></span> <span>Purchases</span></li>
+                  <li data-view="leads" class=""><span class="radio_box"></span> <span>Leads</span></li>
+                </ul>
+                <input type="hidden" id="heatmap_metric_select" value="spend" />
               </div>
+            </div>
+            <div id="heatmap_container" style="width:100%; overflow-x:auto; padding:1rem 0; margin-top: 2rem;">
+              <!-- Rendered by JS -->
+              <div style="text-align:center; padding:3rem; color:#94a3b8; font-size:1.2rem;"><i
+                  class="fa-solid fa-circle-notch fa-spin"></i> Chờ dữ liệu...</div>
+            </div>
+          </div>
+
+          <!-- Region Chart (33%) -->
+          <div class="dom_inner dom_fade_item w33 box_shadow chart" style="background-color: white;">
+            <h2 class="">
+              <span><i class="fa-solid fa-location-dot main_clr"></i> Region Spent</span>
+            </h2>
+            <div id="region_chart_wrap" style="padding-top: 1rem;">
+              <canvas id="region_chart"></canvas>
             </div>
           </div>
         </div>
@@ -1015,6 +1043,24 @@
 
         </div>
 
+      </div>
+
+      <!-- AD LIBRARY VIEW -->
+      <div class="dom_row flex ad_library" id="dom_ad_library"
+        style="display:none; flex-direction:column; gap:1.5rem; width:100%; padding: 0.5rem 0;">
+        <div
+          style="display:flex; justify-content:space-between; align-items:center; width:100%; background: #fff; padding: 1.5rem 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+          <h2 style="margin:0; font-size: 1.6rem; color: #1e293b; display:flex; align-items:center; gap: 0.8rem;">
+            <i class="fa-solid fa-images main_clr"></i> Thư viện Quảng cáo
+          </h2>
+          <div style="font-size: 1.2rem; color: #64748b; background: #f8fafc; padding: 0.5rem 1.2rem; border-radius: 20px; font-weight: 500;">
+            Hiển thị quảng cáo đang chạy
+          </div>
+        </div>
+        <div id="ad_library_content" style="width:100%;">
+          <div style="text-align:center; padding: 4rem; color: #94a3b8;"><i class="fa-solid fa-circle-notch fa-spin"
+              style="font-size:2rem; margin-bottom:1rem; color:#f59e0b;"></i><br>Đang tải thư viện quảng cáo...</div>
+        </div>
       </div>
 
       <div class="dom_detail" id="dom_detail">
@@ -2410,6 +2456,7 @@
 <script src="./js/charts/render_age_gender.js?v=9"></script>
 <script src="./js/charts/region_chart.js?v=9"></script>
 <script src="./js/charts/monthly_chart.js?v=9"></script>
+<script src="./js/charts/heatmap_chart.js?v=9"></script>
 
 <!-- 5. UI Components -->
 <script src="./js/ui/render_campaign.js?v=9"></script>
@@ -2417,6 +2464,7 @@
 <script src="./js/ui/selection_bar.js?v=9"></script>
 <script src="./js/ui/adset_modal.js?v=9"></script>
 <script src="./js/ui/ad_detail_modal.js?v=9"></script>
+<script src="./js/ui/ad_library.js?v=9"></script>
 <script src="./js/ui/ai_report.js?v=9"></script>
 <script src="./js/ui/ai_modal_setup.js?v=9"></script>
 <script src="./js/ui/year_dropdown.js?v=9"></script>

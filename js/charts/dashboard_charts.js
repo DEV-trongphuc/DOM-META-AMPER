@@ -47,6 +47,7 @@ async function loadAllDashboardCharts(campaignIds = []) {
     renderAgeGenderChart(results.spendByAgeGender);
     renderRegionChart(results.spendByRegion);
     renderDetailDailyChart2(results.dailySpend, "spend");
+    if (typeof window.renderHeatmap === "function") window.renderHeatmap();
 
     window._DASHBOARD_BATCH_RESULTS = results;
   } catch (err) {
