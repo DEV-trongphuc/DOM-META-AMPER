@@ -32,7 +32,12 @@ function init_cors() {
     ];
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if (in_array(rtrim($origin, '/'), $ALLOWED_ORIGINS) || empty($origin)) {
+    $origin_clean = rtrim($origin, '/');
+    
+    $is_allowed = in_array($origin_clean, $ALLOWED_ORIGINS) 
+        || preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin_clean);
+
+    if ($is_allowed || empty($origin)) {
         header("Access-Control-Allow-Origin: " . ($origin ?: '*'));
     } else {
         if (strpos($origin, 'file://') === 0 || empty($origin)) {
