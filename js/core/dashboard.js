@@ -164,10 +164,15 @@ async function main() {
     if (typeof fetchGoogleAdsData === "function") await fetchGoogleAdsData(false);
   })();
 
+  // 1. Chờ load cấu hình cài đặt từ database
+  await window._SETTINGS_PROMISE;
+  
+  // 2. Khởi tạo Account Selector để thiết lập đúng ACCOUNT_ID và META_TOKEN tương ứng
+  await initAccountSelector();
+  
+  // 3. Tiến hành tải các dữ liệu khác sử dụng ACCOUNT_ID và META_TOKEN đã được thiết lập đúng
   await Promise.all([
-    window._SETTINGS_PROMISE,
     googleAdsTask,
-    initAccountSelector(),
     loadDashboardData(),
     syncAiHistoryFromSheet(),
   ]);

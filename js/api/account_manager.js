@@ -356,19 +356,8 @@ window.saveSelectedAccounts = async function() {
     }
     
     try {
-        await window.saveAllowedAccountsSync(groups);
-        
-        // Lưu token cho từng account được chọn để khi load lại hệ thống tự tìm thấy
-        for (const acc of selectedAccounts) {
-            try {
-                await fetch(`${window.SETTINGS_SHEET_URL}?account_id=${acc.id}`, {
-                    method: "POST",
-                    body: JSON.stringify({ key: "meta_access_token", value: token })
-                });
-            } catch (e) {
-                console.warn(`Không thể lưu token cho account ${acc.id}:`, e);
-            }
-        }
+        // Đồng bộ cấu hình Workspace và Token sang tất cả tài khoản
+        await _saveWorkspaceConfigToAll(groups);
         
         window.ALLOWED_ACCOUNTS = groups;
         
@@ -393,7 +382,7 @@ window._removeTokenGroup = async function(index) {
     groups.splice(index, 1);
     
     try {
-        await window.saveAllowedAccountsSync(groups);
+        await _saveWorkspaceConfigToAll(groups);
         
         window.ALLOWED_ACCOUNTS = groups;
         
@@ -425,7 +414,7 @@ window._removeAccountFromGroup = async function(groupIndex, accountId) {
     group.accounts = group.accounts.filter(a => a.id !== accountId);
     
     try {
-        await window.saveAllowedAccountsSync(groups);
+        await _saveWorkspaceConfigToAll(groups);
         
         window.ALLOWED_ACCOUNTS = groups;
         
@@ -445,3 +434,25 @@ window._removeAccountFromGroup = async function(groupIndex, accountId) {
         alert("Lỗi xóa: " + e.message);
     }
 };
+
+async function _saveWorkspaceConfigToAll(groups) {
+    for (const g of groups) {
+        for (const acc of (g.accounts || [])) {
+            const cleanAccId = acc.id.replace('act_', '');
+            try {
+                // 1. Đồng bộ cấu hình Workspace (dom_allowed_accounts)
+                await fetch(`${window.SETTINGS_SHEET_URL}?account_id=${cleanAccId}`, {
+                    method: "POST",
+                    body: JSON.stringify({ key: "dom_allowed_accounts", value: groups })
+                });
+                // 2. Đồng bộ token tương ứng cho account này (meta_access_token)
+                await fetch(`${window.SETTINGS_SHEET_URL}?account_id=${cleanAccId}`, {
+                    method: "POST",
+                    body: JSON.stringify({ key: "meta_access_token", value: g.token })
+                });
+            } catch (e) {
+                console.warn(`Không thể đồng bộ cấu hình cho account ${cleanAccId}:`, e);
+            }
+        }
+    }
+}
