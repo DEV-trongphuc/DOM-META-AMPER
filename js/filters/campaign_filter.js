@@ -5,6 +5,7 @@ async function applyCampaignFilter(keyword) {
   if (typeof updateBrandDropdownUI === "function") updateBrandDropdownUI();
   if (typeof updatePerfBrandDropdownUI === "function") updatePerfBrandDropdownUI();
   if (typeof refreshGoogleAds === "function") refreshGoogleAds();
+  if (typeof renderAdLibrary === "function") renderAdLibrary();
 
   const domContainer = document.querySelector(".dom_container");
   const isGoogleAdsView = domContainer && domContainer.classList.contains("google_ads");
@@ -20,9 +21,25 @@ async function applyCampaignFilter(keyword) {
     return;
   }
 
+  const lowerKw = keyword.toLowerCase();
+
+  // Lấy danh sách các mã brand bộ lọc để phân biệt với từ khóa tìm kiếm tự do
+  let brandCodes = ["trb", "hgd", "bean", "esta", "lp", "lepetit", "snowee", "son"];
+  if (typeof loadBrandSettings === "function") {
+    const brands = loadBrandSettings();
+    brands.forEach(b => {
+      if (b.filter) brandCodes.push(b.filter.toLowerCase());
+    });
+  }
+  const isBrandFilter = brandCodes.includes(lowerKw);
+
   const filtered = keyword
     ? window._ALL_CAMPAIGNS.filter((c) => {
-      const lowerKw = keyword.toLowerCase();
+      if (isBrandFilter) {
+        // Bộ lọc brand: chỉ lọc dựa theo campaign name chứa mã brand
+        return (c.name || "").toLowerCase().includes(lowerKw);
+      }
+      // Tìm kiếm tự do: tìm theo campaign name, adset name, hoặc ad name
       if ((c.name || "").toLowerCase().includes(lowerKw)) return true;
       if (c.id === keyword) return true;
       const hasAdset = (c.adsets || []).some(

@@ -32,6 +32,7 @@ window.renderAdLibrary = function () {
         if ((ad.status || "").toLowerCase() === "active") {
           activeAds.push({
             brand: brandName,
+            campaign_name: c.name,
             campaign_id: c.id,
             adset_id: as.id,
             ad_id: ad.id,
@@ -58,7 +59,13 @@ window.renderAdLibrary = function () {
   // Apply Global Brand Filter
   let filteredAds = activeAds;
   if (typeof CURRENT_CAMPAIGN_FILTER !== 'undefined' && CURRENT_CAMPAIGN_FILTER && CURRENT_CAMPAIGN_FILTER !== "RESET") {
-    filteredAds = activeAds.filter(ad => ad.brand === CURRENT_CAMPAIGN_FILTER);
+    const filterLower = CURRENT_CAMPAIGN_FILTER.toLowerCase();
+    filteredAds = activeAds.filter(ad => {
+      const brandMatch = (ad.brand || "").toLowerCase() === filterLower;
+      const campaignNameMatch = (ad.campaign_name || "").toLowerCase().includes(filterLower);
+      const adNameMatch = (ad.ad_name || "").toLowerCase().includes(filterLower);
+      return brandMatch || campaignNameMatch || adNameMatch;
+    });
   }
 
   if (filteredAds.length === 0) {

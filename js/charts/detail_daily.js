@@ -16,6 +16,13 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
     if (type === "impression") return item.impressions || 0;
     if (type === "message")
       return item.actions["onsite_conversion.messaging_conversation_started_7d"] || 0;
+    if (type === "cpr") {
+      const spend = item.spend || 0;
+      const result = getResults(item);
+      const goal = (VIEW_GOAL || "").toUpperCase();
+      const isThousandMetric = (goal === "REACH" || goal === "IMPRESSIONS");
+      return result > 0 ? (isThousandMetric ? Math.round((spend / result) * 1000) : Math.round(spend / result)) : 0;
+    }
     return 0;
   });
 
@@ -25,7 +32,7 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
 
   // 🎨 Gradient
   const gLine = c2d.createLinearGradient(0, 0, 0, 400);
-  if (type === "spend") {
+  if (type === "spend" || type === "cpr") {
     gLine.addColorStop(0, CHART_GOLD_SOFT);
     gLine.addColorStop(1, CHART_GOLD_FILL);
   } else if (type === "impression") {
@@ -43,13 +50,13 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
     chart.data.datasets[0].data = chartData;
     chart.data.datasets[0].label = type.charAt(0).toUpperCase() + type.slice(1);
     chart.data.datasets[0].borderColor =
-      type === "spend" ? CHART_GOLD_DARK : CHART_NAVY_HEX;
+      (type === "spend" || type === "cpr") ? CHART_GOLD_DARK : CHART_NAVY_HEX;
     chart.data.datasets[0].backgroundColor = gLine;
     chart.options.scales.y.suggestedMax = maxValue * 1.1;
 
     chart.options.plugins.datalabels.displayIndices = displayIndices;
     chart.options.plugins.tooltip.callbacks.label = (c) =>
-      `${c.dataset.label}: ${(type === "spend" || type === "cpm") ? formatMoneyShort(c.raw) : c.raw
+      `${c.dataset.label}: ${(type === "spend" || type === "cpr" || type === "cpm") ? formatMoneyShort(c.raw) : c.raw
       }`;
 
     chart.update("active");
@@ -66,12 +73,12 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
           label: type.charAt(0).toUpperCase() + type.slice(1),
           data: chartData,
           backgroundColor: gLine,
-          borderColor: type === "spend" ? CHART_GOLD_DARK : CHART_NAVY_HEX,
+          borderColor: (type === "spend" || type === "cpr") ? CHART_GOLD_DARK : CHART_NAVY_HEX,
           fill: true,
           tension: 0.3,
           pointRadius: 3,
           pointBackgroundColor:
-            type === "spend" ? CHART_GOLD_DARK : CHART_NAVY_MID,
+            (type === "spend" || type === "cpr") ? CHART_GOLD_DARK : CHART_NAVY_MID,
           borderWidth: 3,
         },
       ],
@@ -86,7 +93,7 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
         tooltip: {
           callbacks: {
             label: (c) =>
-              `${c.dataset.label}: ${(type === "spend" || type === "cpm") ? formatMoneyShort(c.raw) : c.raw
+              `${c.dataset.label}: ${(type === "spend" || type === "cpr" || type === "cpm") ? formatMoneyShort(c.raw) : c.raw
               }`,
           },
         },
@@ -102,7 +109,7 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
             const index = ctx.dataIndex;
 
             if (v > 0 && indices.has(index)) {
-              return currentDetailDailyType === "spend"
+              return (currentDetailDailyType === "spend" || currentDetailDailyType === "cpr")
                 ? formatMoneyShort(v)
                 : v;
             }
