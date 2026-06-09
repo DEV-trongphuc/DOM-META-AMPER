@@ -197,11 +197,13 @@ if (quickFilterBox) {
       // Hiển thị text đã chọn
       selectedText.innerHTML = label;
 
+      const baseCampaigns = getBrandFilteredCampaigns();
+
       // --- 🔹 Active campaigns ---
       if (view === "active_ads") {
         const activeLower = "active";
 
-        const activeCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+        const activeCampaigns = baseCampaigns.filter((c) => {
           let campaignActive = false;
           for (const adset of c.adsets || []) {
             for (const ad of adset.ads || []) {
@@ -220,7 +222,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Campaigns with Spend ---
       else if (view === "spent_ads") {
-        const spentCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+        const spentCampaigns = baseCampaigns.filter((c) => {
           const spend = +c.spend || 0;
           return spend > 0;
         });
@@ -229,7 +231,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Lead Ads (Optimization Goal) ---
       else if (view === "lead_ads_goal") {
-        const leadAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const leadAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some(
             (adset) =>
               adset.optimization_goal?.toLowerCase().includes("lead")
@@ -241,7 +243,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Message Ads (Optimization Goal) ---
       else if (view === "mess_ads_goal") {
-        const messageAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const messageAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some(
             (adset) =>
               adset.optimization_goal?.toLowerCase() === "replies" ||
@@ -254,7 +256,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Engagement Ads (Optimization Goal) ---
       else if (view === "engage_ads_goal") {
-        const engageAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const engageAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some((adset) =>
             [
               "post_engagement",
@@ -269,7 +271,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Traffic Ads ---
       else if (view === "traffic_ads_goal") {
-        const trafficAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const trafficAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some((adset) =>
             [
               "link_clicks",
@@ -282,7 +284,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Sales/Conversions Ads ---
       else if (view === "sales_ads_goal") {
-        const salesAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const salesAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some((adset) =>
             [
               "offsite_conversions",
@@ -296,7 +298,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Video Views Ads ---
       else if (view === "video_ads_goal") {
-        const videoAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const videoAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some((adset) =>
             [
               "thruplay",
@@ -309,7 +311,7 @@ if (quickFilterBox) {
 
       // --- 🔹 App Promotion Ads ---
       else if (view === "app_ads_goal") {
-        const appAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const appAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some((adset) =>
             [
               "app_installs",
@@ -322,7 +324,7 @@ if (quickFilterBox) {
 
       // --- 🔹 High CTR (> 1%) ---
       else if (view === "high_ctr") {
-        const highCtrCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+        const highCtrCampaigns = baseCampaigns.filter((c) => {
           const clicks = +c.inline_link_clicks || +c.clicks || 0;
           const imps = +c.impressions || 0;
           if (imps === 0) return false;
@@ -333,7 +335,7 @@ if (quickFilterBox) {
 
       // --- 🔹 High ROAS (> 2) ---
       else if (view === "high_roas") {
-        const highRoasCampaigns = window._ALL_CAMPAIGNS.filter((c) => {
+        const highRoasCampaigns = baseCampaigns.filter((c) => {
           const roasArr = c.purchase_roas || [];
           const roasVal = roasArr.find(a =>
             a.action_type === "purchase" || a.action_type === "omni_purchase" ||
@@ -347,7 +349,7 @@ if (quickFilterBox) {
 
       // --- 🔹 Brand Awareness (Optimization Goal) ---
       else if (view === "ba_ads_goal") {
-        const awarenessAdsCampaigns = window._ALL_CAMPAIGNS.filter((c) =>
+        const awarenessAdsCampaigns = baseCampaigns.filter((c) =>
           c.adsets?.some((adset) =>
             ["reach", "ad_recall_lift", "impressions"].includes(
               adset.optimization_goal?.toLowerCase()
@@ -361,7 +363,7 @@ if (quickFilterBox) {
       // --- 🔹 Reset filter ---
       else if (view === "reset") {
         selectedText.textContent = "Quick filter";
-        renderCampaignView(window._ALL_CAMPAIGNS);
+        renderCampaignView(baseCampaigns);
       }
 
       // ✅ Đóng dropdown ngay lập tức
@@ -400,14 +402,16 @@ if (statusFilterBox) {
 
       selectedText.innerHTML = label;
 
+      const baseCampaigns = getBrandFilteredCampaigns();
+
       if (view === "reset_status") {
         selectedText.textContent = "Sắp kết thúc";
-        renderCampaignView(window._ALL_CAMPAIGNS);
+        renderCampaignView(baseCampaigns);
       } else {
         const now = new Date();
         const oneDayMs = 24 * 60 * 60 * 1000;
 
-        const filtered = window._ALL_CAMPAIGNS.filter(c => {
+        const filtered = baseCampaigns.filter(c => {
           // Lấy end_time gần nhất từ adsets của campaign
           const endTimes = (c.adsets || [])
             .map(as => as.end_time ? new Date(as.end_time) : null)

@@ -1,4 +1,29 @@
 
+function getBrandFilteredCampaigns() {
+  const keyword = typeof CURRENT_CAMPAIGN_FILTER !== "undefined" ? CURRENT_CAMPAIGN_FILTER : "";
+  if (!keyword || keyword.toUpperCase() === "RESET") {
+    return window._ALL_CAMPAIGNS || [];
+  }
+  const lowerKw = keyword.toLowerCase();
+
+  let brandCodes = ["trb", "hgd", "bean", "esta", "lp", "lepetit", "snowee", "son"];
+  if (typeof loadBrandSettings === "function") {
+    const brands = loadBrandSettings();
+    brands.forEach(b => {
+      if (b.filter) brandCodes.push(b.filter.toLowerCase());
+    });
+  }
+  const isBrandFilter = brandCodes.includes(lowerKw);
+
+  if (isBrandFilter) {
+    return (window._ALL_CAMPAIGNS || []).filter((c) =>
+      (c.name || "").toLowerCase().includes(lowerKw)
+    );
+  }
+  return window._ALL_CAMPAIGNS || [];
+}
+window.getBrandFilteredCampaigns = getBrandFilteredCampaigns;
+
 async function applyCampaignFilter(keyword) {
   CURRENT_CAMPAIGN_FILTER = keyword || "";
 

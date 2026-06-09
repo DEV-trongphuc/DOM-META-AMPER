@@ -2,6 +2,28 @@ function renderDetailDailyChart(dataByDate, type = currentDetailDailyType) {
   if (!dataByDate) return;
   currentDetailDailyType = type; // Đảm bảo biến toàn cục được cập nhật
 
+  // Đồng bộ UI dropdown
+  const qualitySelect = document.querySelector(".dom_select.daily");
+  if (qualitySelect) {
+    const list = qualitySelect.querySelector("ul.dom_select_show");
+    const selectedEl = qualitySelect.querySelector(".dom_selected");
+    if (list && selectedEl) {
+      const allItems = list.querySelectorAll("li");
+      for (let i = 0; i < allItems.length; i++) {
+        const li = allItems[i];
+        if (li.dataset.type === type) {
+          allItems.forEach((el) => el.classList.remove("active"));
+          list.querySelectorAll(".radio_box").forEach((r) => r.classList.remove("active"));
+          li.classList.add("active");
+          const radio = li.querySelector(".radio_box");
+          if (radio) radio.classList.add("active");
+          selectedEl.textContent = li.textContent.trim();
+          break;
+        }
+      }
+    }
+  }
+
   const ctx = document.getElementById("detail_spent_chart");
   if (!ctx) return;
 
@@ -1194,7 +1216,7 @@ function renderCharts({
   byDevice,
   byDate,
 }) {
-  renderDetailDailyChart(byDate, "spend");
+  renderDetailDailyChart(byDate, currentDetailDailyType);
   renderChartByHour(byHour);
   renderScheduleIntelligence(byHour);
   renderChartByAgeGender(byAgeGender);

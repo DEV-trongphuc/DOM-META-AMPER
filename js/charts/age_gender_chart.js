@@ -297,6 +297,9 @@ function getDateRange(type) {
   const end = new Date(today);
 
   switch (type) {
+    case "today_yesterday":
+      start.setDate(today.getDate() - 1);
+      break;
     case "today":
       break;
     case "yesterday":

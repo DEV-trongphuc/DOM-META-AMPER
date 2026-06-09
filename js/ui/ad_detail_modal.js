@@ -715,17 +715,18 @@ if (filterInput) {
     debounce((e) => {
       if (e.key === "Enter") {
         const keyword = e.target.value.trim().toLowerCase();
+        const baseCampaigns = getBrandFilteredCampaigns();
         const filtered = keyword
-          ? window._ALL_CAMPAIGNS.filter((c) =>
+          ? baseCampaigns.filter((c) =>
             (c.name || "").toLowerCase().includes(keyword)
           )
-          : window._ALL_CAMPAIGNS;
+          : baseCampaigns;
 
         // 🔹 Render lại danh sách và tổng quan
         renderCampaignView(filtered);
       } else if (e.target.value.trim() === "") {
         // 🧹 Nếu clear input → reset về mặc định
-        renderCampaignView(window._ALL_CAMPAIGNS);
+        renderCampaignView(getBrandFilteredCampaigns());
       }
     }, 300)
   );
@@ -735,7 +736,7 @@ if (filterInput) {
     "input",
     debounce((e) => {
       if (e.target.value.trim() === "") {
-        renderCampaignView(window._ALL_CAMPAIGNS);
+        renderCampaignView(getBrandFilteredCampaigns());
       }
     }, 300)
   );
@@ -747,11 +748,12 @@ if (filterButton) {
     "click",
     debounce(() => {
       const keyword = filterInput?.value?.trim().toLowerCase() || "";
+      const baseCampaigns = getBrandFilteredCampaigns();
       const filtered = keyword
-        ? window._ALL_CAMPAIGNS.filter((c) =>
+        ? baseCampaigns.filter((c) =>
           (c.name || "").toLowerCase().includes(keyword)
         )
-        : window._ALL_CAMPAIGNS;
+        : baseCampaigns;
 
       // 🔹 Render lại danh sách và tổng quan
       renderCampaignView(filtered);
