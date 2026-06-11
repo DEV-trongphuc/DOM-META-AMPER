@@ -45,6 +45,20 @@ const CONFIG = {
   SHEET_NAME:        "DATA",
 };
 
+const ACCOUNTS_TO_SYNC = [
+  { customerId: "466-215-2707", sheetName: "DATA" },
+  { customerId: "367-797-3546", sheetName: "ESTA_DATA" }
+];
+
+function _getGoogleAccountByMetaId(metaId) {
+  const cleanId = String(metaId || "").replace("act_", "").trim();
+  if (cleanId === "1283070995510667") {
+    return { customerId: "367-797-3546", sheetName: "ESTA_DATA" };
+  }
+  // Default/Ampersand: "676599667843841"
+  return { customerId: "466-215-2707", sheetName: "DATA" };
+}
+
 const GADS_API_BASE = "https://googleads.googleapis.com/v23";
 
 // ── Sheet name constants ───────────────────────────────────
@@ -62,13 +76,17 @@ const U = { email:0, name:1, role:2, status:3, addedAt:4, requestAt:5, lastLogin
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
+  const accountId = p.account_id || "";
+  const googleAcc = _getGoogleAccountByMetaId(accountId);
+  const sheetName = googleAcc.sheetName;
+
   try {
     // ── Google Ads sync trigger ──────────────────────────────
     if (p.action === 'sync') {
       _clearDoGetCache();
-      syncGoogleAdsData();
+      syncGoogleAdsData(accountId);
       _clearDoGetCache();
-      return _json({ ok: true, syncedAt: _getLastSyncTime() });
+      return _json({ ok: true, syncedAt: _getLastSyncTime(sheetName) });
     }
 
     // ── Keywords on-demand ───────────────────────────────────
@@ -94,14 +112,14 @@ function doGet(e) {
     }
 
     // ── Default: Google Ads performance data ─────────────────
-    const cacheKey = 'doGet_' + (p.time_range || 'all');
+    const cacheKey = 'doGet_' + accountId + '_' + (p.time_range || 'all');
     try {
       const cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
     } catch(_) {}
 
     const ss    = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const shObj = ss.getSheetByName(CONFIG.SHEET_NAME);
+    const shObj = ss.getSheetByName(sheetName);
     if (!shObj) return _json({ error: 'Sheet not found' });
 
     const data = shObj.getDataRange().getValues();
@@ -130,7 +148,7 @@ function doGet(e) {
       rows.push(row.map(val => val instanceof Date ? _formatDate(val) : val));
     }
 
-    const jsonStr = JSON.stringify({ h: keys, d: rows, syncedAt: _getLastSyncTime() });
+    const jsonStr = JSON.stringify({ h: keys, d: rows, syncedAt: _getLastSyncTime(sheetName) });
     try { if (jsonStr.length < 100000) CacheService.getScriptCache().put(cacheKey, jsonStr, 1800); } catch(_) {}
     return ContentService.createTextOutput(jsonStr).setMimeType(ContentService.MimeType.JSON);
 
@@ -145,8 +163,8 @@ function doPost(e) {
 
     // ── Google Ads sync ───────────────────────────────────────
     if (body.action === 'sync') {
-      syncGoogleAdsData();
-      return _json({ ok: true, syncedAt: _getLastSyncTime() });
+      syncGoogleAdsData(body.account_id);
+      return _json({ ok: true, syncedAt: _getLastSyncTime(_getGoogleAccountByMetaId(body.account_id).sheetName) });
     }
 
     const sheet = (body.sheet || 'settings').toLowerCase();
@@ -405,20 +423,29 @@ function _deleteAiReport(id) {
 //  GOOGLE ADS SYNC  (giữ nguyên logic từ google_data.gs)
 // ════════════════════════════════════════════════════════════
 
-function syncGoogleAdsData() {
+function syncGoogleAdsData(accountId) {
   const today = new Date();
   const since = _formatDate(new Date(today.getTime() - CONFIG.DEFAULT_DAYS * 86400000));
   const until = _formatDate(today);
-  console.log(`📅 Incremental Sync (${CONFIG.DEFAULT_DAYS} ngày): ${since} → ${until}`);
-  _fetchAndWriteData(since, until, false);
+  
+  const accounts = accountId 
+    ? [_getGoogleAccountByMetaId(accountId)] 
+    : ACCOUNTS_TO_SYNC;
+
+  accounts.forEach(acc => {
+    console.log(`📅 Incremental Sync (${CONFIG.DEFAULT_DAYS} ngày) cho ${acc.customerId} -> ${acc.sheetName}: ${since} → ${until}`);
+    _fetchAndWriteData(acc.customerId, acc.sheetName, since, until, false);
+  });
 }
 
 function fullHistorySync() {
   const today = new Date();
   const since = _formatDate(new Date(today.getTime() - 90 * 86400000));
   const until = _formatDate(today);
-  console.log(`📅 Full History Sync: ${since} → ${until}`);
-  _fetchAndWriteData(since, until, true);
+  ACCOUNTS_TO_SYNC.forEach(acc => {
+    console.log(`📅 Full History Sync cho ${acc.customerId} -> ${acc.sheetName}: ${since} → ${until}`);
+    _fetchAndWriteData(acc.customerId, acc.sheetName, since, until, true);
+  });
 }
 
 const HEADER_DATA = [
@@ -427,8 +454,8 @@ const HEADER_DATA = [
   "Mobile","Desktop","Tablet","Hourly","Channels","Locations","Distances"
 ];
 
-function _fetchAndWriteData(since, until, clearFirst) {
-  const customerId = CONFIG.CUSTOMER_ID.replace(/-/g,'');
+function _fetchAndWriteData(customerIdStr, sheetName, since, until, clearFirst) {
+  const customerId = customerIdStr.replace(/-/g,'');
   const headers = _getApiHeaders();
   const url = `${GADS_API_BASE}/customers/${customerId}/googleAds:searchStream`;
 
@@ -562,7 +589,7 @@ function _fetchAndWriteData(since, until, clearFirst) {
   if (missingGeoIds.size > 0) {
     const idsStr = Array.from(missingGeoIds).filter(id=>id&&id!=='unk').slice(0,500).join(',');
     if (idsStr) {
-      const geoUrl = `${GADS_API_BASE}/customers/${CONFIG.CUSTOMER_ID.replace(/-/g,'')}/googleAds:searchStream`;
+      const geoUrl = `${GADS_API_BASE}/customers/${customerId}/googleAds:searchStream`;
       const geoResp = UrlFetchApp.fetch(geoUrl, { method:'post', headers:_getApiHeaders(), payload: JSON.stringify({ query:`SELECT geo_target_constant.id, geo_target_constant.name FROM geo_target_constant WHERE geo_target_constant.id IN (${idsStr})` }), muteHttpExceptions:true });
       if (geoResp.getResponseCode()===200) {
         const geoData=JSON.parse(geoResp.getContentText());
@@ -586,10 +613,10 @@ function _fetchAndWriteData(since, until, clearFirst) {
   });
 
   if (!finalRows.length) return console.warn('⚠️ Không có dữ liệu.');
-  const sheet = _getOrCreateSheet(CONFIG.SHEET_NAME, HEADER_DATA);
+  const sheet = _getOrCreateSheet(sheetName, HEADER_DATA);
   _smartUpsert(sheet, finalRows, since, until, HEADER_DATA, clearFirst);
-  _logSyncVersion(since, until, finalRows.length);
-  console.log(`✅ Hoàn tất! Đã ghi ${finalRows.length} dòng.`);
+  _logSyncVersion(sheetName, since, until, finalRows.length);
+  console.log(`✅ Hoàn tất! Đã ghi ${finalRows.length} dòng vào sheet ${sheetName}.`);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -598,12 +625,14 @@ function _fetchAndWriteData(since, until, clearFirst) {
 
 function _getKeywordsResponse(params) {
   const campaignId=params.campaignId||'', campaignName=params.campaignName||'', since=params.since||'', until=params.until||'';
+  const accountId = params.account_id || '';
   if ((!campaignId&&!campaignName)||!since||!until) return _json({ok:false,error:'Missing params'});
-  const cacheKey=`kw6_${campaignId||campaignName}_${since}_${until}`;
+  const cacheKey=`kw6_${accountId}_${campaignId||campaignName}_${since}_${until}`;
   try { const c=CacheService.getScriptCache().get(cacheKey); if (c) return ContentService.createTextOutput(c).setMimeType(ContentService.MimeType.JSON); } catch(_) {}
 
   try {
-    const customerId=CONFIG.CUSTOMER_ID.replace(/-/g,''), headers=_getApiHeaders();
+    const googleAcc = _getGoogleAccountByMetaId(accountId);
+    const customerId=googleAcc.customerId.replace(/-/g,''), headers=_getApiHeaders();
     const url=`${GADS_API_BASE}/customers/${customerId}/googleAds:searchStream`;
     const campFilter=campaignId?`WHERE campaign.id = ${campaignId}`:`WHERE campaign.name = '${campaignName.replace(/'/g,"\\'")}'`;
     const typeResp=UrlFetchApp.fetch(url,{method:'post',headers,payload:JSON.stringify({query:`SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.advertising_channel_sub_type FROM campaign ${campFilter} LIMIT 1`}),muteHttpExceptions:true});
@@ -691,9 +720,47 @@ function _parseResponse(resp, label, optional=false) {
 
 function _json(data) { return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
 function _formatDate(date) { return date.getFullYear()+'-'+('0'+(date.getMonth()+1)).slice(-2)+'-'+('0'+date.getDate()).slice(-2); }
-function _clearDoGetCache() { try{const c=CacheService.getScriptCache();c.remove('doGet_all');const t=new Date();for(let i=0;i<=90;i++){const d=_formatDate(new Date(t.getTime()-i*86400000));c.remove('doGet_'+JSON.stringify({since:d,until:d}));}}catch(_){} }
-function _getLastSyncTime() { try{const v=SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName('Version');return v&&v.getLastRow()>=2?v.getRange(v.getLastRow(),1).getValue().toString():null;}catch{return null;} }
-function _logSyncVersion(since,until,rowCount) { try{const ss=SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);let v=ss.getSheetByName('Version');if(!v){v=ss.insertSheet('Version');v.getRange(1,1,1,4).setValues([['Synced At','Since','Until','Rows']]).setFontWeight('bold');}v.appendRow([Utilities.formatDate(new Date(),'Asia/Ho_Chi_Minh','dd/MM/yyyy HH:mm:ss'),since,until,rowCount]);}catch(_){} }
+function _clearDoGetCache() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const accounts = ['', '1283070995510667', '676599667843841'];
+    accounts.forEach(accId => {
+      cache.remove('doGet_' + accId + '_all');
+      const t = new Date();
+      for (let i = 0; i <= 90; i++) {
+        const ds = _formatDate(new Date(t.getTime() - i * 86400000));
+        cache.remove('doGet_' + accId + '_' + JSON.stringify({ since: ds, until: ds }));
+      }
+    });
+  } catch(_) {}
+}
+
+function _getLastSyncTime(sheetName) {
+  try {
+    const v = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID).getSheetByName('Version');
+    if (!v || v.getLastRow() < 2) return null;
+    if (!sheetName) return v.getRange(v.getLastRow(),1).getValue().toString();
+    const data = v.getRange(2, 1, v.getLastRow() - 1, 5).getValues();
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (String(data[i][4] || '').trim() === sheetName) {
+        return data[i][0].toString();
+      }
+    }
+    return v.getRange(v.getLastRow(),1).getValue().toString();
+  } catch(_) { return null; }
+}
+
+function _logSyncVersion(sheetName, since, until, rowCount) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    let v = ss.getSheetByName('Version');
+    if (!v) {
+      v = ss.insertSheet('Version');
+      v.getRange(1, 1, 1, 5).setValues([['Synced At', 'Since', 'Until', 'Rows', 'Sheet']]).setFontWeight('bold');
+    }
+    v.appendRow([Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy HH:mm:ss'), since, until, rowCount, sheetName]);
+  } catch(_) {}
+}
 
 // ── Triggers ────────────────────────────────────────────────
 function createDailyTrigger() {

@@ -61,6 +61,10 @@ window.fetchGoogleAdsData = async function (force = false) {
         // This avoids 2 cold starts of Apps Script, saving ~2-4 seconds.
         const url = new URL(GOOGLE_SHEET_API_URL);
         url.searchParams.append("time_range", JSON.stringify({ since: ps, until: endDate }));
+        if (window.ACCOUNT_ID) {
+            const cleanAccId = String(window.ACCOUNT_ID).replace('act_', '').trim();
+            url.searchParams.append("account_id", cleanAccId);
+        }
 
         const response = await fetch(url.toString());
         const compactData = response.ok ? await response.json() : { h: [], d: [] };
@@ -184,7 +188,11 @@ async function triggerGAdsSync() {
     if (btn) { btn.classList.add('loading'); btn.disabled = true; }
     _showGoogleSkeletons();
     try {
-        const url = `${GOOGLE_SHEET_API_URL}?action=sync`;
+        let url = `${GOOGLE_SHEET_API_URL}?action=sync`;
+        if (window.ACCOUNT_ID) {
+            const cleanAccId = String(window.ACCOUNT_ID).replace('act_', '').trim();
+            url += `&account_id=${cleanAccId}`;
+        }
         const resp = await fetch(url);
         const result = resp.ok ? await resp.json() : null;
         if (result && result.syncedAt) {
@@ -1412,7 +1420,11 @@ function _loadKeywords(campaignId) {
         return;
     }
 
-    const url = GOOGLE_SHEET_API_URL + '?type=keywords&campaignId=' + encodeURIComponent(campaignId) + '&since=' + since + '&until=' + until;
+    let url = GOOGLE_SHEET_API_URL + '?type=keywords&campaignId=' + encodeURIComponent(campaignId) + '&since=' + since + '&until=' + until;
+    if (window.ACCOUNT_ID) {
+        const cleanAccId = String(window.ACCOUNT_ID).replace('act_', '').trim();
+        url += '&account_id=' + encodeURIComponent(cleanAccId);
+    }
     fetch(url)
         .then(r => r.json())
         .then(data => {

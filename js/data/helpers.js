@@ -134,6 +134,7 @@ function getResults(item, goal) {
 
   if (resultType === "page_like") {
     const likeTypes = ["page_like", "like", "page_follow", "onsite_conversion.page_like"];
+    console.log("[PageLike Debug] Item:", item, "Actions:", actions);
     if (Array.isArray(actions)) {
       let sum = 0;
       for (let i = 0; i < actions.length; i++) {
@@ -141,6 +142,7 @@ function getResults(item, goal) {
           sum += +actions[i].value || 0;
         }
       }
+      console.log("[PageLike Debug] Array Sum:", sum);
       return sum;
     } else {
       let sum = 0;
@@ -149,6 +151,7 @@ function getResults(item, goal) {
           sum += +actions[t] || 0;
         }
       }
+      console.log("[PageLike Debug] Object Sum:", sum);
       return sum;
     }
   }
