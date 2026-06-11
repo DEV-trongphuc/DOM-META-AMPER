@@ -132,6 +132,27 @@ function getResults(item, goal) {
   if (!resultType && goalKey) resultType = GOAL_KEY_RESULT_MAP[goalKey];
   if (!resultType) resultType = resultMapping.DEFAULT;
 
+  if (resultType === "page_like") {
+    const likeTypes = ["page_like", "like", "page_follow", "onsite_conversion.page_like"];
+    if (Array.isArray(actions)) {
+      let sum = 0;
+      for (let i = 0; i < actions.length; i++) {
+        if (likeTypes.includes(actions[i].action_type)) {
+          sum += +actions[i].value || 0;
+        }
+      }
+      return sum;
+    } else {
+      let sum = 0;
+      for (const t of likeTypes) {
+        if (actions[t]) {
+          sum += +actions[t] || 0;
+        }
+      }
+      return sum;
+    }
+  }
+
   if (Array.isArray(actions)) {
     if (insights[resultType]) {
       const sp = insights[resultType];
