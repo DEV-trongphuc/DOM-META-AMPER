@@ -1052,6 +1052,10 @@ async function fetchGoogleAdsMonthlyData() {
     try {
         const url = new URL(GOOGLE_SHEET_API_URL);
         url.searchParams.append("time_range", JSON.stringify({ since: startOfYear, until: todayStr }));
+        if (window.ACCOUNT_ID) {
+            const cleanAccId = String(window.ACCOUNT_ID).replace('act_', '').trim();
+            url.searchParams.append("account_id", cleanAccId);
+        }
         const response = await fetch(url.toString());
         if (response.ok) {
             const compactData = await response.json();
