@@ -160,10 +160,6 @@ async function main() {
     }
   })();
 
-  const googleAdsTask = (async () => {
-    if (typeof fetchGoogleAdsData === "function") await fetchGoogleAdsData(false);
-  })();
-
   // 1. Chờ load cấu hình cài đặt từ database
   await window._SETTINGS_PROMISE;
   
@@ -172,7 +168,9 @@ async function main() {
   
   // 3. Tiến hành tải các dữ liệu khác sử dụng ACCOUNT_ID và META_TOKEN đã được thiết lập đúng
   await Promise.all([
-    googleAdsTask,
+    (async () => {
+      if (typeof fetchGoogleAdsData === "function") await fetchGoogleAdsData(false);
+    })(),
     loadDashboardData(),
     syncAiHistoryFromSheet(),
   ]);
