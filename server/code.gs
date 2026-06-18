@@ -39,7 +39,7 @@ function syncGoogleAdsData(accountId) {
   const since = _formatDate(new Date(today.getTime() - CONFIG.DEFAULT_DAYS * 86400000));
   const until = _formatDate(today);
   
-  const accounts = accountId 
+  const accounts = (accountId && typeof accountId !== 'object') 
     ? [_getGoogleAccountByMetaId(accountId)] 
     : ACCOUNTS_TO_SYNC;
 

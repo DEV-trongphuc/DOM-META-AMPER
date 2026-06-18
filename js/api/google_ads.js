@@ -1356,6 +1356,8 @@ window._openKeywordPopup = function (campaignId, campaignName) {
     const modal = document.getElementById('g_keyword_modal');
     if (!modal) return;
     window._kwModalOpen = true;  // guard: prevent background re-render
+    window._currentKwCampaignId = campaignId;
+    window._currentKwCampaignName = campaignName;
     const sd = window.startDate || startDate || '';
     const ed = window.endDate || endDate || '';
     document.getElementById('g_kw_camp_name').textContent = campaignName;
@@ -1374,6 +1376,68 @@ window._closeKeywordModal = function () {
     const modal = document.getElementById('g_keyword_modal');
     if (modal) modal.classList.remove('active');
     window._kwModalOpen = false;  // allow re-render again
+};
+
+window._exportKeywordsCsv = function () {
+    const campaignId = window._currentKwCampaignId;
+    const campaignName = window._currentKwCampaignName || 'Campaign';
+    if (!campaignId) return;
+
+    const sd = window.startDate || startDate || '';
+    const ed = window.endDate || endDate || '';
+    const cacheKey = `${campaignId}|${sd}|${ed}`;
+    const data = _kwCache[cacheKey];
+    if (!data) {
+        if (typeof showToast === 'function') showToast('❌ Không có dữ liệu để xuất!');
+        return;
+    }
+
+    let csvContent = "";
+    let filename = "";
+
+    if (_kwActiveTab === 'keywords') {
+        const headers = ["Keyword", "Ad Group", "Match Type", "Impressions", "Clicks", "CTR", "Conversions", "Spent", "Imp Share"];
+        const rows = (data.keywords || []).map(k => {
+            const ctr = k.imp > 0 ? (k.click / k.imp * 100).toFixed(2) + "%" : "0.00%";
+            return [
+                `"${(k.keyword || '').replace(/"/g, '""')}"`,
+                `"${(k.adGroup || '').replace(/"/g, '""')}"`,
+                `"${(k.matchType || '').replace(/"/g, '""')}"`,
+                k.imp || 0,
+                k.click || 0,
+                `"${ctr}"`,
+                k.conv || 0,
+                k.cost || 0,
+                `"${k.impShare != null && k.impShare !== '' ? k.impShare + '%' : '-'}"`
+            ].join(",");
+        });
+        csvContent = [headers.join(","), ...rows].join("\n");
+        filename = `keywords_${campaignName.replace(/[^a-zA-Z0-9]/g, '_')}_${sd}_${ed}.csv`;
+    } else {
+        const headers = ["Search Term", "Status", "Impressions", "Clicks", "CTR", "CPC", "Spent"];
+        const rows = (data.searchTerms || []).map(s => {
+            const ctr = s.imp > 0 ? (s.click / s.imp * 100).toFixed(2) + "%" : "0.00%";
+            const cpc = s.click > 0 ? (s.cost / s.click).toFixed(0) : 0;
+            return [
+                `"${(s.term || '').replace(/"/g, '""')}"`,
+                `"${(s.status || '').replace(/"/g, '""')}"`,
+                s.imp || 0,
+                s.click || 0,
+                `"${ctr}"`,
+                cpc,
+                s.cost || 0
+            ].join(",");
+        });
+        csvContent = [headers.join(","), ...rows].join("\n");
+        filename = `search_terms_${campaignName.replace(/[^a-zA-Z0-9]/g, '_')}_${sd}_${ed}.csv`;
+    }
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    if (typeof showToast === 'function') showToast("Xuất CSV thành công!");
 };
 
 
