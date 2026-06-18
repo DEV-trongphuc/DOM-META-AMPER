@@ -448,6 +448,33 @@ function fullHistorySync() {
   });
 }
 
+function syncFromFeb25() {
+  const since = "2026-02-25";
+  const until = _formatDate(new Date());
+  ACCOUNTS_TO_SYNC.forEach(acc => {
+    console.log(`📅 Custom Sync từ ${since} đến ${until} cho ${acc.customerId} -> ${acc.sheetName}`);
+    _fetchAndWriteData(acc.customerId, acc.sheetName, since, until, false);
+  });
+}
+
+function autoBackfillPast45Days() {
+  const today = new Date();
+  const since = _formatDate(new Date(today.getTime() - 45 * 86400000));
+  const until = _formatDate(today);
+  ACCOUNTS_TO_SYNC.forEach(acc => {
+    console.log(`📅 Auto Backfill (45 days) cho ${acc.customerId} -> ${acc.sheetName}: ${since} → ${until}`);
+    _fetchAndWriteData(acc.customerId, acc.sheetName, since, until, false);
+  });
+}
+
+function createMonthlyTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => { 
+    if (t.getHandlerFunction().includes("autoBackfillPast45Days")) ScriptApp.deleteTrigger(t); 
+  });
+  ScriptApp.newTrigger("autoBackfillPast45Days").timeBased().onMonthDay(1).atHour(3).create();
+  console.log("✅ Đã tạo Trigger tự động quét lại 45 ngày vào lúc 3h sáng ngày 1 hàng tháng.");
+}
+
 const HEADER_DATA = [
   "Date","Campaign","Campaign ID","Spent (₫)","Impressions","Clicks","CTR (%)","All Conversions",
   "Directions","Calls","Menu","Orders","Other","Store Visits",
