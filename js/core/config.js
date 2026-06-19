@@ -4,6 +4,17 @@ const GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwEmgc4Q5a
 let monthlyChartInstance = null;
 let startDate, endDate;
 
+Object.defineProperty(window, 'startDate', {
+  get: () => startDate,
+  set: (v) => { startDate = v; },
+  configurable: true
+});
+Object.defineProperty(window, 'endDate', {
+  get: () => endDate,
+  set: (v) => { endDate = v; },
+  configurable: true
+});
+
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 window.safeGetActionValue = (actions, type) => {

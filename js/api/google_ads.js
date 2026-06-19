@@ -216,10 +216,10 @@ function renderGoogleAdsView() {
     // Guard: don't re-render while keyword modal is open (avoid chart flicker)
     if (window._kwModalOpen) return;
     // Ensure dates
-    if (!window.startDate || !window.endDate) {
+    if (!startDate || !endDate) {
         const dr = (typeof getDateRange === 'function') ? getDateRange("last_7days") : { start: "", end: "" };
-        window.startDate = window.startDate || dr.start;
-        window.endDate = window.endDate || dr.end;
+        startDate = startDate || dr.start;
+        endDate = endDate || dr.end;
     }
 
     // Filter by date
@@ -1358,8 +1358,8 @@ window._openKeywordPopup = function (campaignId, campaignName) {
     window._kwModalOpen = true;  // guard: prevent background re-render
     window._currentKwCampaignId = campaignId;
     window._currentKwCampaignName = campaignName;
-    const sd = window.startDate || startDate || '';
-    const ed = window.endDate || endDate || '';
+    const sd = startDate || '';
+    const ed = endDate || '';
     document.getElementById('g_kw_camp_name').textContent = campaignName;
     document.getElementById('g_kw_date_range').innerHTML = sd
         ? '<span style="display:inline-flex;align-items:center;gap:0.6rem;padding:0.45rem 1.2rem;background:#fffbeb;border:1.5px solid #fde68a;border-radius:20px;font-size:1.15rem;font-weight:600;color:#92400e;"><i class="fa-regular fa-calendar" style="color:#f59e0b;"></i>&nbsp;' + sd + '&nbsp;\u2192&nbsp;' + ed + '</span>'
@@ -1383,8 +1383,8 @@ window._exportKeywordsCsv = function () {
     const campaignName = window._currentKwCampaignName || 'Campaign';
     if (!campaignId) return;
 
-    const sd = window.startDate || startDate || '';
-    const ed = window.endDate || endDate || '';
+    const sd = startDate || '';
+    const ed = endDate || '';
     const cacheKey = `${campaignId}|${sd}|${ed}`;
     const data = _kwCache[cacheKey];
     if (!data) {
@@ -1463,8 +1463,8 @@ function _loadKeywords(campaignId) {
     const stBody = document.getElementById('g_st_body');
     if (!kwBody) return;
 
-    const since = (typeof startDate !== 'undefined' && startDate) || window.startDate || '';
-    const until = (typeof endDate !== 'undefined' && endDate) || window.endDate || '';
+    const since = startDate || '';
+    const until = endDate || '';
 
     // ── Check in-memory cache first ──────────────────────────────────────────
     const cacheKey = `${campaignId}|${since}|${until}`;
