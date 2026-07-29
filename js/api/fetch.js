@@ -22,6 +22,14 @@ async function fetchJSON(url, options = {}, retries = 3) {
           await new Promise((r) => setTimeout(r, 5000));
           return fetchJSON(url, options, retries - 1);
         }
+        // Tự động mở Modal Token khi Meta API báo lỗi Auth/Token/Session (Code 190, 100, 102, OAuthException)
+        const code = errData.error?.code;
+        const subcode = errData.error?.error_subcode;
+        const isAuthErr = code === 190 || code === 100 || code === 102 || subcode === 460 || errData.error?.type === 'OAuthException' || (errData.error?.message && /token|session|oauth/i.test(errData.error.message));
+        if (isAuthErr && typeof window.openTokenModal === 'function') {
+          console.warn(`[fetchJSON] 🔴 Meta API lỗi Auth/Token (Code ${code}). Đang mở Token Modal...`);
+          window.openTokenModal(`Meta API báo lỗi Token (Code ${code || 190}): ${errData.error?.message || 'Token không hợp lệ hoặc hết hạn'}`);
+        }
       } catch { }
       throw new Error(msg);
     }

@@ -436,6 +436,10 @@
               <i class="fa-solid fa-wand-magic-sparkles"></i>
               <span>AI Phân tích</span>
             </button>
+            <button id="update_token_nav_btn" class="toolbar_btn" title="Cập nhật Meta Access Token" onclick="window.openTokenModal && window.openTokenModal()">
+              <i class="fa-solid fa-key" style="color:#d88200;"></i>
+              <span>Token</span>
+            </button>
             <button id="share_url_btn" class="toolbar_btn" title="Share (Ctrl+Shift+S)">
               <i class="fa-solid fa-share-nodes"></i>
               <span>Share</span>
@@ -504,6 +508,11 @@
                 style="display:flex;align-items:center;gap:.5rem;background:#f1f5f9;border:1.5px solid #e2e8f0;padding:.8rem 1.8rem;border-radius:.8rem;cursor:pointer;font-size:1.3rem;font-weight:600;color:#475569;transition:background .15s;"
                 onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
                 <i class="fa-solid fa-calendar-days"></i> Đổi khoảng thời gian
+              </button>
+              <button onclick="window.openTokenModal && window.openTokenModal()"
+                style="display:flex;align-items:center;gap:.5rem;background:#fff8e6;border:1.5px solid #ffd166;padding:.8rem 1.8rem;border-radius:.8rem;cursor:pointer;font-size:1.3rem;font-weight:700;color:#d88200;transition:all .15s;"
+                onmouseover="this.style.background='#ffe5a0'" onmouseout="this.style.background='#fff8e6'">
+                <i class="fa-solid fa-key"></i> Đổi Meta Access Token
               </button>
             </div>
           </div>
