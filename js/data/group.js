@@ -166,7 +166,11 @@ function groupByCampaign(adsets, campaignsData = []) {
   }
 
   return Object.values(campaigns).map((c) => {
+    const sumAdsetSpends = (c.adsets || []).reduce((s, a) => s + (a.spend || 0), 0);
     const sumAdsetResults = (c.adsets || []).reduce((s, a) => s + (a.result || 0), 0);
+    if (!c.spend && sumAdsetSpends > 0) {
+      c.spend = sumAdsetSpends;
+    }
     if (c._goals.size === 1) {
       const uniqueGoal     = Array.from(c._goals)[0];
       c.result             = getResults(c._cMetrics, uniqueGoal) || sumAdsetResults;
