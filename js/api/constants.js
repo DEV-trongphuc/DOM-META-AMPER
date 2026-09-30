@@ -84,6 +84,8 @@ const GOAL_GROUP_LOOKUP = Object.create(null);
 for (const group in goalMapping) {
   for (const goal of goalMapping[group]) {
     GOAL_GROUP_LOOKUP[goal] = group;
+    GOAL_GROUP_LOOKUP[goal.toUpperCase()] = group;
+    GOAL_GROUP_LOOKUP[goal.toLowerCase()] = group;
   }
 }
 
@@ -110,7 +112,9 @@ for (const group in goalMapping) {
 
 function getCampaignIcon(optimizationGoal) {
   if (!optimizationGoal) return campaignIconMapping.DEFAULT;
-  const goalGroup = GOAL_GROUP_LOOKUP[optimizationGoal];
+  const normalized = optimizationGoal.toString().trim().toUpperCase();
+  const goalGroup = GOAL_GROUP_LOOKUP[normalized] || GOAL_GROUP_LOOKUP[optimizationGoal];
   return campaignIconMapping[goalGroup] || campaignIconMapping.DEFAULT;
 }
+
 

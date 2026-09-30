@@ -112,13 +112,35 @@ function getResults(item, goal) {
   const insights = item.insights?.data?.[0] || item.insights || item;
   if (!insights) return 0;
 
-  let optGoal = goal || VIEW_GOAL || item.optimization_goal || insights.optimization_goal || "";
+  let rawGoal = (
+    goal ||
+    VIEW_GOAL ||
+    item.optimization_goal ||
+    insights.optimization_goal ||
+    item.objective ||
+    insights.objective ||
+    item.optimizationGoal ||
+    ""
+  ).toString().trim();
+
+  let optGoal = rawGoal.toUpperCase();
+
+  const itemName = (item.name || item.ad_name || item.campaign_name || insights.campaign_name || "").toLowerCase();
+  const isLikeCampaign =
+    optGoal.includes("LIKE") ||
+    optGoal.includes("FOLLOW") ||
+    /like\s*page|page\s*like|likepage|follow/i.test(itemName) ||
+    ((item.objective || insights.objective || "").toUpperCase() === "PAGE_LIKES");
 
   // If goal is a group name (e.g. "Lead Form"), resolve to a technical goal key
-  let goalKey = GOAL_GROUP_LOOKUP[optGoal];
+  let goalKey = GOAL_GROUP_LOOKUP[optGoal] || GOAL_GROUP_LOOKUP[rawGoal];
   if (!goalKey && goalMapping[optGoal]) {
     goalKey = optGoal;
     optGoal = goalMapping[goalKey][0];
+  }
+  if (!goalKey && isLikeCampaign) {
+    goalKey = "Pagelike";
+    optGoal = "PAGE_LIKES";
   }
 
   if (optGoal === "REACH" || goalKey === "Awareness") {
@@ -127,15 +149,16 @@ function getResults(item, goal) {
   if (optGoal === "IMPRESSIONS") return +insights.impressions || 0;
 
   const actions  = insights.actions || {};
-  let resultType = resultMapping[optGoal];
+  let resultType = resultMapping[optGoal] || resultMapping[rawGoal];
 
   if (!resultType && goalKey) resultType = GOAL_KEY_RESULT_MAP[goalKey];
+  if (!resultType && isLikeCampaign) resultType = "page_like";
   if (!resultType) resultType = resultMapping.DEFAULT;
 
-  if (resultType === "page_like" || goalKey === "Pagelike") {
+  if (resultType === "page_like" || goalKey === "Pagelike" || isLikeCampaign) {
     const getVal = (type) => {
       if (Array.isArray(actions)) {
-        const found = actions.find((a) => a.action_type === type);
+        const found = actions.find((a) => a && a.action_type === type);
         return found ? +found.value || 0 : 0;
       }
       return actions && typeof actions === "object" ? +actions[type] || 0 : 0;
@@ -179,8 +202,13 @@ function getResults(item, goal) {
       }
     }
 
+    if (total === 0 && item.follow > 0) {
+      total = +item.follow || 0;
+    }
+
     return total;
   }
+
 
   if (Array.isArray(actions)) {
     if (insights[resultType]) {

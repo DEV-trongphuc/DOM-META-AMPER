@@ -41,7 +41,9 @@ async function handleViewClick(e, type = "ad") {
   const name = itemObj ? (itemObj.name || itemObj.ad_name) : (adViewEl.dataset.name || "");
   let result = itemObj ? (itemObj.result || getResults(itemObj, goal)) : parseFloat(adViewEl.dataset.result || 0);
   if ((!result || result === 0) && itemObj) result = getResults(itemObj, goal);
+  if ((!result || result === 0) && itemObj?.follow > 0) result = itemObj.follow;
   const cpr = itemObj ? getMetricValue(itemObj, "cpr") : parseFloat(adViewEl.dataset.cpr || 0);
+
 
   // ✅ Luôn reset funnel khi mở ad mới (kể cả khi không có cache)
   window._videoFunnelLoaded = false;
@@ -537,19 +539,40 @@ async function showAdDetail(ad_id) {
       byDevice: processedByDevice,
     });
     // Single pass over processedByDate — accumulate all 4 totals at once
+    const currentGoal = VIEW_GOAL || "";
     let _spend = 0, _impressions = 0, _reach = 0, _results = 0;
     for (const d of Object.values(processedByDate)) {
       _spend       += d.spend       || 0;
       _impressions += d.impressions || 0;
       _reach       += d.reach       || 0;
-      _results     += getResults(d, goal) || 0;
+      _results     += getResults(d, currentGoal) || 0;
     }
+    if (_results === 0 && typeof calcTotalAction === "function") {
+      const isLikeGoal = (currentGoal || "").toUpperCase().includes("LIKE") || (currentGoal || "").toUpperCase().includes("FOLLOW");
+      if (isLikeGoal) {
+        _results = calcTotalAction(processedByDate, "like");
+      }
+    }
+
+    if (_results > 0) {
+      const resultEl = document.querySelector("#detail_result span");
+      if (resultEl) resultEl.textContent = formatNumber(_results);
+
+      const cprEl = document.querySelector("#detail_cpr span");
+      if (cprEl) {
+        const isThousand = currentGoal === "REACH" || currentGoal === "IMPRESSIONS";
+        const cprVal = isThousand ? (_spend / _results) * 1000 : _spend / _results;
+        cprEl.textContent = formatMoney(cprVal);
+      }
+    }
+
     window.campaignSummaryData = {
       spend:       _spend,
       impressions: _impressions,
       reach:       _reach,
       results:     _results,
     };
+
 
     window.targetingData = targeting;
     window.processedByDate = processedByDate;

@@ -10,7 +10,7 @@ function groupByCampaign(adsets, campaignsData = []) {
 
     const campId   = as.campaign_id   || as.campaignId   || "unknown_campaign";
     const campName = as.campaign_name || as.campaignName || "Unknown";
-    const goal     = as.optimization_goal || as.optimizationGoal || "UNKNOWN";
+    const goal     = as.optimization_goal || as.optimizationGoal || as.objective || ((as.name || campName) && /likepage|like\s*page/i.test(as.name || campName) ? "PAGE_LIKES" : "UNKNOWN");
     const asId     = as.id || as.adset_id || as.adsetId || `adset_${i}`;
 
     let campaign = campaigns[campId];
@@ -20,7 +20,7 @@ function groupByCampaign(adsets, campaignsData = []) {
         id:           campId,
         name:         campName,
         spend:        +cMetrics.spend       || 0,
-        result:       getResults(cMetrics)  || 0,
+        result:       getResults(cMetrics, goal) || 0,
         reach:        +cMetrics.reach       || 0,
         impressions:  +cMetrics.impressions || 0,
         reactions:    getReaction(cMetrics) || 0,
@@ -31,7 +31,7 @@ function groupByCampaign(adsets, campaignsData = []) {
         account_name:   cMetrics.account_name   || "",
         account_currency: cMetrics.account_currency || "",
         buying_type:    cMetrics.buying_type    || "",
-        objective:      cMetrics.objective      || "",
+        objective:      cMetrics.objective      || as.objective || "",
         actions:        cMetrics.actions        || [],
         action_values:  cMetrics.action_values  || [],
         video_play_actions:              cMetrics.video_play_actions              || [],
@@ -52,36 +52,44 @@ function groupByCampaign(adsets, campaignsData = []) {
 
     let adset = campaign._adsetMap[asId];
     if (!adset) {
+      const computedFollow = (
+        Math.max(
+          window.safeGetActionValue(as.actions, "page_like"),
+          window.safeGetActionValue(as.actions, "onsite_conversion.page_like"),
+          window.safeGetActionValue(as.actions, "like")
+        ) +
+        Math.max(
+          window.safeGetActionValue(as.actions, "page_follow"),
+          window.safeGetActionValue(as.actions, "onsite_conversion.page_follow"),
+          window.safeGetActionValue(as.actions, "follow"),
+          window.safeGetActionValue(as.actions, "follows"),
+          window.safeGetActionValue(as.actions, "onsite_conversion.follow")
+        ) +
+        Math.max(
+          window.safeGetActionValue(as.actions, "instagram_profile_follow"),
+          window.safeGetActionValue(as.actions, "onsite_conversion.instagram_profile_follow")
+        )
+      );
+
+      let asResult = getResults(as, goal) || 0;
+      if (!asResult && computedFollow > 0 && (goal.includes("LIKE") || goal.includes("FOLLOW") || /likepage|like\s*page/i.test(as.name || campName))) {
+        asResult = computedFollow;
+      }
+
       adset = {
         id:   asId,
         name: as.name || as.adset_name || as.adsetName || "Unnamed Adset",
         optimization_goal: goal,
         spend:       +as.spend       || 0,
-        result:      getResults(as)  || 0,
+        result:      asResult,
         reach:       +as.reach       || 0,
         impressions: +as.impressions || 0,
         reactions:   getReaction(as) || 0,
         clicks:      +as.clicks      || 0,
         inline_link_clicks: +as.inline_link_clicks || 0,
         link_clicks: window.safeGetActionValue(as.actions, "link_click") || +as.inline_link_clicks || 0,
-        follow: (
-          Math.max(
-            window.safeGetActionValue(as.actions, "page_like"),
-            window.safeGetActionValue(as.actions, "onsite_conversion.page_like"),
-            window.safeGetActionValue(as.actions, "like")
-          ) +
-          Math.max(
-            window.safeGetActionValue(as.actions, "page_follow"),
-            window.safeGetActionValue(as.actions, "onsite_conversion.page_follow"),
-            window.safeGetActionValue(as.actions, "follow"),
-            window.safeGetActionValue(as.actions, "follows"),
-            window.safeGetActionValue(as.actions, "onsite_conversion.follow")
-          ) +
-          Math.max(
-            window.safeGetActionValue(as.actions, "instagram_profile_follow"),
-            window.safeGetActionValue(as.actions, "onsite_conversion.instagram_profile_follow")
-          )
-        ),
+        follow:      computedFollow,
+
         purchase_roas: as.purchase_roas || [],
         account_id:    as.account_id   || "",
         account_name:  as.account_name || "",
@@ -115,13 +123,18 @@ function groupByCampaign(adsets, campaignsData = []) {
           : ad.insights || {};
 
       const adActions = ins.actions;
+      let adResult = getResults(ins, ad.optimization_goal || goal) || 0;
+      if (!adResult && adset.result > 0 && ads.length === 1) {
+        adResult = adset.result;
+      }
+
       adset.ads.push({
         id:     ad.ad_id || ad.id || null,
         name:   ad.ad_name || ad.name || "Unnamed Ad",
         status: ad.effective_status?.toUpperCase() || ad.status || "UNKNOWN",
         optimization_goal: ad.optimization_goal || goal || "UNKNOWN",
         spend:              +ins.spend              || 0,
-        result:             getResults(ins, ad.optimization_goal || goal) || 0,
+        result:             adResult,
         reach:              +ins.reach              || 0,
         impressions:        +ins.impressions        || 0,
         reactions:          getReaction(ins)        || 0,
@@ -146,16 +159,25 @@ function groupByCampaign(adsets, campaignsData = []) {
         post_url:  ad.creative?.facebook_post_url || ad.creative?.instagram_permalink_url || "#",
       });
     }
+
+    if (adset.ads.length === 1 && !adset.ads[0].result && adset.result > 0) {
+      adset.ads[0].result = adset.result;
+    }
   }
 
   return Object.values(campaigns).map((c) => {
+    const sumAdsetResults = (c.adsets || []).reduce((s, a) => s + (a.result || 0), 0);
     if (c._goals.size === 1) {
       const uniqueGoal     = Array.from(c._goals)[0];
-      c.result             = getResults(c._cMetrics, uniqueGoal);
+      c.result             = getResults(c._cMetrics, uniqueGoal) || sumAdsetResults;
       c.optimization_goal  = uniqueGoal;
     } else {
-      c.result       = 0;
+      c.result       = sumAdsetResults;
       c.isMixedGoal  = true;
+    }
+
+    if (!c.result && sumAdsetResults > 0) {
+      c.result = sumAdsetResults;
     }
 
     if (c.adsets.length > 0) c.optimization_goal = c.adsets[0].optimization_goal;
@@ -166,3 +188,4 @@ function groupByCampaign(adsets, campaignsData = []) {
     return c;
   });
 }
+

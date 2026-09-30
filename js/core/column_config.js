@@ -103,15 +103,30 @@ function getMetricValue(item, metricId) {
   if (meta.type === "special") {
     const spend = +item.spend || 0;
     const reach = +item.reach || 0;
-    const impressions = +item.impressions || 0;
-    const result = +item.result || 0;
+    let result = +item.result || 0;
 
-    if (metricId === "result") return result;
+    if (metricId === "result") {
+      if (!result && (item.actions || item.insights)) {
+        result = getResults(item, item.optimization_goal || VIEW_GOAL);
+      }
+      if (!result && Array.isArray(item.adsets) && item.adsets.length > 0) {
+        result = item.adsets.reduce((s, a) => s + getMetricValue(a, "result"), 0);
+      }
+      if (!result && Array.isArray(item.ads) && item.ads.length > 0) {
+        result = item.ads.reduce((s, a) => s + getMetricValue(a, "result"), 0);
+      }
+      if (!result && item.follow > 0) {
+        result = +item.follow;
+      }
+      return result;
+    }
     if (metricId === "cpr") {
+      if (!result) result = getMetricValue(item, "result");
       if (result === 0) return 0;
       const isThousandMetric = (item.optimization_goal === "REACH" || item.optimization_goal === "IMPRESSIONS");
       return isThousandMetric ? (spend / result) * 1000 : spend / result;
     }
+
     if (metricId === "cpm") {
       if (impressions === 0) return 0;
       return (spend / impressions) * 1000;

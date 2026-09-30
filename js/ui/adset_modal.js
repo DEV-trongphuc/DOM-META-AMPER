@@ -19,7 +19,9 @@ async function handleAdsetInsightClick(btn) {
   const impressions = adsetObj ? adsetObj.impressions : parseFloat(btn.dataset.impressions || 0);
   let result = adsetObj ? (adsetObj.result || getResults(adsetObj, goal)) : parseFloat(btn.dataset.result || 0);
   if ((!result || result === 0) && adsetObj) result = getResults(adsetObj, goal);
+  if ((!result || result === 0) && adsetObj?.follow > 0) result = adsetObj.follow;
   const cpr = adsetObj ? getMetricValue(adsetObj, "cpr") : parseFloat(btn.dataset.cpr || 0);
+
 
   // Hiển thị ngay Actions Detail từ bộ nhớ (trước khi gọi API breakdown)
   if (adsetObj) {
@@ -298,9 +300,34 @@ async function showAdsetDetail(adset_id) {
     renderInteraction(processedByDate);
     window.dataByDate = processedByDate;
 
+    // Cập nhật Result và CPR từ processedByDate nếu modal đang hiển thị 0
+    const currentGoal = VIEW_GOAL || "";
+    let totalBatchResult = 0;
+    for (const d of Object.values(processedByDate)) {
+      totalBatchResult += getResults(d, currentGoal) || 0;
+    }
+    if (totalBatchResult === 0 && typeof calcTotalAction === "function") {
+      const isLikeGoal = (currentGoal || "").toUpperCase().includes("LIKE") || (currentGoal || "").toUpperCase().includes("FOLLOW");
+      if (isLikeGoal) {
+        totalBatchResult = calcTotalAction(processedByDate, "like");
+      }
+    }
+    if (totalBatchResult > 0) {
+      const resultEl = document.querySelector("#detail_result span");
+      if (resultEl) resultEl.textContent = formatNumber(totalBatchResult);
+
+      const cprEl = document.querySelector("#detail_cpr span");
+      if (cprEl) {
+        const isThousand = currentGoal === "REACH" || currentGoal === "IMPRESSIONS";
+        const cprVal = isThousand ? (totalSpend / totalBatchResult) * 1000 : totalSpend / totalBatchResult;
+        cprEl.textContent = formatMoney(cprVal);
+      }
+    }
+
     // ✅ Dùng cùng nguồn với Full Actions Detail (lastFullActionsData)
     window._videoFunnelLoaded = true;
     renderVideoFunnel(lastFullActionsData);
+
 
     renderCharts({
       byHour: processedByHour,

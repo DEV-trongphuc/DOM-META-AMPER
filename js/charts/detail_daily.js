@@ -1065,9 +1065,14 @@ function renderChartByPlatform(allData) {
 
     const items = [];
     for (const [key, val] of Object.entries(group)) {
-      const spend = +val.spend || 0;
       const goal = val.optimization_goal || VIEW_GOAL;
-      const result = getResults(val, goal); // có thể = 0 hoặc undefined
+      let result = getResults(val, goal); // có thể = 0 hoặc undefined
+      if (!result && typeof calcTotalAction === "function") {
+        const isLikeGoal = (goal || "").toUpperCase().includes("LIKE") || (goal || "").toUpperCase().includes("FOLLOW");
+        if (isLikeGoal && val.actions) {
+          result = calcTotalAction({ single: val }, "like");
+        }
+      }
 
       let cpr = 0;
       if (result && spend) {
@@ -1076,6 +1081,7 @@ function renderChartByPlatform(allData) {
       }
 
       if (spend > 0) items.push({ key, spend, result: result || 0, cpr, goal });
+
     }
 
     if (!items.length) continue;
