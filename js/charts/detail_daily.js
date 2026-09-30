@@ -1066,8 +1066,8 @@ function renderChartByPlatform(allData) {
     const items = [];
     for (const [key, val] of Object.entries(group)) {
       const spend = +val.spend || 0;
-      const result = getResults(val); // có thể = 0 hoặc undefined
-      const goal = VIEW_GOAL;
+      const goal = val.optimization_goal || VIEW_GOAL;
+      const result = getResults(val, goal); // có thể = 0 hoặc undefined
 
       let cpr = 0;
       if (result && spend) {
@@ -1150,9 +1150,9 @@ function renderDeepCPR(allData) {
     const groupItems = [];
     for (const [key, val] of Object.entries(group)) {
       const spend = +val.spend || 0;
-      const result = getResults(val);
-      if (!spend || !result) continue;
       const goal = (val.optimization_goal || VIEW_GOAL || "").toUpperCase();
+      const result = getResults(val, goal);
+      if (!spend || !result) continue;
       const isThousandMetric = (goal === "REACH" || goal === "IMPRESSIONS");
       const cpr = isThousandMetric ? (spend / result) * 1000 : spend / result;
       groupItems.push({ key, spend, result, cpr, goal });

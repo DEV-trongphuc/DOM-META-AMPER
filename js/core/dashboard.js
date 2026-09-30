@@ -28,20 +28,29 @@ async function loadCampaignList() {
     const campaigns = groupByCampaign(adsets, campaignsInsights);
 
     window._ALL_CAMPAIGNS = campaigns;
-    console.time("[PERF] renderCampaignView");
-    renderCampaignView(campaigns);
-    console.timeEnd("[PERF] renderCampaignView");
+    if (
+      typeof CURRENT_CAMPAIGN_FILTER !== "undefined" &&
+      CURRENT_CAMPAIGN_FILTER &&
+      CURRENT_CAMPAIGN_FILTER.toUpperCase() !== "RESET" &&
+      typeof applyCampaignFilter === "function"
+    ) {
+      await applyCampaignFilter(CURRENT_CAMPAIGN_FILTER);
+    } else {
+      console.time("[PERF] renderCampaignView");
+      renderCampaignView(campaigns);
+      console.timeEnd("[PERF] renderCampaignView");
 
-    const allAds = campaigns.flatMap((c) =>
-      c.adsets.flatMap((as) =>
-        (as.ads || []).map((ad) => ({
-          campaign_name: c.name,
-          optimization_goal: as.optimization_goal,
-          insights: { spend: ad.spend || 0 },
-        }))
-      )
-    );
-    renderGoalChart(allAds);
+      const allAds = campaigns.flatMap((c) =>
+        c.adsets.flatMap((as) =>
+          (as.ads || []).map((ad) => ({
+            campaign_name: c.name,
+            optimization_goal: as.optimization_goal,
+            insights: { spend: ad.spend || 0 },
+          }))
+        )
+      );
+      renderGoalChart(allAds);
+    }
 
     if (typeof loadExtraCharts === "function") loadExtraCharts();
 
@@ -120,6 +129,9 @@ async function loadDashboardData() {
   ]).finally(() => {
     if (loading) loading.classList.remove("active");
     toggleSkeletons(".dom_dashboard", false);
+    if (typeof window.updateUrlWithCurrentState === "function") {
+      window.updateUrlWithCurrentState();
+    }
     console.timeEnd("[PERF] ⭐ Total Dashboard Data Load");
   });
 }
@@ -174,6 +186,11 @@ async function main() {
     loadDashboardData(),
     syncAiHistoryFromSheet(),
   ]);
+
+  // 4. Khôi phục bộ lọc Brand từ link chia sẻ nếu có
+  if (typeof window.restoreBrandFilterFromURL === "function") {
+    await window.restoreBrandFilterFromURL();
+  }
 
   // Lắng nghe sự kiện Reset All Filters từ Empty Card
   document.addEventListener("click", (e) => {

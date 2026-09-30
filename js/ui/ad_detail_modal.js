@@ -39,7 +39,8 @@ async function handleViewClick(e, type = "ad") {
   const impressions = itemObj ? itemObj.impressions : parseFloat(adViewEl.dataset.impressions || 0);
   const goal = itemObj ? itemObj.optimization_goal : (adViewEl.dataset.goal || "");
   const name = itemObj ? (itemObj.name || itemObj.ad_name) : (adViewEl.dataset.name || "");
-  const result = itemObj ? itemObj.result : parseFloat(adViewEl.dataset.result || 0);
+  let result = itemObj ? (itemObj.result || getResults(itemObj, goal)) : parseFloat(adViewEl.dataset.result || 0);
+  if ((!result || result === 0) && itemObj) result = getResults(itemObj, goal);
   const cpr = itemObj ? getMetricValue(itemObj, "cpr") : parseFloat(adViewEl.dataset.cpr || 0);
 
   // ✅ Luôn reset funnel khi mở ad mới (kể cả khi không có cache)
@@ -541,9 +542,7 @@ async function showAdDetail(ad_id) {
       _spend       += d.spend       || 0;
       _impressions += d.impressions || 0;
       _reach       += d.reach       || 0;
-      _results     += d.actions?.["onsite_conversion.lead_grouped"]
-                   || d.actions?.["onsite_conversion.messaging_conversation_started_7d"]
-                   || 0;
+      _results     += getResults(d, goal) || 0;
     }
     window.campaignSummaryData = {
       spend:       _spend,

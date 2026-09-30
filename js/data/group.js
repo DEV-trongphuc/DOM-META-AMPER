@@ -65,10 +65,22 @@ function groupByCampaign(adsets, campaignsData = []) {
         inline_link_clicks: +as.inline_link_clicks || 0,
         link_clicks: window.safeGetActionValue(as.actions, "link_click") || +as.inline_link_clicks || 0,
         follow: (
-          window.safeGetActionValue(as.actions, "page_like") +
-          window.safeGetActionValue(as.actions, "page_follow") +
-          window.safeGetActionValue(as.actions, "instagram_profile_follow") +
-          window.safeGetActionValue(as.actions, "onsite_conversion.page_like")
+          Math.max(
+            window.safeGetActionValue(as.actions, "page_like"),
+            window.safeGetActionValue(as.actions, "onsite_conversion.page_like"),
+            window.safeGetActionValue(as.actions, "like")
+          ) +
+          Math.max(
+            window.safeGetActionValue(as.actions, "page_follow"),
+            window.safeGetActionValue(as.actions, "onsite_conversion.page_follow"),
+            window.safeGetActionValue(as.actions, "follow"),
+            window.safeGetActionValue(as.actions, "follows"),
+            window.safeGetActionValue(as.actions, "onsite_conversion.follow")
+          ) +
+          Math.max(
+            window.safeGetActionValue(as.actions, "instagram_profile_follow"),
+            window.safeGetActionValue(as.actions, "onsite_conversion.instagram_profile_follow")
+          )
         ),
         purchase_roas: as.purchase_roas || [],
         account_id:    as.account_id   || "",
@@ -109,7 +121,7 @@ function groupByCampaign(adsets, campaignsData = []) {
         status: ad.effective_status?.toUpperCase() || ad.status || "UNKNOWN",
         optimization_goal: ad.optimization_goal || goal || "UNKNOWN",
         spend:              +ins.spend              || 0,
-        result:             getResults(ins)         || 0,
+        result:             getResults(ins, ad.optimization_goal || goal) || 0,
         reach:              +ins.reach              || 0,
         impressions:        +ins.impressions        || 0,
         reactions:          getReaction(ins)        || 0,

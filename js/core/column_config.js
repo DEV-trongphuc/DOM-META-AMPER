@@ -75,7 +75,12 @@ function getMetricValue(item, metricId) {
       }
       // Tên thay thế cho Page Like/Follows
       if (metricId === "follow") {
-        act = actions.find(a => a.action_type === "page_like" || a.action_type === "like" || a.action_type === "onsite_conversion.page_like");
+        act = actions.find(a => [
+          "page_like", "like", "page_follow", "follow", "follows",
+          "instagram_profile_follow", "onsite_conversion.page_like",
+          "onsite_conversion.page_follow", "onsite_conversion.follow",
+          "onsite_conversion.instagram_profile_follow"
+        ].includes(a.action_type));
       }
       // Tên thay thế cho ThruPlay
       if (metricId === "thruplay") {

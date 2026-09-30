@@ -132,28 +132,54 @@ function getResults(item, goal) {
   if (!resultType && goalKey) resultType = GOAL_KEY_RESULT_MAP[goalKey];
   if (!resultType) resultType = resultMapping.DEFAULT;
 
-  if (resultType === "page_like") {
-    const likeTypes = ["page_like", "like", "page_follow", "onsite_conversion.page_like"];
-    console.log("[PageLike Debug] Item:", item, "Actions:", actions);
-    if (Array.isArray(actions)) {
-      let sum = 0;
-      for (let i = 0; i < actions.length; i++) {
-        if (likeTypes.includes(actions[i].action_type)) {
-          sum += +actions[i].value || 0;
-        }
+  if (resultType === "page_like" || goalKey === "Pagelike") {
+    const getVal = (type) => {
+      if (Array.isArray(actions)) {
+        const found = actions.find((a) => a.action_type === type);
+        return found ? +found.value || 0 : 0;
       }
-      console.log("[PageLike Debug] Array Sum:", sum);
-      return sum;
-    } else {
-      let sum = 0;
-      for (const t of likeTypes) {
-        if (actions[t]) {
-          sum += +actions[t] || 0;
-        }
+      return actions && typeof actions === "object" ? +actions[type] || 0 : 0;
+    };
+
+    // Facebook page likes & follows
+    const fbLikes = Math.max(
+      getVal("page_like"),
+      getVal("onsite_conversion.page_like"),
+      getVal("like")
+    );
+    const fbFollows = Math.max(
+      getVal("page_follow"),
+      getVal("onsite_conversion.page_follow"),
+      getVal("follow"),
+      getVal("follows"),
+      getVal("onsite_conversion.follow")
+    );
+    // Instagram profile follows
+    const igFollows = Math.max(
+      getVal("instagram_profile_follow"),
+      getVal("onsite_conversion.instagram_profile_follow")
+    );
+
+    // Đối với FB Page: lấy max giữa like và follow để tránh đếm trùng 1 hành vi trên Trang;
+    // cộng thêm lượt follow Instagram nếu có.
+    const fbTotal = Math.max(fbLikes, fbFollows);
+    let total = fbTotal + igFollows;
+
+    // Fallback: quét các key thay thế nếu total = 0
+    if (total === 0) {
+      const fallbackKeys = [
+        "page_like", "like", "page_follow", "follow", "follows",
+        "instagram_profile_follow", "onsite_conversion.page_like",
+        "onsite_conversion.page_follow", "onsite_conversion.follow",
+        "onsite_conversion.instagram_profile_follow"
+      ];
+      for (const k of fallbackKeys) {
+        const v = getVal(k);
+        if (v > 0) total = Math.max(total, v);
       }
-      console.log("[PageLike Debug] Object Sum:", sum);
-      return sum;
     }
+
+    return total;
   }
 
   if (Array.isArray(actions)) {

@@ -45,7 +45,7 @@ const goalMapping = {
   Engagement:  ["POST_ENGAGEMENT", "THRUPLAY", "EVENT_RESPONSES"],
   Message:     ["REPLIES"],
   Traffic:     ["OFFSITE_CONVERSIONS", "LINK_CLICKS", "PROFILE_VISIT", "LANDING_PAGE_VIEWS"],
-  Pagelike:    ["PAGE_LIKES", "PAGE_LIKE", "LIKE"],
+  Pagelike:    ["PAGE_LIKES", "PAGE_LIKE", "LIKE", "PAGE_FOLLOWS", "PAGE_FOLLOW", "FOLLOWS", "FOLLOW", "PROFILE_FOLLOWS"],
 };
 
 const resultMapping = {
@@ -62,6 +62,10 @@ const resultMapping = {
   PAGE_LIKES:      "page_like",
   PAGE_LIKE:       "page_like",
   LIKE:            "page_like",
+  PAGE_FOLLOWS:    "page_like",
+  PAGE_FOLLOW:     "page_like",
+  FOLLOWS:         "page_like",
+  FOLLOW:          "page_like",
   DEFAULT:         "reach",
 };
 

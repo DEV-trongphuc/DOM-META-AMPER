@@ -82,24 +82,34 @@ function updateBrandDropdownUI() {
     ? ""
     : (CURRENT_CAMPAIGN_FILTER || "").toLowerCase();
 
-  dropdownUl.innerHTML = brands.map((b) => {
+  // Đảm bảo luôn có tùy chọn "Tất cả" nếu danh sách chưa có filter rỗng
+  const hasAllOption = brands.some(b => !b.filter || b.filter.trim() === "");
+  const allBrandsList = hasAllOption ? brands : [
+    { filter: "", name: "Tất cả", img: "./assets/brand_logo/ampersand_img.jpg" },
+    ...brands
+  ];
+
+  dropdownUl.innerHTML = allBrandsList.map((b) => {
     const bFilter  = (b.filter || "").toLowerCase();
     const isActive = bFilter === current;
     return `
     <li data-filter="${b.filter}" class="${isActive ? "active" : ""}">
-      <img src="${b.img}" />
+      <img src="${b.img}" onerror="this.style.display='none'" />
       <span>${b.name}</span>
     </li>`;
   }).join("");
 
-  const selectedBrand = brands.find((b) => (b.filter || "").toLowerCase() === current) || brands[brands.length - 1];
+  const selectedBrand = allBrandsList.find((b) => (b.filter || "").toLowerCase() === current) || allBrandsList[0];
   if (selectedBrand) {
     const parent = dropdownUl.closest(".quick_filter_detail");
     if (parent) {
       const parentImg  = parent.querySelector("img");
       const parentText = parent.querySelector(".dom_selected");
-      if (parentImg)  parentImg.src            = selectedBrand.img;
-      if (parentText) parentText.textContent   = selectedBrand.name;
+      if (parentImg) {
+        parentImg.src = selectedBrand.img || "./assets/brand_logo/ampersand_img.jpg";
+        parentImg.style.display = selectedBrand.img ? "inline-block" : "none";
+      }
+      if (parentText) parentText.textContent = selectedBrand.name;
     }
   }
 }

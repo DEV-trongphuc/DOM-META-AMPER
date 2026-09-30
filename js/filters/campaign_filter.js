@@ -26,6 +26,9 @@ window.getBrandFilteredCampaigns = getBrandFilteredCampaigns;
 
 async function applyCampaignFilter(keyword) {
   CURRENT_CAMPAIGN_FILTER = keyword || "";
+  if (typeof window.updateUrlWithCurrentState === "function") {
+    window.updateUrlWithCurrentState();
+  }
 
   if (typeof updateBrandDropdownUI === "function") updateBrandDropdownUI();
   if (typeof updatePerfBrandDropdownUI === "function") updatePerfBrandDropdownUI();
@@ -163,17 +166,43 @@ function calcTotal(data, key) {
 }
 function calcTotalAction(data, type) {
   if (!data) return 0;
+  const types = Array.isArray(type) ? type : (type === "like" ? [
+    "page_like", "like", "page_follow", "follow", "follows",
+    "instagram_profile_follow", "onsite_conversion.page_like",
+    "onsite_conversion.page_follow", "onsite_conversion.follow",
+    "onsite_conversion.instagram_profile_follow"
+  ] : [type]);
+
   return Object.values(data).reduce(
     (sum, d) => {
       const actionsArr = d.actions;
-      // ⭐ Hỗ trợ 2 format:
-      // 1. Array: [{action_type, value}, ...] — từ adset raw data
-      // 2. Object: {action_type: value, ...} — từ processedByDate trong showAdDetail
       if (Array.isArray(actionsArr)) {
-        const entry = actionsArr.find(a => a.action_type === type);
-        return sum + (entry ? +entry.value || 0 : 0);
+        if (type === "like" || (Array.isArray(type) && type.includes("page_like"))) {
+          const getV = (t) => {
+            const e = actionsArr.find(a => a.action_type === t);
+            return e ? +e.value || 0 : 0;
+          };
+          const fbLikes = Math.max(getV("page_like"), getV("onsite_conversion.page_like"), getV("like"));
+          const fbFollows = Math.max(getV("page_follow"), getV("onsite_conversion.page_follow"), getV("follow"), getV("follows"), getV("onsite_conversion.follow"));
+          const igFollows = Math.max(getV("instagram_profile_follow"), getV("onsite_conversion.instagram_profile_follow"));
+          return sum + Math.max(fbLikes, fbFollows) + igFollows;
+        }
+        for (const t of types) {
+          const entry = actionsArr.find(a => a.action_type === t);
+          if (entry) return sum + (+entry.value || 0);
+        }
+        return sum;
       } else if (actionsArr && typeof actionsArr === "object") {
-        return sum + (+actionsArr[type] || 0);
+        if (type === "like" || (Array.isArray(type) && type.includes("page_like"))) {
+          const getV = (t) => +actionsArr[t] || 0;
+          const fbLikes = Math.max(getV("page_like"), getV("onsite_conversion.page_like"), getV("like"));
+          const fbFollows = Math.max(getV("page_follow"), getV("onsite_conversion.page_follow"), getV("follow"), getV("follows"), getV("onsite_conversion.follow"));
+          const igFollows = Math.max(getV("instagram_profile_follow"), getV("onsite_conversion.instagram_profile_follow"));
+          return sum + Math.max(fbLikes, fbFollows) + igFollows;
+        }
+        for (const t of types) {
+          if (actionsArr[t]) return sum + (+actionsArr[t] || 0);
+        }
       }
       return sum;
     },
@@ -796,6 +825,13 @@ function renderFullActionsDetail(manualTotals, filterQuery = "") {
     "page_like": "Follows",
     "onsite_conversion.page_like": "Follows",
     "instagram_profile_follow": "Follows",
+    "page_follow": "Follows",
+    "follow": "Follows",
+    "follows": "Follows",
+    "like": "Follows",
+    "onsite_conversion.page_follow": "Follows",
+    "onsite_conversion.follow": "Follows",
+    "onsite_conversion.instagram_profile_follow": "Follows",
     "post_reaction": "Reactions/Likes",
     "post_net_like": "Reactions/Likes",
     // Video Metrics
